@@ -1,0 +1,6 @@
+requests>=2.25.1
+python-dotenv>=0.15.0
+
+# Testes
+pytest>=7.0.0
+pytest-mock>=3.6.1

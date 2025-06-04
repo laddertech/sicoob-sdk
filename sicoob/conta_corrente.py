@@ -1,0 +1,108 @@
+from typing import Dict, List, Optional
+import requests
+from .auth import OAuth2Client
+from .api_client import APIClientBase
+
+class ContaCorrenteAPI(APIClientBase):
+    """Classe para operações de conta corrente no Sicoob."""
+
+    def __init__(self, oauth_client: OAuth2Client, session: requests.Session, sandbox_mode: bool = False):
+        """Inicializa a API de conta corrente.
+        
+        Args:
+            oauth_client: Cliente OAuth2 para autenticação
+            session: Sessão HTTP existente
+            sandbox_mode: Se True, usa URL de sandbox (default: False)
+        """
+        super().__init__(oauth_client, session, sandbox_mode)
+        self.base_path = '/conta-corrente/v4'
+
+    def extrato(
+        self,
+        mes: int,
+        ano: int,
+        dia_inicial: int,
+        dia_final: int,
+        numero_conta_corrente: int,
+        agrupar_cnab: bool = False
+    ) -> List[Dict]:
+        """Obtém o extrato da conta corrente por período.
+        
+        Args:
+            mes: Mês do extrato (1-12)
+            ano: Ano do extrato (4 dígitos)
+            dia_inicial: Dia inicial para o extrato (1-31)
+            dia_final: Dia final para o extrato (1-31)
+            numero_conta_corrente: Número da conta corrente (obrigatório)
+            agrupar_cnab: Se deve agrupar movimento proveniente do CNAB (opcional)
+            
+        Returns:
+            Lista de dicts com as transações do período
+            
+        Raises:
+            Exception: Em caso de falha na requisição
+        """
+        try:
+            headers = self._get_headers()
+            headers['client_id'] = str(self.oauth_client.client_id)
+            
+            params = {
+                'diaInicial': dia_inicial,
+                'diaFinal': dia_final,
+                'numeroContaCorrente': numero_conta_corrente,
+                'agruparCNAB': str(agrupar_cnab).lower()
+            }
+            
+            url = f"{self._get_base_url()}{self.base_path}/extrato/{mes}/{ano}"
+            return self.session.get(url, params=params, headers=headers).json()
+        except Exception as e:
+            raise Exception(f"Erro ao consultar extrato: {str(e)}")
+
+    def saldo(self, numero_conta: Optional[str] = None) -> Dict:
+        """Obtém o saldo atual da conta corrente.
+        
+        Args:
+            numero_conta: Número da conta (opcional se já configurado no cliente)
+            
+        Returns:
+            Dict com informações de saldo
+        """
+        params = {}
+        if numero_conta:
+            params['numeroConta'] = numero_conta
+            
+        url = f"{self._get_base_url()}{self.base_path}/saldo"
+        return self.session.get(url, params=params, headers=self._get_headers()).json()
+
+    def transferencia(
+        self,
+        valor: float,
+        conta_destino: str,
+        tipo_transferencia: str = 'TED',
+        descricao: Optional[str] = None,
+        numero_conta: Optional[str] = None
+    ) -> Dict:
+        """Realiza uma transferência entre contas.
+        
+        Args:
+            valor: Valor da transferência
+            conta_destino: Número da conta destino
+            tipo_transferencia: Tipo de transferência (TED/DOC/PIX)
+            descricao: Descrição opcional da transferência
+            numero_conta: Número da conta origem (opcional se já configurado)
+            
+        Returns:
+            Dict com informações da transferência
+        """
+        payload = {
+            'valor': valor,
+            'contaDestino': conta_destino,
+            'tipoTransferencia': tipo_transferencia
+        }
+        if descricao:
+            payload['descricao'] = descricao
+        if numero_conta:
+            payload['numeroConta'] = numero_conta
+            
+        url = f"{self._get_base_url()}{self.base_path}/transferencia"
+        return self.session.post(url, json=payload, headers=self._get_headers()).json()

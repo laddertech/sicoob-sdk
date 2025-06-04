@@ -1,0 +1,45 @@
+import os
+import time
+from dotenv import load_dotenv
+import requests
+
+class OAuth2Client:
+    """Cliente OAuth2 para autenticação com a API Sicoob"""
+    
+    def __init__(self, client_id=None, client_secret=None, certificado=None, chave_privada=None):
+        """Inicializa o cliente OAuth2"""
+        load_dotenv()
+        
+        self.client_id = client_id or os.getenv("SICOOB_CLIENT_ID")
+        self.client_secret = client_secret or os.getenv("SICOOB_CLIENT_SECRET")
+        self.certificado = certificado or os.getenv("SICOOB_CERTIFICADO") 
+        self.chave_privada = chave_privada or os.getenv("SICOOB_CHAVE_PRIVADA")
+        
+        self.token_url = "https://api.sicoob.com.br/token"
+        self.token_info = None
+        self.session = requests.Session()
+        self.session.cert = (self.certificado, self.chave_privada)
+        
+    def get_access_token(self):
+        """Obtém ou renova o token de acesso"""
+        if self.token_info and not self._is_token_expired():
+            return self.token_info['access_token']
+            
+        token_data = {
+            "grant_type": "client_credentials",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret
+        }
+        
+        response = self.session.post(self.token_url, data=token_data)
+        response.raise_for_status()
+        
+        self.token_info = response.json()
+        self.token_info['expires_at'] = time.time() + self.token_info['expires_in']
+        return self.token_info['access_token']
+        
+    def _is_token_expired(self):
+        """Verifica se o token expirou"""
+        if not self.token_info or 'expires_at' not in self.token_info:
+            return True
+        return time.time() >= self.token_info['expires_at'] - 60  # 60s de margem
