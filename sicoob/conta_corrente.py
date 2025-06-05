@@ -43,7 +43,7 @@ class ContaCorrenteAPI(APIClientBase):
             Exception: Em caso de falha na requisição
         """
         try:
-            headers = self._get_headers()
+            headers = self._get_headers(scope="cco_consulta")
             headers['client_id'] = str(self.oauth_client.client_id)
             
             params = {
@@ -72,7 +72,7 @@ class ContaCorrenteAPI(APIClientBase):
             params['numeroConta'] = numero_conta
             
         url = f"{self._get_base_url()}{self.base_path}/saldo"
-        return self.session.get(url, params=params, headers=self._get_headers()).json()
+        return self.session.get(url, params=params, headers=self._get_headers(scope="cco_consulta")).json()
 
     def transferencia(
         self,
@@ -105,4 +105,4 @@ class ContaCorrenteAPI(APIClientBase):
             payload['numeroConta'] = numero_conta
             
         url = f"{self._get_base_url()}{self.base_path}/transferencia"
-        return self.session.post(url, json=payload, headers=self._get_headers()).json()
+        return self.session.post(url, json=payload, headers=self._get_headers(scope="cco_transferencias")).json()

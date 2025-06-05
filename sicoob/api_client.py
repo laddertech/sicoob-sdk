@@ -24,9 +24,9 @@ class APIClientBase:
         """Retorna a URL base conforme modo de operação"""
         return self.SANDBOX_URL if self.sandbox_mode else self.BASE_URL
         
-    def _get_headers(self) -> Dict[str, str]:
+    def _get_headers(self, scope) -> Dict[str, str]:
         """Retorna headers padrão com token de acesso"""
-        token = self.oauth_client.get_access_token()
+        token = self.oauth_client.get_access_token(scope)
         return {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",

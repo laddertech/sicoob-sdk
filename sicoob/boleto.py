@@ -37,7 +37,7 @@ class BoletoAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/cobranca-bancaria/v3/boletos"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="boletos_inclusao")
             response = self.session.post(url, json=dados_boleto, headers=headers)
             response.raise_for_status()
             return response.json()
@@ -57,7 +57,7 @@ class BoletoAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/cobranca-bancaria/v3/boletos/{nosso_numero}"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="boletos_consulta")
             response = self.session.get(url, headers=headers)
             response.raise_for_status()
             return response.json()

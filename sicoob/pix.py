@@ -39,7 +39,7 @@ class PixAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/cob/{txid}"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="cob.write")
             response = self.session.put(url, json=dados_cobranca, headers=headers)
             response.raise_for_status()
             return response.json()
@@ -59,7 +59,7 @@ class PixAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/cob/{txid}"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="cob.read")
             response = self.session.get(url, headers=headers)
             
             if response.status_code == 404:
@@ -86,7 +86,7 @@ class PixAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/cob/{txid}"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="cob.write")
             response = self.session.delete(url, headers=headers)
             
             if response.status_code == 404:
@@ -113,7 +113,7 @@ class PixAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/cob/{txid}/qrcode"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="cob.read")
             response = self.session.get(url, headers=headers)
             response.raise_for_status()
             return response.json()
@@ -137,7 +137,7 @@ class PixAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/cobv/{txid}"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="cobv.write")
             response = self.session.put(url, json=dados_cobranca, headers=headers)
             response.raise_for_status()
             return response.json()
@@ -157,7 +157,7 @@ class PixAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/cobv/{txid}"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="cobv.read")
             response = self.session.get(url, headers=headers)
             
             if response.status_code == 404:
@@ -184,7 +184,7 @@ class PixAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/cobv/{txid}"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="cobv.write")
             response = self.session.delete(url, headers=headers)
             
             if response.status_code == 404:
@@ -211,7 +211,7 @@ class PixAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/cobv/{txid}/qrcode"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="cobv.read")
             response = self.session.get(url, headers=headers)
             response.raise_for_status()
             return response.json()
@@ -235,7 +235,7 @@ class PixAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/webhook/{chave}"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="webhook.write")
             payload = {"webhookUrl": webhook_url}
             response = self.session.put(url, json=payload, headers=headers)
             response.raise_for_status()
@@ -259,7 +259,7 @@ class PixAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/webhook/{chave}"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="webhook.read")
             response = self.session.get(url, headers=headers)
             
             if response.status_code == 404:
@@ -286,7 +286,7 @@ class PixAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/webhook/{chave}"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="webhook.write")
             response = self.session.delete(url, headers=headers)
             
             if response.status_code == 404:
@@ -314,7 +314,7 @@ class PixAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/lotecobv/{id_lote}"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="lotecobv.write")
             payload = {"cobrancas": cobrancas}
             response = self.session.put(url, json=payload, headers=headers)
             response.raise_for_status()
@@ -338,7 +338,7 @@ class PixAPI(APIClientBase):
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/lotecobv/{id_lote}"
-            headers = self._get_headers()
+            headers = self._get_headers(scope="lotecobv.read")
             response = self.session.get(url, headers=headers)
             
             if response.status_code == 404:
