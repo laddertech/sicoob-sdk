@@ -107,6 +107,16 @@ class WebhookPixError(PixError):
         super().__init__(message, code)
 
 
+class WebhookPixNaoEncontradoError(WebhookPixError):
+    """Webhook PIX não encontrado"""
+    def __init__(self, chave: str):
+        super().__init__(
+            f"Webhook PIX para chave {chave} não encontrado",
+            code=404,
+            chave=chave
+        )
+
+
 class LoteCobrancaPixError(PixError):
     """Erro durante operações com lote de cobranças PIX"""
     def __init__(self, message: str, code: int = None, id_lote: str = None):

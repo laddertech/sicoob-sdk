@@ -1,6 +1,10 @@
 import pytest
 from unittest.mock import Mock
 from sicoob.conta_corrente import ContaCorrenteAPI
+from sicoob.exceptions import (
+    ExtratoError,
+    TransferenciaError
+)
 
 @pytest.fixture
 def conta_corrente_client(mock_oauth_client):
@@ -39,7 +43,7 @@ def test_extrato_erro(conta_corrente_client):
     mock_response.json.side_effect = Exception("Erro ao consultar extrato")
     conta_corrente_client.session.get.return_value = mock_response
 
-    with pytest.raises(Exception, match="Erro ao consultar extrato"):
+    with pytest.raises(ExtratoError) as exc_info:
         conta_corrente_client.extrato(
             mes=6,
             ano=2025,
@@ -47,6 +51,7 @@ def test_extrato_erro(conta_corrente_client):
             dia_final=30,
             numero_conta_corrente=12345
         )
+    assert "Erro API" in str(exc_info.value)
 
 def test_saldo_sucesso(conta_corrente_client):
     """Testa a obtenção de saldo com sucesso"""
@@ -128,8 +133,9 @@ def test_transferencia_erro(conta_corrente_client):
     mock_response.json.side_effect = Exception("Erro na transferência")
     conta_corrente_client.session.post.return_value = mock_response
 
-    with pytest.raises(Exception, match="Erro na transferência"):
+    with pytest.raises(TransferenciaError) as exc_info:
         conta_corrente_client.transferencia(
             valor=500.00,
             conta_destino="54321"
         )
+    assert "Erro API" in str(exc_info.value)

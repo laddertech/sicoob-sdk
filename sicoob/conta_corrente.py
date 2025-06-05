@@ -68,18 +68,20 @@ class ContaCorrenteAPI(APIClientBase):
             response = self.session.get(url, params=params, headers=headers)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.RequestException as e:
-            periodo = f"{dia_inicial}/{mes}/{ano} a {dia_final}/{mes}/{ano}"
-            if e.response is not None:
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
                 raise ExtratoError(
-                    f"Falha na consulta de extrato - Status: {e.response.status_code}",
+                    f"Extrato não encontrado - Status: {e.response.status_code}",
                     code=e.response.status_code,
-                    periodo=periodo
+                    periodo=f"{dia_inicial}/{mes}/{ano}"
                 )
             raise ExtratoError(
-                f"Falha na comunicação com API de conta corrente: {str(e)}",
-                periodo=periodo
+                f"Falha ao consultar extrato - Status: {e.response.status_code}",
+                code=e.response.status_code,
+                periodo=f"{dia_inicial}/{mes}/{ano}"
             )
+        except Exception as e:
+            raise ExtratoError(f"Erro ao consultar extrato: {str(e)}")
 
     def saldo(self, numero_conta: Optional[str] = None) -> Dict:
         """Obtém o saldo atual da conta corrente.
@@ -104,17 +106,14 @@ class ContaCorrenteAPI(APIClientBase):
             )
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.RequestException as e:
-            if e.response is not None:
-                raise SaldoError(
-                    f"Falha na consulta de saldo - Status: {e.response.status_code}",
-                    code=e.response.status_code,
-                    conta=numero_conta
-                )
+        except requests.exceptions.HTTPError as e:
             raise SaldoError(
-                f"Falha na comunicação com API de conta corrente: {str(e)}",
+                f"Falha na consulta de saldo - Status: {e.response.status_code}",
+                code=e.response.status_code,
                 conta=numero_conta
             )
+        except Exception as e:
+            raise SaldoError(f"Erro ao consultar saldo: {str(e)}", conta=numero_conta)
 
     def transferencia(
         self,
@@ -156,14 +155,11 @@ class ContaCorrenteAPI(APIClientBase):
             )
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.RequestException as e:
-            if e.response is not None:
-                raise TransferenciaError(
-                    f"Falha na transferência - Status: {e.response.status_code}",
-                    code=e.response.status_code,
-                    dados=payload
-                )
+        except requests.exceptions.HTTPError as e:
             raise TransferenciaError(
-                f"Falha na comunicação com API de conta corrente: {str(e)}",
+                f"Falha na transferência - Status: {e.response.status_code}",
+                code=e.response.status_code,
                 dados=payload
             )
+        except Exception as e:
+            raise TransferenciaError(f"Erro na transferência: {str(e)}", dados=payload)

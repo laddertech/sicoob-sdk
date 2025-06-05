@@ -2,6 +2,11 @@ import pytest
 import requests
 from unittest.mock import Mock
 from sicoob.boleto import BoletoAPI
+from sicoob.exceptions import (
+    BoletoNaoEncontradoError,
+    BoletoConsultaError,
+    BoletoError
+)
 
 @pytest.fixture
 def boleto_client(mock_oauth_client):
@@ -97,9 +102,9 @@ def test_consultar_boleto_nao_encontrado(boleto_client):
     boleto_client.session.get.side_effect = http_error
 
     nosso_numero = "000000000"
-    result = boleto_client.consultar_boleto(nosso_numero)
-
-    assert result is None
+    with pytest.raises(BoletoNaoEncontradoError) as exc_info:
+        boleto_client.consultar_boleto(nosso_numero)
+    assert str(exc_info.value) == "[404] Boleto com nosso número 000000000 não encontrado"
 
 def test_consultar_boleto_erro_http(boleto_client):
     """Testa a consulta de boleto com erro HTTP"""
@@ -113,8 +118,9 @@ def test_consultar_boleto_erro_http(boleto_client):
     nosso_numero = "123456789"
 
     # Verifica se exceção é levantada
-    with pytest.raises(Exception, match="500 Server Error"):
+    with pytest.raises(BoletoConsultaError) as exc_info:
         boleto_client.consultar_boleto(nosso_numero)
+    assert "[500] Falha na consulta do boleto - Status: 500" in str(exc_info.value)
 
 def test_consultar_boleto_erro_generico(boleto_client):
     """Testa a consulta de boleto com erro genérico"""

@@ -1,6 +1,15 @@
 import pytest
 from unittest.mock import Mock
 from sicoob.pix import PixAPI
+from sicoob.exceptions import (
+    CobrancaPixError,
+    CobrancaPixNaoEncontradaError,
+    CobrancaPixVencimentoError,
+    WebhookPixError,
+    WebhookPixNaoEncontradoError,
+    LoteCobrancaPixError,
+    QrCodePixError
+)
 
 @pytest.fixture
 def pix_client(mock_oauth_client):
@@ -49,8 +58,9 @@ def test_consultar_cobranca_pix(pix_client):
     # Testa caso de não encontrado (404)
     mock_response.raise_for_status.side_effect = Exception("404")
     mock_response.status_code = 404
-    result = pix_client.consultar_cobranca_pix(txid)
-    assert result is None
+    with pytest.raises(CobrancaPixNaoEncontradaError) as exc_info:
+        pix_client.consultar_cobranca_pix(txid)
+    assert txid in str(exc_info.value)
 
 def test_cancelar_cobranca_pix(pix_client):
     """Testa o cancelamento de cobrança PIX"""
@@ -67,8 +77,9 @@ def test_cancelar_cobranca_pix(pix_client):
     # Testa caso de não encontrado (404)
     mock_response.raise_for_status.side_effect = Exception("404")
     mock_response.status_code = 404
-    result = pix_client.cancelar_cobranca_pix(txid)
-    assert result is False
+    with pytest.raises(CobrancaPixNaoEncontradaError) as exc_info:
+        pix_client.cancelar_cobranca_pix(txid)
+    assert txid in str(exc_info.value)
 
 def test_obter_qrcode_pix(pix_client):
     """Testa a obtenção do QR Code PIX"""
@@ -118,8 +129,9 @@ def test_consultar_webhook_pix(pix_client):
     # Testa caso de não encontrado (404)
     mock_response.raise_for_status.side_effect = Exception("404")
     mock_response.status_code = 404
-    result = pix_client.consultar_webhook_pix(chave)
-    assert result is None
+    with pytest.raises(WebhookPixNaoEncontradoError) as exc_info:
+        pix_client.consultar_webhook_pix(chave)
+    assert chave in str(exc_info.value)
 
 def test_criar_cobranca_pix_com_vencimento(pix_client):
     """Testa a criação de cobrança PIX com vencimento"""
@@ -157,8 +169,9 @@ def test_consultar_cobranca_pix_com_vencimento(pix_client):
     # Testa caso de não encontrado (404)
     mock_response.raise_for_status.side_effect = Exception("404")
     mock_response.status_code = 404
-    result = pix_client.consultar_cobranca_pix_com_vencimento(txid)
-    assert result is None
+    with pytest.raises(CobrancaPixNaoEncontradaError) as exc_info:
+        pix_client.consultar_cobranca_pix_com_vencimento(txid)
+    assert txid in str(exc_info.value)
 
 def test_cancelar_cobranca_pix_com_vencimento(pix_client):
     """Testa o cancelamento de cobrança PIX com vencimento"""
@@ -174,8 +187,9 @@ def test_cancelar_cobranca_pix_com_vencimento(pix_client):
     # Testa caso de não encontrado (404)
     mock_response.raise_for_status.side_effect = Exception("404")
     mock_response.status_code = 404
-    result = pix_client.cancelar_cobranca_pix_com_vencimento(txid)
-    assert result is False
+    with pytest.raises(CobrancaPixNaoEncontradaError) as exc_info:
+        pix_client.cancelar_cobranca_pix_com_vencimento(txid)
+    assert txid in str(exc_info.value)
 
 def test_obter_qrcode_pix_com_vencimento(pix_client):
     """Testa a obtenção do QR Code de cobrança com vencimento"""
@@ -207,8 +221,9 @@ def test_excluir_webhook_pix(pix_client):
     # Testa caso de não encontrado (404)
     mock_response.raise_for_status.side_effect = Exception("404")
     mock_response.status_code = 404
-    result = pix_client.excluir_webhook_pix(chave)
-    assert result is False
+    with pytest.raises(WebhookPixNaoEncontradoError) as exc_info:
+        pix_client.excluir_webhook_pix(chave)
+    assert chave in str(exc_info.value)
 
 def test_criar_lote_cobranca_pix_com_vencimento(pix_client):
     """Testa a criação de lote de cobranças PIX com vencimento"""
@@ -246,5 +261,6 @@ def test_consultar_lote_cobranca_pix_com_vencimento(pix_client):
     # Testa caso de não encontrado (404)
     mock_response.raise_for_status.side_effect = Exception("404")
     mock_response.status_code = 404
-    result = pix_client.consultar_lote_cobranca_pix_com_vencimento(id_lote)
-    assert result is None
+    with pytest.raises(CobrancaPixNaoEncontradaError) as exc_info:
+        pix_client.consultar_lote_cobranca_pix_com_vencimento(id_lote)
+    assert id_lote in str(exc_info.value)
