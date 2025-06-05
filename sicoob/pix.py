@@ -1,6 +1,14 @@
 from typing import Dict, Optional
 import requests
 from .api_client import APIClientBase
+from .exceptions import (
+    CobrancaPixError,
+    CobrancaPixNaoEncontradaError,
+    CobrancaPixVencimentoError,
+    WebhookPixError,
+    LoteCobrancaPixError,
+    QrCodePixError
+)
 
 
 class PixAPI(APIClientBase):
@@ -36,7 +44,7 @@ class PixAPI(APIClientBase):
             Resposta da API com dados da cobrança PIX criada
 
         Raises:
-            Exception: Em caso de falha na requisição
+            CobrancaPixError: Em caso de falha na criação da cobrança PIX
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/cob/{txid}"
@@ -44,10 +52,17 @@ class PixAPI(APIClientBase):
             response = self.session.put(url, json=dados_cobranca, headers=headers)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.HTTPError as http_err:
-            raise Exception(f"Erro HTTP na criação de cobrança PIX: {http_err}")
-        except Exception as e:
-            raise Exception(f"Erro na criação de cobrança PIX: {str(e)}")
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise CobrancaPixError(
+                    f"Falha na criação de cobrança PIX - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    txid=txid
+                )
+            raise CobrancaPixError(
+                f"Falha na comunicação com API PIX: {str(e)}",
+                txid=txid
+            )
 
     def consultar_cobranca_pix(self, txid: str) -> Optional[Dict]:
         """Consulta uma cobrança PIX existente pelo txid
@@ -64,14 +79,21 @@ class PixAPI(APIClientBase):
             response = self.session.get(url, headers=headers)
 
             if response.status_code == 404:
-                return None
+                raise CobrancaPixNaoEncontradaError(txid)
 
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.HTTPError as http_err:
-            raise Exception(f"Erro HTTP na consulta de cobrança PIX: {http_err}")
-        except Exception as e:
-            raise Exception(f"Erro na consulta de cobrança PIX: {str(e)}")
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise CobrancaPixError(
+                    f"Falha na consulta de cobrança PIX - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    txid=txid
+                )
+            raise CobrancaPixError(
+                f"Falha na comunicação com API PIX: {str(e)}",
+                txid=txid
+            )
 
     def cancelar_cobranca_pix(self, txid: str) -> bool:
         """Cancela uma cobrança PIX existente
@@ -91,14 +113,21 @@ class PixAPI(APIClientBase):
             response = self.session.delete(url, headers=headers)
 
             if response.status_code == 404:
-                return False
+                raise CobrancaPixNaoEncontradaError(txid)
 
             response.raise_for_status()
             return True
-        except requests.exceptions.HTTPError as http_err:
-            raise Exception(f"Erro HTTP no cancelamento de cobrança PIX: {http_err}")
-        except Exception as e:
-            raise Exception(f"Erro no cancelamento de cobrança PIX: {str(e)}")
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise CobrancaPixError(
+                    f"Falha no cancelamento de cobrança PIX - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    txid=txid
+                )
+            raise CobrancaPixError(
+                f"Falha na comunicação com API PIX: {str(e)}",
+                txid=txid
+            )
 
     def obter_qrcode_pix(self, txid: str) -> Dict:
         """Obtém a imagem QR Code de uma cobrança PIX existente
@@ -118,10 +147,17 @@ class PixAPI(APIClientBase):
             response = self.session.get(url, headers=headers)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.HTTPError as http_err:
-            raise Exception(f"Erro HTTP ao obter QR Code: {http_err}")
-        except Exception as e:
-            raise Exception(f"Erro ao obter QR Code: {str(e)}")
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise QrCodePixError(
+                    f"Falha ao obter QR Code - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    txid=txid
+                )
+            raise QrCodePixError(
+                f"Falha na comunicação com API PIX: {str(e)}",
+                txid=txid
+            )
 
     def criar_cobranca_pix_com_vencimento(
         self, txid: str, dados_cobranca: Dict
@@ -136,7 +172,7 @@ class PixAPI(APIClientBase):
             Resposta da API com dados da cobrança PIX criada
 
         Raises:
-            Exception: Em caso de falha na requisição
+            CobrancaPixVencimentoError: Em caso de falha na criação da cobrança PIX com vencimento
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/cobv/{txid}"
@@ -144,12 +180,17 @@ class PixAPI(APIClientBase):
             response = self.session.put(url, json=dados_cobranca, headers=headers)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.HTTPError as http_err:
-            raise Exception(
-                f"Erro HTTP na criação de cobrança PIX com vencimento: {http_err}"
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise CobrancaPixVencimentoError(
+                    f"Falha na criação de cobrança PIX com vencimento - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    txid=txid
+                )
+            raise CobrancaPixVencimentoError(
+                f"Falha na comunicação com API PIX: {str(e)}",
+                txid=txid
             )
-        except Exception as e:
-            raise Exception(f"Erro na criação de cobrança PIX com vencimento: {str(e)}")
 
     def consultar_cobranca_pix_com_vencimento(self, txid: str) -> Optional[Dict]:
         """Consulta uma cobrança PIX com vencimento existente pelo txid
@@ -166,17 +207,20 @@ class PixAPI(APIClientBase):
             response = self.session.get(url, headers=headers)
 
             if response.status_code == 404:
-                return None
+                raise CobrancaPixNaoEncontradaError(txid)
 
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.HTTPError as http_err:
-            raise Exception(
-                f"Erro HTTP na consulta de cobrança PIX com vencimento: {http_err}"
-            )
-        except Exception as e:
-            raise Exception(
-                f"Erro na consulta de cobrança PIX com vencimento: {str(e)}"
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise CobrancaPixVencimentoError(
+                    f"Falha na consulta de cobrança PIX com vencimento - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    txid=txid
+                )
+            raise CobrancaPixVencimentoError(
+                f"Falha na comunicação com API PIX: {str(e)}",
+                txid=txid
             )
 
     def cancelar_cobranca_pix_com_vencimento(self, txid: str) -> bool:
@@ -197,17 +241,20 @@ class PixAPI(APIClientBase):
             response = self.session.delete(url, headers=headers)
 
             if response.status_code == 404:
-                return False
+                raise CobrancaPixNaoEncontradaError(txid)
 
             response.raise_for_status()
             return True
-        except requests.exceptions.HTTPError as http_err:
-            raise Exception(
-                f"Erro HTTP no cancelamento de cobrança PIX com vencimento: {http_err}"
-            )
-        except Exception as e:
-            raise Exception(
-                f"Erro no cancelamento de cobrança PIX com vencimento: {str(e)}"
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise CobrancaPixVencimentoError(
+                    f"Falha no cancelamento de cobrança PIX com vencimento - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    txid=txid
+                )
+            raise CobrancaPixVencimentoError(
+                f"Falha na comunicação com API PIX: {str(e)}",
+                txid=txid
             )
 
     def obter_qrcode_pix_com_vencimento(self, txid: str) -> Dict:
@@ -228,13 +275,16 @@ class PixAPI(APIClientBase):
             response = self.session.get(url, headers=headers)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.HTTPError as http_err:
-            raise Exception(
-                f"Erro HTTP ao obter QR Code de cobrança com vencimento: {http_err}"
-            )
-        except Exception as e:
-            raise Exception(
-                f"Erro ao obter QR Code de cobrança com vencimento: {str(e)}"
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise QrCodePixError(
+                    f"Falha ao obter QR Code de cobrança com vencimento - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    txid=txid
+                )
+            raise QrCodePixError(
+                f"Falha na comunicação com API PIX: {str(e)}",
+                txid=txid
             )
 
     def configurar_webhook_pix(self, chave: str, webhook_url: str) -> Dict:
@@ -248,7 +298,7 @@ class PixAPI(APIClientBase):
             Dicionário com resposta da API
 
         Raises:
-            Exception: Em caso de falha na requisição
+            WebhookPixError: Em caso de falha na configuração do webhook
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/webhook/{chave}"
@@ -257,10 +307,17 @@ class PixAPI(APIClientBase):
             response = self.session.put(url, json=payload, headers=headers)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.HTTPError as http_err:
-            raise Exception(f"Erro HTTP ao configurar webhook PIX: {http_err}")
-        except Exception as e:
-            raise Exception(f"Erro ao configurar webhook PIX: {str(e)}")
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise WebhookPixError(
+                    f"Falha ao configurar webhook PIX - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    chave=chave
+                )
+            raise WebhookPixError(
+                f"Falha na comunicação com API PIX: {str(e)}",
+                chave=chave
+            )
 
     def consultar_webhook_pix(self, chave: str) -> Optional[Dict]:
         """Consulta a configuração de webhook para uma chave PIX
@@ -272,7 +329,7 @@ class PixAPI(APIClientBase):
             Dicionário com configuração do webhook ou None se não encontrado
 
         Raises:
-            Exception: Em caso de falha na requisição
+            WebhookPixError: Em caso de falha na consulta do webhook
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/webhook/{chave}"
@@ -284,10 +341,17 @@ class PixAPI(APIClientBase):
 
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.HTTPError as http_err:
-            raise Exception(f"Erro HTTP ao consultar webhook PIX: {http_err}")
-        except Exception as e:
-            raise Exception(f"Erro ao consultar webhook PIX: {str(e)}")
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise WebhookPixError(
+                    f"Falha ao consultar webhook PIX - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    chave=chave
+                )
+            raise WebhookPixError(
+                f"Falha na comunicação com API PIX: {str(e)}",
+                chave=chave
+            )
 
     def excluir_webhook_pix(self, chave: str) -> bool:
         """Remove a configuração de webhook para uma chave PIX
@@ -299,7 +363,7 @@ class PixAPI(APIClientBase):
             True se removido com sucesso, False caso contrário
 
         Raises:
-            Exception: Em caso de falha na requisição
+            WebhookPixError: Em caso de falha na exclusão do webhook
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/webhook/{chave}"
@@ -311,10 +375,17 @@ class PixAPI(APIClientBase):
 
             response.raise_for_status()
             return True
-        except requests.exceptions.HTTPError as http_err:
-            raise Exception(f"Erro HTTP ao excluir webhook PIX: {http_err}")
-        except Exception as e:
-            raise Exception(f"Erro ao excluir webhook PIX: {str(e)}")
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise WebhookPixError(
+                    f"Falha ao excluir webhook PIX - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    chave=chave
+                )
+            raise WebhookPixError(
+                f"Falha na comunicação com API PIX: {str(e)}",
+                chave=chave
+            )
 
     def criar_lote_cobranca_pix_com_vencimento(
         self, id_lote: str, cobrancas: list
@@ -329,7 +400,7 @@ class PixAPI(APIClientBase):
             Resposta da API com dados do lote criado
 
         Raises:
-            Exception: Em caso de falha na requisição
+            LoteCobrancaPixError: Em caso de falha na criação do lote
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/lotecobv/{id_lote}"
@@ -338,13 +409,16 @@ class PixAPI(APIClientBase):
             response = self.session.put(url, json=payload, headers=headers)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.HTTPError as http_err:
-            raise Exception(
-                f"Erro HTTP na criação de lote de cobranças PIX com vencimento: {http_err}"
-            )
-        except Exception as e:
-            raise Exception(
-                f"Erro na criação de lote de cobranças PIX com vencimento: {str(e)}"
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise LoteCobrancaPixError(
+                    f"Falha na criação de lote de cobranças PIX - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    id_lote=id_lote
+                )
+            raise LoteCobrancaPixError(
+                f"Falha na comunicação com API PIX: {str(e)}",
+                id_lote=id_lote
             )
 
     def consultar_lote_cobranca_pix_com_vencimento(
@@ -359,7 +433,7 @@ class PixAPI(APIClientBase):
             Dados do lote ou None se não encontrado
 
         Raises:
-            Exception: Em caso de falha na requisição
+            LoteCobrancaPixError: Em caso de falha na consulta do lote
         """
         try:
             url = f"{self._get_base_url()}/pix/api/v2/lotecobv/{id_lote}"
@@ -371,11 +445,14 @@ class PixAPI(APIClientBase):
 
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.HTTPError as http_err:
-            raise Exception(
-                f"Erro HTTP na consulta de lote de cobranças PIX com vencimento: {http_err}"
-            )
-        except Exception as e:
-            raise Exception(
-                f"Erro na consulta de lote de cobranças PIX com vencimento: {str(e)}"
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise LoteCobrancaPixError(
+                    f"Falha na consulta de lote de cobranças PIX - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    id_lote=id_lote
+                )
+            raise LoteCobrancaPixError(
+                f"Falha na comunicação com API PIX: {str(e)}",
+                id_lote=id_lote
             )

@@ -1,6 +1,11 @@
 from typing import Dict, Optional
 import requests
 from .api_client import APIClientBase
+from .exceptions import (
+    BoletoEmissaoError,
+    BoletoConsultaError,
+    BoletoNaoEncontradoError
+)
 
 
 class BoletoAPI(APIClientBase):
@@ -44,10 +49,15 @@ class BoletoAPI(APIClientBase):
             return response.json()
         except requests.exceptions.RequestException as e:
             if e.response is not None:
-                raise Exception(
-                    f"Erro HTTP na emissão de boleto: {e.response.status_code}"
+                raise BoletoEmissaoError(
+                    f"Falha na emissão do boleto - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    dados_boleto=dados_boleto
                 )
-            raise Exception(f"Erro na emissão de boleto: {str(e)}")
+            raise BoletoEmissaoError(
+                f"Falha na comunicação com API de boletos: {str(e)}",
+                dados_boleto=dados_boleto
+            )
 
     def consultar_boleto(self, nosso_numero: str) -> Optional[Dict]:
         """Consulta um boleto existente pelo nosso número
@@ -67,6 +77,13 @@ class BoletoAPI(APIClientBase):
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 if e.response.status_code == 404:
-                    return None
-                raise Exception(f"{e.response.status_code} {e}")
-            raise Exception(f"Erro na consulta de boleto: {str(e)}")
+                    raise BoletoNaoEncontradoError(nosso_numero)
+                raise BoletoConsultaError(
+                    f"Falha na consulta do boleto - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    nosso_numero=nosso_numero
+                )
+            raise BoletoConsultaError(
+                f"Falha na comunicação com API de boletos: {str(e)}",
+                nosso_numero=nosso_numero
+            )

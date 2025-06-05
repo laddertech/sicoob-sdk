@@ -2,6 +2,11 @@ from typing import Dict, List, Optional
 import requests
 from .auth import OAuth2Client
 from .api_client import APIClientBase
+from .exceptions import (
+    ExtratoError,
+    SaldoError,
+    TransferenciaError
+)
 
 
 class ContaCorrenteAPI(APIClientBase):
@@ -46,7 +51,7 @@ class ContaCorrenteAPI(APIClientBase):
             Lista de dicts com as transações do período
 
         Raises:
-            Exception: Em caso de falha na requisição
+            ExtratoError: Em caso de falha na requisição de extrato
         """
         try:
             headers = self._get_headers(scope="cco_consulta")
@@ -60,9 +65,21 @@ class ContaCorrenteAPI(APIClientBase):
             }
 
             url = f"{self._get_base_url()}{self.base_path}/extrato/{mes}/{ano}"
-            return self.session.get(url, params=params, headers=headers).json()
-        except Exception as e:
-            raise Exception(f"Erro ao consultar extrato: {str(e)}")
+            response = self.session.get(url, params=params, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            periodo = f"{dia_inicial}/{mes}/{ano} a {dia_final}/{mes}/{ano}"
+            if e.response is not None:
+                raise ExtratoError(
+                    f"Falha na consulta de extrato - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    periodo=periodo
+                )
+            raise ExtratoError(
+                f"Falha na comunicação com API de conta corrente: {str(e)}",
+                periodo=periodo
+            )
 
     def saldo(self, numero_conta: Optional[str] = None) -> Dict:
         """Obtém o saldo atual da conta corrente.
@@ -72,15 +89,32 @@ class ContaCorrenteAPI(APIClientBase):
 
         Returns:
             Dict com informações de saldo
-        """
-        params = {}
-        if numero_conta:
-            params["numeroConta"] = numero_conta
 
-        url = f"{self._get_base_url()}{self.base_path}/saldo"
-        return self.session.get(
-            url, params=params, headers=self._get_headers(scope="cco_consulta")
-        ).json()
+        Raises:
+            SaldoError: Em caso de falha na consulta de saldo
+        """
+        try:
+            params = {}
+            if numero_conta:
+                params["numeroConta"] = numero_conta
+
+            url = f"{self._get_base_url()}{self.base_path}/saldo"
+            response = self.session.get(
+                url, params=params, headers=self._get_headers(scope="cco_consulta")
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise SaldoError(
+                    f"Falha na consulta de saldo - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    conta=numero_conta
+                )
+            raise SaldoError(
+                f"Falha na comunicação com API de conta corrente: {str(e)}",
+                conta=numero_conta
+            )
 
     def transferencia(
         self,
@@ -101,18 +135,35 @@ class ContaCorrenteAPI(APIClientBase):
 
         Returns:
             Dict com informações da transferência
-        """
-        payload = {
-            "valor": valor,
-            "contaDestino": conta_destino,
-            "tipoTransferencia": tipo_transferencia,
-        }
-        if descricao:
-            payload["descricao"] = descricao
-        if numero_conta:
-            payload["numeroConta"] = numero_conta
 
-        url = f"{self._get_base_url()}{self.base_path}/transferencia"
-        return self.session.post(
-            url, json=payload, headers=self._get_headers(scope="cco_transferencias")
-        ).json()
+        Raises:
+            TransferenciaError: Em caso de falha na transferência
+        """
+        try:
+            payload = {
+                "valor": valor,
+                "contaDestino": conta_destino,
+                "tipoTransferencia": tipo_transferencia,
+            }
+            if descricao:
+                payload["descricao"] = descricao
+            if numero_conta:
+                payload["numeroConta"] = numero_conta
+
+            url = f"{self._get_base_url()}{self.base_path}/transferencia"
+            response = self.session.post(
+                url, json=payload, headers=self._get_headers(scope="cco_transferencias")
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise TransferenciaError(
+                    f"Falha na transferência - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    dados=payload
+                )
+            raise TransferenciaError(
+                f"Falha na comunicação com API de conta corrente: {str(e)}",
+                dados=payload
+            )
