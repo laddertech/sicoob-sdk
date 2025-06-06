@@ -62,6 +62,19 @@ Operações com boletos bancários.
 
 #### Métodos:
 - `emitir_boleto(dados_boleto)`: Emite novo boleto
+- `emitir_segunda_via(numero_cliente, codigo_modalidade, nosso_numero=None, linha_digitavel=None, codigo_barras=None, gerar_pdf=False, numero_contrato_cobranca=None, client_id=None)`:
+  - Emite segunda via de um boleto existente
+  - Parâmetros:
+    - `numero_cliente` (int): Número do contrato do beneficiário
+    - `codigo_modalidade` (int): Modalidade do boleto (1-8)
+    - `nosso_numero` (int, opcional): Identificador do boleto
+    - `linha_digitavel` (str, opcional): Linha digitável (47 posições)
+    - `codigo_barras` (str, opcional): Código de barras (44 posições)
+    - `gerar_pdf` (bool, opcional): Se True, retorna PDF em base64
+    - `numero_contrato_cobranca` (int, opcional): ID do contrato de cobrança
+    - `client_id` (str, opcional): ClientId para autenticação
+  - Retorna: Dados do boleto ou PDF em base64 se gerar_pdf=True
+  - Exceções: `BoletoEmissaoError` em caso de falha
 - `consultar_boleto(nosso_numero)`: Consulta boleto existente
 - `consultar_boletos_por_pagador(numero_cpf_cnpj, numero_cliente, client_id, codigo_situacao=None, data_inicio=None, data_fim=None)`:
   - Consulta lista de boletos por pagador
@@ -188,6 +201,13 @@ boletos_por_pagador = sicoob.cobranca.boleto.consultar_boletos_por_pagador(
     codigo_situacao=1,  # Em Aberto
     data_inicio="2025-01-01",
     data_fim="2025-06-30"
+)
+
+segunda_via = sicoob.cobranca.boleto.emitir_segunda_via(
+    numero_cliente=123456,
+    codigo_modalidade=1,
+    nosso_numero=987654321,
+    gerar_pdf=True
 )
 
 pix = sicoob.cobranca.pix.criar_cobranca_pix(

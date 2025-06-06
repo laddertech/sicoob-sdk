@@ -2,7 +2,7 @@ import pytest
 import requests
 from unittest.mock import Mock
 from sicoob.boleto import BoletoAPI
-from sicoob.exceptions import BoletoConsultaError, BoletoConsultaPagadorError
+from sicoob.exceptions import BoletoConsultaError, BoletoConsultaPagadorError, BoletoEmissaoError
 
 
 @pytest.fixture
@@ -235,3 +235,119 @@ def test_consultar_boletos_por_pagador_erro_generico(boleto_client):
         )
     assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
     assert exc_info.value.numero_cpf_cnpj == "12345678901"
+
+
+def test_emitir_segunda_via_sucesso(boleto_client):
+    """Testa a emissão de segunda via de boleto com sucesso"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "nossoNumero": "123456789",
+        "linhaDigitavel": "00190000090123456789012345678901234567890000",
+        "pdfBase64": None
+    }
+    boleto_client.session.get.return_value = mock_response
+
+    # Chama o método
+    result = boleto_client.emitir_segunda_via(
+        numero_cliente=123456,
+        codigo_modalidade=1,
+        nosso_numero=987654321
+    )
+
+    # Verificações
+    assert "nossoNumero" in result
+    assert "linhaDigitavel" in result
+    boleto_client.session.get.assert_called_once()
+    args, kwargs = boleto_client.session.get.call_args
+    assert "boletos/segunda-via" in args[0]
+    assert kwargs["params"]["numeroCliente"] == 123456
+    assert kwargs["params"]["codigoModalidade"] == 1
+    assert kwargs["params"]["nossoNumero"] == 987654321
+    assert kwargs["params"]["gerarPdf"] == "false"
+
+
+def test_emitir_segunda_via_com_pdf(boleto_client):
+    """Testa a emissão de segunda via com PDF"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "pdfBase64": "JVBERi0xLjQK..."
+    }
+    boleto_client.session.get.return_value = mock_response
+
+    # Chama o método com gerar_pdf=True
+    result = boleto_client.emitir_segunda_via(
+        numero_cliente=123456,
+        codigo_modalidade=1,
+        linha_digitavel="00190000090123456789012345678901234567890000",
+        gerar_pdf=True
+    )
+
+    # Verificações
+    assert "pdfBase64" in result
+    args, kwargs = boleto_client.session.get.call_args
+    assert kwargs["params"]["linhaDigitavel"] == "00190000090123456789012345678901234567890000"
+    assert kwargs["params"]["gerarPdf"] == "true"
+
+
+def test_emitir_segunda_via_com_codigo_barras(boleto_client):
+    """Testa a emissão de segunda via usando código de barras"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "nossoNumero": "123456789",
+        "linhaDigitavel": "00190000090123456789012345678901234567890000"
+    }
+    boleto_client.session.get.return_value = mock_response
+
+    # Chama o método com código de barras
+    result = boleto_client.emitir_segunda_via(
+        numero_cliente=123456,
+        codigo_modalidade=1,
+        codigo_barras="00190000090123456789012345678901234567890000"
+    )
+
+    # Verificações
+    assert "nossoNumero" in result
+    assert "linhaDigitavel" in result
+    args, kwargs = boleto_client.session.get.call_args
+    assert kwargs["params"]["codigoBarras"] == "00190000090123456789012345678901234567890000"
+    assert "nossoNumero" not in kwargs["params"]
+    assert "linhaDigitavel" not in kwargs["params"]
+
+
+def test_emitir_segunda_via_erro_http(boleto_client):
+    """Testa a emissão de segunda via com erro HTTP"""
+    # Configura o mock para erro HTTP
+    mock_response = Mock()
+    http_error = requests.exceptions.HTTPError("400 Bad Request")
+    http_error.response = mock_response
+    mock_response.status_code = 400
+    boleto_client.session.get.side_effect = http_error
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoEmissaoError) as exc_info:
+        boleto_client.emitir_segunda_via(
+            numero_cliente=123456,
+            codigo_modalidade=1,
+            nosso_numero=987654321
+        )
+    assert "[400] Falha na emissão da segunda via - Status: 400" in str(exc_info.value)
+    assert exc_info.value.code == 400
+
+
+def test_emitir_segunda_via_erro_generico(boleto_client):
+    """Testa a emissão de segunda via com erro genérico"""
+    # Configura o mock para erro genérico
+    boleto_client.session.get.side_effect = requests.exceptions.RequestException(
+        "Erro de conexão"
+    )
+
+    # Verifica se exceção é levantada
+    with pytest.raises(Exception, match="Erro de conexão"):
+        boleto_client.emitir_segunda_via(
+            numero_cliente=123456,
+            codigo_modalidade=1,
+            nosso_numero=987654321
+        )

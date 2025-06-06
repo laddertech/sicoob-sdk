@@ -117,6 +117,78 @@ class BoletoAPI(APIClientBase):
                 numero_cpf_cnpj=numero_cpf_cnpj,
             ) from e
 
+    def emitir_segunda_via(
+        self,
+        numero_cliente: int,
+        codigo_modalidade: int,
+        nosso_numero: Optional[int] = None,
+        linha_digitavel: Optional[str] = None,
+        codigo_barras: Optional[str] = None,
+        gerar_pdf: bool = False,
+        numero_contrato_cobranca: Optional[int] = None,
+        client_id: Optional[str] = None,
+    ) -> Dict:
+        """Emite segunda via de um boleto existente
+
+        Args:
+            numero_cliente: Número que identifica o contrato do beneficiário no Sisbr
+            codigo_modalidade: Identifica a modalidade do boleto (1-8)
+            nosso_numero: Número identificador do boleto no Sisbr (opcional)
+            linha_digitavel: Linha digitável do boleto com 47 posições (opcional)
+            codigo_barras: Código de barras do boleto com 44 posições (opcional)
+            gerar_pdf: Se True, retorna PDF em base64 (default: False)
+            numero_contrato_cobranca: ID do contrato de cobrança (opcional)
+            client_id: ClientId utilizado na utilização do TOKEN (opcional)
+
+        Returns:
+            Dados do boleto ou PDF em base64 se gerar_pdf=True
+
+        Raises:
+            ValueError: Se nenhum identificador de boleto for fornecido
+            BoletoEmissaoError: Em caso de falha na requisição
+        """
+        try:
+            params = {
+                "numeroCliente": numero_cliente,
+                "codigoModalidade": codigo_modalidade,
+                "gerarPdf": "true" if gerar_pdf else "false"
+            }
+
+            if nosso_numero:
+                params["nossoNumero"] = nosso_numero
+            elif linha_digitavel:
+                params["linhaDigitavel"] = linha_digitavel
+            elif codigo_barras:
+                params["codigoBarras"] = codigo_barras
+            else:
+                raise ValueError(
+                    "Deve ser fornecido pelo menos um identificador de boleto "
+                    "(nossoNumero, linhaDigitavel ou codigoBarras)"
+                )
+
+            if numero_contrato_cobranca:
+                params["numeroContratoCobranca"] = numero_contrato_cobranca
+
+            url = f"{self._get_base_url()}/cobranca-bancaria/v3/boletos/segunda-via"
+            headers = self._get_headers(scope="boletos_inclusao")
+            if client_id:
+                headers["client_id"] = client_id
+
+            response = self.session.get(url, params=params, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise BoletoEmissaoError(
+                    f"Falha na emissão da segunda via - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    dados_boleto=params,
+                ) from e
+            raise BoletoEmissaoError(
+                f"Falha na comunicação com API de boletos: {str(e)}",
+                dados_boleto=params,
+            ) from e
+
     def consultar_boleto(
         self,
         numero_cliente: int,
