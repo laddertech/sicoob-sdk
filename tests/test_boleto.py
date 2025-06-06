@@ -9,7 +9,8 @@ from sicoob.exceptions import (
     BoletoEmissaoError,
     BoletoAlteracaoError,
     BoletoBaixaError,
-    BoletoAlteracaoPagadorError
+    BoletoAlteracaoPagadorError,
+    BoletoWebhookError
 )
 
 
@@ -1092,3 +1093,173 @@ def test_alterar_pagador_erro_comunicacao(boleto_client):
     assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
     assert exc_info.value.numero_cpf_cnpj == "12345678901"
     assert exc_info.value.dados_pagador == pagador
+
+
+def test_cadastrar_webhook_sucesso(boleto_client):
+    """Testa o cadastro de webhook com sucesso (status 201)"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.status_code = 201
+    mock_response.json.return_value = {
+        "url": "https://webhook.example.com/notificacoes",
+        "codigoTipoMovimento": 7,
+        "codigoPeriodoMovimento": 1
+    }
+    boleto_client.session.post.return_value = mock_response
+
+    # Dados de teste
+    webhook = {
+        "url": "https://webhook.example.com/notificacoes",
+        "codigoTipoMovimento": 7,
+        "codigoPeriodoMovimento": 1,
+        "email": "notificacoes@empresa.com"
+    }
+    client_id = "client-id-123"
+
+    # Chama o método
+    result = boleto_client.cadastrar_webhook(
+        webhook=webhook,
+        client_id=client_id
+    )
+
+    # Verificações
+    assert result["url"] == webhook["url"]
+    assert result["codigoTipoMovimento"] == webhook["codigoTipoMovimento"]
+    boleto_client.session.post.assert_called_once()
+    args, kwargs = boleto_client.session.post.call_args
+    assert "webhooks" in args[0]
+    assert kwargs["json"] == webhook
+    assert kwargs["headers"]["client_id"] == client_id
+
+
+def test_cadastrar_webhook_erro_negocio(boleto_client):
+    """Testa erro de negócio (400) no cadastro de webhook"""
+    # Configura o mock para erro 400
+    mock_response = Mock()
+    mock_response.status_code = 400
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "URL de webhook inválida",
+            "codigo": "ERR001"
+        }]
+    }
+    boleto_client.session.post.return_value = mock_response
+
+    # Dados de teste
+    webhook = {
+        "url": "url-invalida",
+        "codigoTipoMovimento": 7,
+        "codigoPeriodoMovimento": 1
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.cadastrar_webhook(
+            webhook=webhook,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[400] Falha no cadastro do webhook: URL de webhook inválida" in str(exc_info.value)
+    assert exc_info.value.code == 400
+    assert exc_info.value.url == "url-invalida"
+    assert exc_info.value.dados_webhook == webhook
+
+
+def test_cadastrar_webhook_erro_dados_inconsistentes(boleto_client):
+    """Testa erro de dados inconsistentes (406) no cadastro de webhook"""
+    # Configura o mock para erro 406
+    mock_response = Mock()
+    mock_response.status_code = 406
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Tipo de movimento inválido",
+            "codigo": "ERR002"
+        }]
+    }
+    boleto_client.session.post.return_value = mock_response
+
+    # Dados de teste
+    webhook = {
+        "url": "https://webhook.example.com/notificacoes",
+        "codigoTipoMovimento": 99,  # Inválido
+        "codigoPeriodoMovimento": 1
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.cadastrar_webhook(
+            webhook=webhook,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[406] Falha no cadastro do webhook: Tipo de movimento inválido" in str(exc_info.value)
+    assert exc_info.value.code == 406
+    assert exc_info.value.url == webhook["url"]
+    assert exc_info.value.dados_webhook == webhook
+
+
+def test_cadastrar_webhook_erro_interno(boleto_client):
+    """Testa erro interno (500) no cadastro de webhook"""
+    # Configura o mock para erro 500
+    mock_response = Mock()
+    mock_response.status_code = 500
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Erro interno no servidor",
+            "codigo": "ERR500"
+        }]
+    }
+    boleto_client.session.post.return_value = mock_response
+
+    # Dados de teste
+    webhook = {
+        "url": "https://webhook.example.com/notificacoes",
+        "codigoTipoMovimento": 7,
+        "codigoPeriodoMovimento": 1
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.cadastrar_webhook(
+            webhook=webhook,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[500] Falha no cadastro do webhook: Erro interno no servidor" in str(exc_info.value)
+    assert exc_info.value.code == 500
+    assert exc_info.value.url == webhook["url"]
+    assert exc_info.value.dados_webhook == webhook
+
+
+def test_cadastrar_webhook_erro_comunicacao(boleto_client):
+    """Testa erro de comunicação no cadastro de webhook"""
+    # Configura o mock para erro de comunicação
+    boleto_client.session.post.side_effect = requests.exceptions.RequestException(
+        "Erro de conexão"
+    )
+
+    # Dados de teste
+    webhook = {
+        "url": "https://webhook.example.com/notificacoes",
+        "codigoTipoMovimento": 7,
+        "codigoPeriodoMovimento": 1
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.cadastrar_webhook(
+            webhook=webhook,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
+    assert exc_info.value.url == webhook["url"]
+    assert exc_info.value.dados_webhook == webhook

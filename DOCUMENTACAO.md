@@ -191,6 +191,32 @@ Operações com boletos bancários.
     )
     ```
 
+- `cadastrar_webhook(webhook, client_id)`:
+  - Cadastra um webhook para receber notificações de acordo com o tipo de movimento
+  - Parâmetros:
+    - `webhook` (dict): Dicionário com os dados do webhook contendo:
+      - `url` (str): URL do webhook (obrigatório)
+      - `codigoTipoMovimento` (int): Código do tipo de movimento (obrigatório)
+        - 7: Pagamento (Baixa operacional)
+      - `codigoPeriodoMovimento` (int): Código do período de movimento (obrigatório)
+        - 1: Movimento atual (D0)
+      - `email` (str, opcional): Email do associado
+    - `client_id` (str): ClientId para autenticação
+  - Retorna: Resposta da API com confirmação do cadastro (status 201)
+  - Exceções: `BoletoWebhookError` em caso de falha (status 400, 406, 500)
+  - Exemplo:
+    ```python
+    sicoob.cobranca.boleto.cadastrar_webhook(
+        webhook={
+            "url": "https://webhook.example.com/notificacoes",
+            "codigoTipoMovimento": 7,
+            "codigoPeriodoMovimento": 1,
+            "email": "notificacoes@empresa.com"
+        },
+        client_id="client-id-123"
+    )
+    ```
+
 ### API de PIX
 **Arquivo:** `sicoob/pix.py`
 

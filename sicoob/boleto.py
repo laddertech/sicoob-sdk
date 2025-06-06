@@ -10,6 +10,7 @@ from .exceptions import (
     BoletoConsultaError,
     BoletoConsultaPagadorError,
     BoletoConsultaFaixaError,
+    BoletoWebhookError,
 )
 
 
@@ -529,4 +530,72 @@ class BoletoAPI(APIClientBase):
                 f"Falha na comunicação com API de boletos: {str(e)}",
                 numero_cpf_cnpj=pagador.get("numeroCpfCnpj"),
                 dados_pagador=pagador
+            ) from e
+
+
+    def cadastrar_webhook(
+        self,
+        webhook: Dict,
+        client_id: str,
+    ) -> Dict:
+        """Cadastra um webhook para receber notificações de acordo com o tipo de movimento
+
+        Args:
+            webhook: Dicionário com os dados do webhook contendo:
+                - url: URL do webhook (obrigatório)
+                - codigoTipoMovimento: Código do tipo de movimento (obrigatório)
+                - codigoPeriodoMovimento: Código do período de movimento (obrigatório)
+                - email: Email do associado (opcional)
+            client_id: ClientId utilizado na utilização do TOKEN
+
+        Returns:
+            Resposta da API com confirmação do cadastro (status 201)
+
+        Raises:
+            BoletoWebhookError: Em caso de falha na requisição com status 400, 406 ou 500
+        """
+        try:
+            # Valida parâmetros obrigatórios
+            if not all(key in webhook for key in ["url", "codigoTipoMovimento", "codigoPeriodoMovimento"]):
+                raise ValueError("Parâmetros obrigatórios do webhook não informados")
+
+            url = f"{self._get_base_url()}/cobranca-bancaria/v3/webhooks"
+            headers = self._get_headers(scope="boletos_webhook")
+            headers["client_id"] = client_id
+
+            response = self.session.post(url, json=webhook, headers=headers)
+
+            # Trata erros específicos com códigos 400, 406, 500
+            if response.status_code in (400, 406, 500):
+                error_data = response.json()
+                error_msg = error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')
+                raise BoletoWebhookError(
+                    f"Falha no cadastro do webhook: {error_msg}",
+                    code=response.status_code,
+                    url=webhook.get("url"),
+                    dados_webhook=webhook
+                )
+
+            # Verifica se o status é 201 (Created)
+            if response.status_code != 201:
+                raise BoletoWebhookError(
+                    f"Resposta inesperada da API: {response.status_code}",
+                    code=response.status_code,
+                    url=webhook.get("url"),
+                    dados_webhook=webhook
+                )
+
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise BoletoWebhookError(
+                    f"Falha no cadastro do webhook - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    url=webhook.get("url"),
+                    dados_webhook=webhook
+                ) from e
+            raise BoletoWebhookError(
+                f"Falha na comunicação com API de boletos: {str(e)}",
+                url=webhook.get("url"),
+                dados_webhook=webhook
             ) from e

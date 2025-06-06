@@ -78,6 +78,14 @@ class BoletoAlteracaoPagadorError(BoletoError):
         super().__init__(message, code)
 
 
+class BoletoWebhookError(BoletoError):
+    """Erro durante operações de webhook de boleto"""
+    def __init__(self, message: str, code: int = None, url: str = None, dados_webhook: dict = None):
+        self.url = url
+        self.dados_webhook = dados_webhook
+        super().__init__(message, code)
+
+
 class ContaCorrenteError(SicoobError):
     """Classe base para erros relacionados a conta corrente"""
     pass
