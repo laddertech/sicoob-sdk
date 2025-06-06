@@ -8,7 +8,8 @@ from sicoob.exceptions import (
     BoletoConsultaPagadorError,
     BoletoEmissaoError,
     BoletoAlteracaoError,
-    BoletoBaixaError
+    BoletoBaixaError,
+    BoletoAlteracaoPagadorError
 )
 
 
@@ -921,3 +922,173 @@ def test_baixar_boleto_erro_comunicacao(boleto_client):
     assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
     assert exc_info.value.nosso_numero == nosso_numero
     assert exc_info.value.dados_boleto == dados_boleto
+
+
+def test_alterar_pagador_sucesso(boleto_client):
+    """Testa a alteração de pagador com sucesso (status 204)"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.status_code = 204
+    boleto_client.session.put.return_value = mock_response
+
+    # Dados de teste
+    pagador = {
+        "numeroCliente": 5224,
+        "numeroCpfCnpj": "12345678901",
+        "nome": "Fulano de Tal",
+        "endereco": "Rua Teste, 123",
+        "bairro": "Centro",
+        "cidade": "São Paulo",
+        "cep": "01001000",
+        "uf": "SP",
+        "email": "fulano@teste.com"
+    }
+    client_id = "client-id-123"
+
+    # Chama o método
+    result = boleto_client.alterar_pagador(
+        pagador=pagador,
+        client_id=client_id
+    )
+
+    # Verificações
+    assert result is None  # Método deve retornar None em caso de sucesso
+    boleto_client.session.put.assert_called_once()
+    args, kwargs = boleto_client.session.put.call_args
+    assert "pagadores" in args[0]
+    assert kwargs["json"] == pagador
+    assert kwargs["headers"]["client_id"] == client_id
+
+
+def test_alterar_pagador_erro_negocio(boleto_client):
+    """Testa erro de negócio (400) na alteração de pagador"""
+    # Configura o mock para erro 400
+    mock_response = Mock()
+    mock_response.status_code = 400
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Pagador não encontrado",
+            "codigo": "ERR001"
+        }]
+    }
+    boleto_client.session.put.return_value = mock_response
+
+    # Dados de teste
+    pagador = {
+        "numeroCliente": 5224,
+        "numeroCpfCnpj": "12345678901",
+        "nome": "Fulano de Tal"
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoAlteracaoPagadorError) as exc_info:
+        boleto_client.alterar_pagador(
+            pagador=pagador,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[400] Falha na alteração do pagador: Pagador não encontrado" in str(exc_info.value)
+    assert exc_info.value.code == 400
+    assert exc_info.value.numero_cpf_cnpj == "12345678901"
+    assert exc_info.value.dados_pagador == pagador
+
+
+def test_alterar_pagador_erro_dados_inconsistentes(boleto_client):
+    """Testa erro de dados inconsistentes (406) na alteração de pagador"""
+    # Configura o mock para erro 406
+    mock_response = Mock()
+    mock_response.status_code = 406
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Dados inconsistentes",
+            "codigo": "ERR002"
+        }]
+    }
+    boleto_client.session.put.return_value = mock_response
+
+    # Dados de teste
+    pagador = {
+        "numeroCliente": 5224,
+        "numeroCpfCnpj": "12345678901",
+        "nome": "Fulano de Tal",
+        "email": "email-invalido"
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoAlteracaoPagadorError) as exc_info:
+        boleto_client.alterar_pagador(
+            pagador=pagador,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[406] Falha na alteração do pagador: Dados inconsistentes" in str(exc_info.value)
+    assert exc_info.value.code == 406
+    assert exc_info.value.numero_cpf_cnpj == "12345678901"
+    assert exc_info.value.dados_pagador == pagador
+
+
+def test_alterar_pagador_erro_interno(boleto_client):
+    """Testa erro interno (500) na alteração de pagador"""
+    # Configura o mock para erro 500
+    mock_response = Mock()
+    mock_response.status_code = 500
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Erro interno no servidor",
+            "codigo": "ERR500"
+        }]
+    }
+    boleto_client.session.put.return_value = mock_response
+
+    # Dados de teste
+    pagador = {
+        "numeroCliente": 5224,
+        "numeroCpfCnpj": "12345678901",
+        "nome": "Fulano de Tal"
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoAlteracaoPagadorError) as exc_info:
+        boleto_client.alterar_pagador(
+            pagador=pagador,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[500] Falha na alteração do pagador: Erro interno no servidor" in str(exc_info.value)
+    assert exc_info.value.code == 500
+    assert exc_info.value.numero_cpf_cnpj == "12345678901"
+    assert exc_info.value.dados_pagador == pagador
+
+
+def test_alterar_pagador_erro_comunicacao(boleto_client):
+    """Testa erro de comunicação na alteração de pagador"""
+    # Configura o mock para erro de comunicação
+    boleto_client.session.put.side_effect = requests.exceptions.RequestException(
+        "Erro de conexão"
+    )
+
+    # Dados de teste
+    pagador = {
+        "numeroCliente": 5224,
+        "numeroCpfCnpj": "12345678901",
+        "nome": "Fulano de Tal"
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoAlteracaoPagadorError) as exc_info:
+        boleto_client.alterar_pagador(
+            pagador=pagador,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
+    assert exc_info.value.numero_cpf_cnpj == "12345678901"
+    assert exc_info.value.dados_pagador == pagador

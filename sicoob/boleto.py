@@ -4,6 +4,7 @@ import requests
 from .api_client import APIClientBase
 from .exceptions import (
     BoletoAlteracaoError,
+    BoletoAlteracaoPagadorError,
     BoletoBaixaError,
     BoletoEmissaoError,
     BoletoConsultaError,
@@ -462,4 +463,70 @@ class BoletoAPI(APIClientBase):
                 f"Falha na comunicação com API de boletos: {str(e)}",
                 nosso_numero=str(nosso_numero),
                 dados_alteracao=dados_alteracao
+            ) from e
+
+    def alterar_pagador(
+        self,
+        pagador: Dict,
+        client_id: str,
+    ) -> None:
+        """Altera informações do cadastro do pagador
+
+        Args:
+            pagador: Dicionário com os dados do pagador contendo:
+                - numeroCliente: Número do cliente
+                - numeroCpfCnpj: CPF/CNPJ do pagador
+                - nome: Nome do pagador
+                - endereco: Endereço completo
+                - bairro: Bairro
+                - cidade: Cidade
+                - cep: CEP
+                - uf: UF (sigla do estado)
+                - email: Email do pagador
+            client_id: ClientId utilizado na utilização do TOKEN
+
+        Returns:
+            None em caso de sucesso (status 204)
+
+        Raises:
+            BoletoAlteracaoPagadorError: Em caso de falha na requisição com status 400, 406 ou 500
+        """
+        try:
+            url = f"{self._get_base_url()}/cobranca-bancaria/v3/pagadores"
+            headers = self._get_headers(scope="boletos_alteracao")
+            headers["client_id"] = client_id
+
+            response = self.session.put(url, json=pagador, headers=headers)
+
+            # Trata erros específicos com códigos 400, 406, 500
+            if response.status_code in (400, 406, 500):
+                error_data = response.json()
+                raise BoletoAlteracaoPagadorError(
+                    f"Falha na alteração do pagador: {error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')}",
+                    code=response.status_code,
+                    numero_cpf_cnpj=pagador.get("numeroCpfCnpj"),
+                    dados_pagador=pagador
+                )
+
+            # Verifica se o status é 204 (No Content)
+            if response.status_code != 204:
+                raise BoletoAlteracaoPagadorError(
+                    f"Resposta inesperada da API: {response.status_code}",
+                    code=response.status_code,
+                    numero_cpf_cnpj=pagador.get("numeroCpfCnpj"),
+                    dados_pagador=pagador
+                )
+
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise BoletoAlteracaoPagadorError(
+                    f"Falha na alteração do pagador - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    numero_cpf_cnpj=pagador.get("numeroCpfCnpj"),
+                    dados_pagador=pagador
+                ) from e
+            raise BoletoAlteracaoPagadorError(
+                f"Falha na comunicação com API de boletos: {str(e)}",
+                numero_cpf_cnpj=pagador.get("numeroCpfCnpj"),
+                dados_pagador=pagador
             ) from e

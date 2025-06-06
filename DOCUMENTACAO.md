@@ -135,6 +135,40 @@ Operações com boletos bancários.
     )
     ```
 
+- `alterar_pagador(pagador, client_id)`:
+  - Altera informações do cadastro do pagador
+  - Parâmetros:
+    - `pagador` (dict): Dicionário com os dados do pagador contendo:
+      - `numeroCliente` (int): Número do cliente
+      - `numeroCpfCnpj` (str): CPF/CNPJ do pagador
+      - `nome` (str): Nome do pagador
+      - `endereco` (str): Endereço completo
+      - `bairro` (str): Bairro
+      - `cidade` (str): Cidade
+      - `cep` (str): CEP
+      - `uf` (str): UF (sigla do estado)
+      - `email` (str): Email do pagador
+    - `client_id` (str): ClientId para autenticação
+  - Retorna: None em caso de sucesso (status 204)
+  - Exceções: `BoletoAlteracaoPagadorError` em caso de falha (status 400, 406, 500)
+  - Exemplo:
+    ```python
+    sicoob.cobranca.boleto.alterar_pagador(
+        pagador={
+            "numeroCliente": 5224,
+            "numeroCpfCnpj": "12345678901",
+            "nome": "Fulano de Tal",
+            "endereco": "Rua Teste, 123",
+            "bairro": "Centro",
+            "cidade": "São Paulo",
+            "cep": "01001000",
+            "uf": "SP",
+            "email": "fulano@teste.com"
+        },
+        client_id="client-id-123"
+    )
+    ```
+
 - `baixar_boleto(nosso_numero, dados_boleto, client_id)`:
   - Comanda a baixa de um boleto existente
   - Parâmetros:

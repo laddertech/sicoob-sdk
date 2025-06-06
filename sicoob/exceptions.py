@@ -70,6 +70,14 @@ class BoletoAlteracaoError(BoletoError):
         super().__init__(message, code)
 
 
+class BoletoAlteracaoPagadorError(BoletoError):
+    """Erro durante a alteração de dados do pagador"""
+    def __init__(self, message: str, code: int = None, numero_cpf_cnpj: str = None, dados_pagador: dict = None):
+        self.numero_cpf_cnpj = numero_cpf_cnpj
+        self.dados_pagador = dados_pagador
+        super().__init__(message, code)
+
+
 class ContaCorrenteError(SicoobError):
     """Classe base para erros relacionados a conta corrente"""
     pass
