@@ -54,6 +54,14 @@ class BoletoNaoEncontradoError(BoletoConsultaError):
         )
 
 
+class BoletoAlteracaoError(BoletoError):
+    """Erro durante a alteração de boleto"""
+    def __init__(self, message: str, code: int = None, nosso_numero: str = None, dados_alteracao: dict = None):
+        self.nosso_numero = nosso_numero
+        self.dados_alteracao = dados_alteracao
+        super().__init__(message, code)
+
+
 class ContaCorrenteError(SicoobError):
     """Classe base para erros relacionados a conta corrente"""
     pass

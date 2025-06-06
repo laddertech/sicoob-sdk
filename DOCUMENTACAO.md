@@ -111,6 +111,30 @@ Operações com boletos bancários.
     )
     ```
 
+- `alterar_boleto(nosso_numero, dados_alteracao, client_id)`:
+  - Altera dados de um boleto existente
+  - Parâmetros:
+    - `nosso_numero` (int): Número identificador do boleto no Sisbr
+    - `dados_alteracao` (dict): Dicionário com os dados a serem alterados (apenas um objeto por requisição)
+      - Objetos suportados: `seuNumero`, `desconto`, `abatimento`, `multa`, `jurosMora`, `rateioCredito`, `pix`, `prorrogacaoVencimento`, `prorrogacaoLimitePagamento`
+    - `client_id` (str): ClientId para autenticação
+  - Retorna: None em caso de sucesso (status 204)
+  - Exceções: `BoletoAlteracaoError` em caso de falha (status 400, 406, 500)
+  - Exemplo:
+    ```python
+    sicoob.cobranca.boleto.alterar_boleto(
+        nosso_numero=123456789,
+        dados_alteracao={
+            "desconto": {
+                "tipoDesconto": 1,
+                "dataPrimeiroDesconto": "2025-06-10",
+                "valorPrimeiroDesconto": 10.50
+            }
+        },
+        client_id="client-id-123"
+    )
+    ```
+
 ### API de PIX
 **Arquivo:** `sicoob/pix.py`
 
