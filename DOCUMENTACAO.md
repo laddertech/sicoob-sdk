@@ -88,6 +88,29 @@ Operações com boletos bancários.
   - Retorna: Lista de boletos encontrados
   - Exceções: `BoletoConsultaPagadorError` em caso de falha
 
+- `consultar_faixas_nosso_numero(numero_cliente, codigo_modalidade, quantidade, client_id, numero_contrato_cobranca=None)`:
+  - Consulta faixas de nosso número disponíveis
+  - Parâmetros:
+    - `numero_cliente` (int): Número do contrato do beneficiário
+    - `codigo_modalidade` (int): Modalidade do boleto (1-Simples, 3-Caucionada, 4-Vinculada, 8-Conta Capital)
+    - `quantidade` (int): Quantidade mínima de números disponíveis requeridos
+    - `client_id` (str): ClientId para autenticação
+    - `numero_contrato_cobranca` (int, opcional): ID do contrato de cobrança
+  - Retorna: Dicionário com:
+    - `numeroInicial`: Número inicial da faixa
+    - `numeroFinal`: Número final da faixa
+    - `validaDigitoVerificadorNossoNumero`: Indica se deve calcular DV (0-não, 1-sim)
+  - Exceções: `BoletoConsultaFaixaError` em caso de falha
+  - Exemplo:
+    ```python
+    faixas = sicoob.cobranca.boleto.consultar_faixas_nosso_numero(
+        numero_cliente=123456,
+        codigo_modalidade=1,
+        quantidade=100,
+        client_id="client-id-123"
+    )
+    ```
+
 ### API de PIX
 **Arquivo:** `sicoob/pix.py`
 

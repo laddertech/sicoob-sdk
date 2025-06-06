@@ -2,7 +2,7 @@ import pytest
 import requests
 from unittest.mock import Mock
 from sicoob.boleto import BoletoAPI
-from sicoob.exceptions import BoletoConsultaError, BoletoConsultaPagadorError, BoletoEmissaoError
+from sicoob.exceptions import BoletoConsultaError, BoletoConsultaFaixaError, BoletoConsultaPagadorError, BoletoEmissaoError
 
 
 @pytest.fixture
@@ -351,3 +351,218 @@ def test_emitir_segunda_via_erro_generico(boleto_client):
             codigo_modalidade=1,
             nosso_numero=987654321
         )
+
+
+def test_consultar_faixas_nosso_numero_sucesso(boleto_client):
+    """Testa a consulta de faixas de nosso número com sucesso"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "resultado": [{
+            "numeroInicial": 1000,
+            "numeroFinal": 1100,
+            "validaDigitoVerificadorNossoNumero": 0,
+            "numeroCliente": 123456,
+            "codigoModalidade": 1,
+            "quantidade": 100,
+            "numeroContratoCobranca": 789
+        }]
+    }
+    mock_response.status_code = 200
+    boleto_client.session.get.return_value = mock_response
+
+    # Chama o método com todos os parâmetros
+    result = boleto_client.consultar_faixas_nosso_numero(
+        numero_cliente=123456,
+        codigo_modalidade=1,
+        quantidade=100,
+        client_id="client-id-123",
+        numero_contrato_cobranca=789
+    )
+
+    # Verificações
+    assert result["numeroInicial"] == 1000
+    assert result["numeroFinal"] == 1100
+    assert result["validaDigitoVerificadorNossoNumero"] == 0
+    boleto_client.session.get.assert_called_once()
+    args, kwargs = boleto_client.session.get.call_args
+    assert "boletos/faixas-nosso-numero" in args[0]
+    assert kwargs["params"]["numeroCliente"] == 123456
+    assert kwargs["params"]["codigoModalidade"] == 1
+    assert kwargs["params"]["quantidade"] == 100
+    assert kwargs["params"]["numeroContratoCobranca"] == 789
+    assert kwargs["headers"]["client_id"] == "client-id-123"
+
+
+def test_consultar_faixas_nosso_numero_sem_contrato(boleto_client):
+    """Testa a consulta sem número de contrato de cobrança"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "resultado": [{
+            "numeroInicial": 5000,
+            "numeroFinal": 5100,
+            "validaDigitoVerificadorNossoNumero": 1,
+            "numeroCliente": 123456,
+            "codigoModalidade": 1,
+            "quantidade": 100
+        }]
+    }
+    mock_response.status_code = 200
+    boleto_client.session.get.return_value = mock_response
+
+    # Chama o método sem contrato de cobrança
+    result = boleto_client.consultar_faixas_nosso_numero(
+        numero_cliente=123456,
+        codigo_modalidade=1,
+        quantidade=100,
+        client_id="client-id-123"
+    )
+
+    # Verificações
+    assert result["validaDigitoVerificadorNossoNumero"] == 1
+    args, kwargs = boleto_client.session.get.call_args
+    assert "numeroContratoCobranca" not in kwargs["params"]
+
+
+def test_consultar_faixas_nosso_numero_erro_http(boleto_client):
+    """Testa a consulta com erro HTTP"""
+    # Configura o mock para erro HTTP
+    mock_response = Mock()
+    http_error = requests.exceptions.HTTPError("400 Bad Request")
+    http_error.response = mock_response
+    mock_response.status_code = 400
+    boleto_client.session.get.side_effect = http_error
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoConsultaFaixaError) as exc_info:
+        boleto_client.consultar_faixas_nosso_numero(
+            numero_cliente=123456,
+            codigo_modalidade=1,
+            quantidade=100,
+            client_id="client-id-123"
+        )
+    assert "[400] Falha na consulta de faixas - Status: 400" in str(exc_info.value)
+    assert exc_info.value.numero_cliente == 123456
+
+
+def test_consultar_faixas_nosso_numero_erro_generico(boleto_client):
+    """Testa a consulta com erro genérico"""
+    # Configura o mock para erro genérico
+    boleto_client.session.get.side_effect = requests.exceptions.RequestException(
+        "Erro de conexão"
+    )
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoConsultaFaixaError) as exc_info:
+        boleto_client.consultar_faixas_nosso_numero(
+            numero_cliente=123456,
+            codigo_modalidade=1,
+            quantidade=100,
+            client_id="client-id-123"
+        )
+    assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
+    assert exc_info.value.numero_cliente == 123456
+
+
+def test_consultar_faixas_nosso_numero_estrutura_resultado(boleto_client):
+    """Testa a estrutura de resposta com array resultado"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "resultado": [{
+            "numeroCliente": 5224,
+            "nome": "JOSE PEREIRA",
+            "codigoModalidade": 1,
+            "numeroInicial": 1,
+            "numeroFinal": 10,
+            "quantidade": 10,
+            "numeroContratoCobranca": 1,
+            "validaDigitoVerificadorNossoNumero": True
+        }]
+    }
+    mock_response.status_code = 200
+    boleto_client.session.get.return_value = mock_response
+
+    # Chama o método
+    result = boleto_client.consultar_faixas_nosso_numero(
+        numero_cliente=5224,
+        codigo_modalidade=1,
+        quantidade=10,
+        client_id="client-id-123"
+    )
+
+    # Verificações
+    assert result["numeroInicial"] == 1
+    assert result["numeroFinal"] == 10
+    assert result["validaDigitoVerificadorNossoNumero"] == 1  # Deve converter True para 1
+
+
+def test_consultar_faixas_nosso_numero_erro_negocio(boleto_client):
+    """Testa erro de negócio (400)"""
+    # Configura o mock para erro 400
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Parâmetros inválidos",
+            "codigo": "ERR001"
+        }]
+    }
+    mock_response.status_code = 400
+    boleto_client.session.get.return_value = mock_response
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoConsultaFaixaError) as exc_info:
+        boleto_client.consultar_faixas_nosso_numero(
+            numero_cliente=5224,
+            codigo_modalidade=1,
+            quantidade=10,
+            client_id="client-id-123"
+        )
+    assert "Parâmetros inválidos" in str(exc_info.value)
+    assert exc_info.value.code == 400
+
+
+def test_consultar_faixas_nosso_numero_erro_dados(boleto_client):
+    """Testa erro de dados inconsistentes (406)"""
+    # Configura o mock para erro 406
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Dados inconsistentes",
+            "codigo": "ERR002"
+        }]
+    }
+    mock_response.status_code = 406
+    boleto_client.session.get.return_value = mock_response
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoConsultaFaixaError) as exc_info:
+        boleto_client.consultar_faixas_nosso_numero(
+            numero_cliente=5224,
+            codigo_modalidade=1,
+            quantidade=10,
+            client_id="client-id-123"
+        )
+    assert "Dados inconsistentes" in str(exc_info.value)
+    assert exc_info.value.code == 406
+
+
+def test_consultar_faixas_nosso_numero_sem_resultados(boleto_client):
+    """Testa quando não há faixas disponíveis"""
+    # Configura o mock para resposta vazia
+    mock_response = Mock()
+    mock_response.json.return_value = {"resultado": []}
+    mock_response.status_code = 200
+    boleto_client.session.get.return_value = mock_response
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoConsultaFaixaError) as exc_info:
+        boleto_client.consultar_faixas_nosso_numero(
+            numero_cliente=5224,
+            codigo_modalidade=1,
+            quantidade=10,
+            client_id="client-id-123"
+        )
+    assert "Nenhuma faixa disponível encontrada" in str(exc_info.value)
+    assert exc_info.value.code == 404

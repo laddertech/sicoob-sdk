@@ -6,6 +6,7 @@ from .exceptions import (
     BoletoEmissaoError,
     BoletoConsultaError,
     BoletoConsultaPagadorError,
+    BoletoConsultaFaixaError,
 )
 
 
@@ -187,6 +188,85 @@ class BoletoAPI(APIClientBase):
             raise BoletoEmissaoError(
                 f"Falha na comunicação com API de boletos: {str(e)}",
                 dados_boleto=params,
+            ) from e
+
+    def consultar_faixas_nosso_numero(
+        self,
+        numero_cliente: int,
+        codigo_modalidade: int,
+        quantidade: int,
+        client_id: str,
+        numero_contrato_cobranca: Optional[int] = None,
+    ) -> Dict:
+        """Consulta faixas de nosso número disponíveis
+
+        Args:
+            numero_cliente: Número que identifica o contrato do beneficiário no Sisbr
+            codigo_modalidade: Identifica a modalidade do boleto (1-Simples, 3-Caucionada, 4-Vinculada, 8-Conta Capital)
+            quantidade: Quantidade mínima de nosso números que devem estar disponíveis
+            client_id: ClientId utilizado na utilização do TOKEN
+            numero_contrato_cobranca: ID do contrato de cobrança (opcional)
+
+        Returns:
+            Dicionário com as faixas de nosso número disponíveis, contendo:
+            - numeroInicial: Número inicial da faixa
+            - numeroFinal: Número final da faixa
+            - validaDigitoVerificadorNossoNumero: Indica se deve calcular DV (0-não, 1-sim)
+
+        Raises:
+            BoletoConsultaFaixaError: Em caso de falha na requisição
+        """
+        try:
+            params = {
+                "numeroCliente": numero_cliente,
+                "codigoModalidade": codigo_modalidade,
+                "quantidade": quantidade,
+            }
+
+            if numero_contrato_cobranca:
+                params["numeroContratoCobranca"] = numero_contrato_cobranca
+
+            url = f"{self._get_base_url()}/cobranca-bancaria/v3/boletos/faixas-nosso-numero"
+            headers = self._get_headers(scope="boletos_consulta")
+            headers["client_id"] = client_id
+
+            response = self.session.get(url, params=params, headers=headers)
+
+            # Trata erros específicos com códigos 400, 406, 500
+            if response.status_code in (400, 406, 500):
+                error_data = response.json()
+                raise BoletoConsultaFaixaError(
+                    f"Falha na consulta de faixas: {error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')}",
+                    code=response.status_code,
+                    numero_cliente=numero_cliente
+                )
+
+            response.raise_for_status()
+
+            data = response.json()
+            # Ajusta para a estrutura esperada (array resultado)
+            if "resultado" in data and len(data["resultado"]) > 0:
+                faixa = data["resultado"][0]
+                # Converte validaDigitoVerificadorNossoNumero para int (0/1) se for boolean
+                if isinstance(faixa.get("validaDigitoVerificadorNossoNumero"), bool):
+                    faixa["validaDigitoVerificadorNossoNumero"] = 1 if faixa["validaDigitoVerificadorNossoNumero"] else 0
+                return faixa
+
+            raise BoletoConsultaFaixaError(
+                "Nenhuma faixa disponível encontrada",
+                code=404,
+                numero_cliente=numero_cliente
+            )
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise BoletoConsultaFaixaError(
+                    f"Falha na consulta de faixas - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    numero_cliente=numero_cliente,
+                ) from e
+            raise BoletoConsultaFaixaError(
+                f"Falha na comunicação com API de boletos: {str(e)}",
+                numero_cliente=numero_cliente,
             ) from e
 
     def consultar_boleto(

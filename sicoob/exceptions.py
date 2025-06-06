@@ -37,6 +37,13 @@ class BoletoConsultaPagadorError(BoletoError):
         super().__init__(message, code)
 
 
+class BoletoConsultaFaixaError(BoletoError):
+    """Erro durante a consulta de faixas de nosso número"""
+    def __init__(self, message: str, code: int = None, numero_cliente: int = None):
+        self.numero_cliente = numero_cliente
+        super().__init__(message, code)
+
+
 class BoletoNaoEncontradoError(BoletoConsultaError):
     """Boleto não encontrado durante consulta"""
     def __init__(self, nosso_numero: str):
