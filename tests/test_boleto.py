@@ -7,7 +7,8 @@ from sicoob.exceptions import (
     BoletoConsultaFaixaError,
     BoletoConsultaPagadorError,
     BoletoEmissaoError,
-    BoletoAlteracaoError
+    BoletoAlteracaoError,
+    BoletoBaixaError
 )
 
 
@@ -752,3 +753,171 @@ def test_alterar_boleto_erro_comunicacao(boleto_client):
     assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
     assert exc_info.value.nosso_numero == str(nosso_numero)
     assert exc_info.value.dados_alteracao == dados_alteracao
+
+
+def test_baixar_boleto_sucesso(boleto_client):
+    """Testa a baixa de boleto com sucesso (status 204)"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.status_code = 204
+    boleto_client.session.post.return_value = mock_response
+
+    # Dados de teste
+    nosso_numero = 123456789
+    dados_boleto = {
+        "numeroCliente": 5224,
+        "codigoModalidade": 1
+    }
+    client_id = "client-id-123"
+
+    # Chama o método
+    result = boleto_client.baixar_boleto(
+        nosso_numero=nosso_numero,
+        dados_boleto=dados_boleto,
+        client_id=client_id
+    )
+
+    # Verificações
+    assert result is None  # Método deve retornar None em caso de sucesso
+    boleto_client.session.post.assert_called_once()
+    args, kwargs = boleto_client.session.post.call_args
+    assert f"boletos/{nosso_numero}/baixar" in args[0]
+    assert kwargs["json"] == dados_boleto
+    assert kwargs["headers"]["client_id"] == client_id
+
+
+def test_baixar_boleto_erro_negocio(boleto_client):
+    """Testa erro de negócio (400) na baixa de boleto"""
+    # Configura o mock para erro 400
+    mock_response = Mock()
+    mock_response.status_code = 400
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Boleto já baixado",
+            "codigo": "ERR001"
+        }]
+    }
+    boleto_client.session.post.return_value = mock_response
+
+    # Dados de teste
+    nosso_numero = 123456789
+    dados_boleto = {
+        "numeroCliente": 5224,
+        "codigoModalidade": 1
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoBaixaError) as exc_info:
+        boleto_client.baixar_boleto(
+            nosso_numero=nosso_numero,
+            dados_boleto=dados_boleto,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[400] Falha na baixa do boleto: Boleto já baixado" in str(exc_info.value)
+    assert exc_info.value.code == 400
+    assert exc_info.value.nosso_numero == nosso_numero
+    assert exc_info.value.dados_boleto == dados_boleto
+
+
+def test_baixar_boleto_erro_dados_inconsistentes(boleto_client):
+    """Testa erro de dados inconsistentes (406) na baixa de boleto"""
+    # Configura o mock para erro 406
+    mock_response = Mock()
+    mock_response.status_code = 406
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Dados inconsistentes",
+            "codigo": "ERR002"
+        }]
+    }
+    boleto_client.session.post.return_value = mock_response
+
+    # Dados de teste
+    nosso_numero = 123456789
+    dados_boleto = {
+        "numeroCliente": 5224,
+        "codigoModalidade": 1
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoBaixaError) as exc_info:
+        boleto_client.baixar_boleto(
+            nosso_numero=nosso_numero,
+            dados_boleto=dados_boleto,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[406] Falha na baixa do boleto: Dados inconsistentes" in str(exc_info.value)
+    assert exc_info.value.code == 406
+    assert exc_info.value.nosso_numero == nosso_numero
+    assert exc_info.value.dados_boleto == dados_boleto
+
+
+def test_baixar_boleto_erro_interno(boleto_client):
+    """Testa erro interno (500) na baixa de boleto"""
+    # Configura o mock para erro 500
+    mock_response = Mock()
+    mock_response.status_code = 500
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Erro interno no servidor",
+            "codigo": "ERR500"
+        }]
+    }
+    boleto_client.session.post.return_value = mock_response
+
+    # Dados de teste
+    nosso_numero = 123456789
+    dados_boleto = {
+        "numeroCliente": 5224,
+        "codigoModalidade": 1
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoBaixaError) as exc_info:
+        boleto_client.baixar_boleto(
+            nosso_numero=nosso_numero,
+            dados_boleto=dados_boleto,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[500] Falha na baixa do boleto: Erro interno no servidor" in str(exc_info.value)
+    assert exc_info.value.code == 500
+    assert exc_info.value.nosso_numero == nosso_numero
+    assert exc_info.value.dados_boleto == dados_boleto
+
+
+def test_baixar_boleto_erro_comunicacao(boleto_client):
+    """Testa erro de comunicação na baixa de boleto"""
+    # Configura o mock para erro de comunicação
+    boleto_client.session.post.side_effect = requests.exceptions.RequestException(
+        "Erro de conexão"
+    )
+
+    # Dados de teste
+    nosso_numero = 123456789
+    dados_boleto = {
+        "numeroCliente": 5224,
+        "codigoModalidade": 1
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoBaixaError) as exc_info:
+        boleto_client.baixar_boleto(
+            nosso_numero=nosso_numero,
+            dados_boleto=dados_boleto,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
+    assert exc_info.value.nosso_numero == nosso_numero
+    assert exc_info.value.dados_boleto == dados_boleto

@@ -135,6 +135,28 @@ Operações com boletos bancários.
     )
     ```
 
+- `baixar_boleto(nosso_numero, dados_boleto, client_id)`:
+  - Comanda a baixa de um boleto existente
+  - Parâmetros:
+    - `nosso_numero` (int): Número identificador do boleto no Sisbr
+    - `dados_boleto` (dict): Dicionário com os dados do boleto contendo:
+      - `numeroCliente` (int): Número do cliente
+      - `codigoModalidade` (int): Código da modalidade
+    - `client_id` (str): ClientId para autenticação
+  - Retorna: None em caso de sucesso (status 204)
+  - Exceções: `BoletoBaixaError` em caso de falha (status 400, 406, 500)
+  - Exemplo:
+    ```python
+    sicoob.cobranca.boleto.baixar_boleto(
+        nosso_numero=123456789,
+        dados_boleto={
+            "numeroCliente": 5224,
+            "codigoModalidade": 1
+        },
+        client_id="client-id-123"
+    )
+    ```
+
 ### API de PIX
 **Arquivo:** `sicoob/pix.py`
 

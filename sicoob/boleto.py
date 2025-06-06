@@ -4,6 +4,7 @@ import requests
 from .api_client import APIClientBase
 from .exceptions import (
     BoletoAlteracaoError,
+    BoletoBaixaError,
     BoletoEmissaoError,
     BoletoConsultaError,
     BoletoConsultaPagadorError,
@@ -342,6 +343,67 @@ class BoletoAPI(APIClientBase):
                 nosso_numero=str(params.get("nossoNumero", "")),
             ) from e
 
+
+    def baixar_boleto(
+        self,
+        nosso_numero: int,
+        dados_boleto: Dict,
+        client_id: str,
+    ) -> None:
+        """Comanda a baixa de um boleto existente
+
+        Args:
+            nosso_numero: Número identificador do boleto no Sisbr
+            dados_boleto: Dicionário com os dados do boleto contendo:
+                - numeroCliente: Número do cliente
+                - codigoModalidade: Código da modalidade
+            client_id: ClientId utilizado na utilização do TOKEN
+
+        Returns:
+            None em caso de sucesso (status 204)
+
+        Raises:
+            BoletoBaixaError: Em caso de falha na requisição com status 400, 406 ou 500
+        """
+        try:
+            url = f"{self._get_base_url()}/cobranca-bancaria/v3/boletos/{nosso_numero}/baixar"
+            headers = self._get_headers(scope="boletos_baixa")
+            headers["client_id"] = client_id
+
+            response = self.session.post(url, json=dados_boleto, headers=headers)
+
+            # Trata erros específicos com códigos 400, 406, 500
+            if response.status_code in (400, 406, 500):
+                error_data = response.json()
+                raise BoletoBaixaError(
+                    f"Falha na baixa do boleto: {error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')}",
+                    code=response.status_code,
+                    nosso_numero=nosso_numero,
+                    dados_boleto=dados_boleto
+                )
+
+            # Verifica se o status é 204 (No Content)
+            if response.status_code != 204:
+                raise BoletoBaixaError(
+                    f"Resposta inesperada da API: {response.status_code}",
+                    code=response.status_code,
+                    nosso_numero=nosso_numero,
+                    dados_boleto=dados_boleto
+                )
+
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise BoletoBaixaError(
+                    f"Falha na baixa do boleto - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    nosso_numero=nosso_numero,
+                    dados_boleto=dados_boleto
+                ) from e
+            raise BoletoBaixaError(
+                f"Falha na comunicação com API de boletos: {str(e)}",
+                nosso_numero=nosso_numero,
+                dados_boleto=dados_boleto
+            ) from e
 
     def alterar_boleto(
         self,

@@ -54,6 +54,14 @@ class BoletoNaoEncontradoError(BoletoConsultaError):
         )
 
 
+class BoletoBaixaError(BoletoError):
+    """Erro durante a baixa de boleto"""
+    def __init__(self, message: str, code: int = None, nosso_numero: int = None, dados_boleto: dict = None):
+        self.nosso_numero = nosso_numero
+        self.dados_boleto = dados_boleto
+        super().__init__(message, code)
+
+
 class BoletoAlteracaoError(BoletoError):
     """Erro durante a alteração de boleto"""
     def __init__(self, message: str, code: int = None, nosso_numero: str = None, dados_alteracao: dict = None):
