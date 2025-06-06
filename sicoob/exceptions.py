@@ -80,9 +80,10 @@ class BoletoAlteracaoPagadorError(BoletoError):
 
 class BoletoWebhookError(BoletoError):
     """Erro durante operações de webhook de boleto"""
-    def __init__(self, message: str, code: int = None, url: str = None, dados_webhook: dict = None):
+    def __init__(self, message: str, code: int = None, url: str = None, dados_webhook: dict = None, id_webhook: int = None):
         self.url = url
         self.dados_webhook = dados_webhook
+        self.id_webhook = id_webhook
         super().__init__(message, code)
 
 

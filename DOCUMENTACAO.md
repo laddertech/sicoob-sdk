@@ -217,6 +217,45 @@ Operações com boletos bancários.
     )
     ```
 
+- `consultar_webhook(id_webhook, codigo_tipo_movimento, client_id)`:
+  - Consulta os detalhes de um webhook cadastrado
+  - Parâmetros:
+    - `id_webhook` (int): Identificador único do webhook
+    - `codigo_tipo_movimento` (int): Código do tipo de movimento do webhook
+      - 7: Pagamento (Baixa operacional)
+    - `client_id` (str): ClientId para autenticação
+  - Retorna: Dicionário com os dados do webhook conforme estrutura:
+    ```json
+    {
+      "resultado": [
+        {
+          "idWebhook": 4,
+          "url": "https://webhook.com",
+          "email": "webhook@email.com",
+          "codigoTipoMovimento": 7,
+          "descricaoTipoMovimento": "Pagamento (Baixa operacional)",
+          "codigoPeriodoMovimento": 1,
+          "descricaoPeriodoMovimento": "Movimento atual (D0)",
+          "codigoSituacao": 3,
+          "descricaoSituacao": "Inativo",
+          "dataHoraCadastro": "2024-09-03T00:27:18.483Z",
+          "dataHoraUltimaAlteracao": "2024-09-06T12:24:11.296Z",
+          "dataHoraInativacao": "2024-09-05T18:50:55.099Z",
+          "descricaoMotivoInativacao": "Erro ao enviar notificação"
+        }
+      ]
+    }
+    ```
+  - Exceções: `BoletoWebhookError` em caso de falha (status 400, 406, 500)
+  - Exemplo:
+    ```python
+    webhook = sicoob.cobranca.boleto.consultar_webhook(
+        id_webhook=4,
+        codigo_tipo_movimento=7,
+        client_id="client-id-123"
+    )
+    ```
+
 ### API de PIX
 **Arquivo:** `sicoob/pix.py`
 

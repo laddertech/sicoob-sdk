@@ -533,6 +533,81 @@ class BoletoAPI(APIClientBase):
             ) from e
 
 
+    def consultar_webhook(
+        self,
+        id_webhook: int,
+        codigo_tipo_movimento: int,
+        client_id: str,
+    ) -> Dict:
+        """Consulta os detalhes de um webhook cadastrado
+
+        Args:
+            id_webhook: Identificador único do webhook
+            codigo_tipo_movimento: Código do tipo de movimento do webhook (7-Pagamento)
+            client_id: ClientId utilizado na utilização do TOKEN
+
+        Returns:
+            Dicionário com os dados do webhook conforme estrutura da API:
+            {
+                "resultado": [
+                    {
+                        "idWebhook": int,
+                        "url": str,
+                        "email": str,
+                        "codigoTipoMovimento": int,
+                        "descricaoTipoMovimento": str,
+                        "codigoPeriodoMovimento": int,
+                        "descricaoPeriodoMovimento": str,
+                        "codigoSituacao": int,
+                        "descricaoSituacao": str,
+                        "dataHoraCadastro": str,
+                        "dataHoraUltimaAlteracao": str,
+                        "dataHoraInativacao": str,
+                        "descricaoMotivoInativacao": str
+                    }
+                ]
+            }
+
+        Raises:
+            BoletoWebhookError: Em caso de falha na requisição com status 400, 406 ou 500
+        """
+        try:
+            params = {
+                "idWebhook": id_webhook,
+                "codigoTipoMovimento": codigo_tipo_movimento
+            }
+
+            url = f"{self._get_base_url()}/cobranca-bancaria/v3/webhooks"
+            headers = self._get_headers(scope="boletos_webhook")
+            headers["client_id"] = client_id
+
+            response = self.session.get(url, params=params, headers=headers)
+
+            # Trata erros específicos com códigos 400, 406, 500
+            if response.status_code in (400, 406, 500):
+                error_data = response.json()
+                error_msg = error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')
+                raise BoletoWebhookError(
+                    f"Falha na consulta do webhook: {error_msg}",
+                    code=response.status_code,
+                    id_webhook=id_webhook
+                )
+
+            response.raise_for_status()
+            return response.json()
+
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise BoletoWebhookError(
+                    f"Falha na consulta do webhook - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    id_webhook=id_webhook
+                ) from e
+            raise BoletoWebhookError(
+                f"Falha na comunicação com API de boletos: {str(e)}",
+                id_webhook=id_webhook
+            ) from e
+
     def cadastrar_webhook(
         self,
         webhook: Dict,
