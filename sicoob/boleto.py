@@ -608,6 +608,68 @@ class BoletoAPI(APIClientBase):
                 id_webhook=id_webhook
             ) from e
 
+    def atualizar_webhook(
+        self,
+        id_webhook: int,
+        webhook: Dict,
+        client_id: str,
+    ) -> None:
+        """Atualiza um webhook cadastrado
+
+        Args:
+            id_webhook: Identificador único do webhook
+            webhook: Dicionário com os dados do webhook para atualização contendo:
+                - url: URL do webhook (obrigatório)
+                - email: Email do associado (opcional)
+            client_id: ClientId utilizado na utilização do TOKEN
+
+        Returns:
+            None em caso de sucesso (status 204)
+
+        Raises:
+            BoletoWebhookError: Em caso de falha na requisição com status 400, 406 ou 500
+        """
+        try:
+            url = f"{self._get_base_url()}/cobranca-bancaria/v3/webhooks/{id_webhook}"
+            headers = self._get_headers(scope="boletos_webhook")
+            headers["client_id"] = client_id
+
+            response = self.session.patch(url, json=webhook, headers=headers)
+
+            # Trata erros específicos com códigos 400, 406, 500
+            if response.status_code in (400, 406, 500):
+                error_data = response.json()
+                error_msg = error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')
+                raise BoletoWebhookError(
+                    f"Falha na atualização do webhook: {error_msg}",
+                    code=response.status_code,
+                    id_webhook=id_webhook,
+                    dados_webhook=webhook
+                )
+
+            # Verifica se o status é 204 (No Content)
+            if response.status_code != 204:
+                raise BoletoWebhookError(
+                    f"Resposta inesperada da API: {response.status_code}",
+                    code=response.status_code,
+                    id_webhook=id_webhook,
+                    dados_webhook=webhook
+                )
+
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise BoletoWebhookError(
+                    f"Falha na atualização do webhook - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    id_webhook=id_webhook,
+                    dados_webhook=webhook
+                ) from e
+            raise BoletoWebhookError(
+                f"Falha na comunicação com API de boletos: {str(e)}",
+                id_webhook=id_webhook,
+                dados_webhook=webhook
+            ) from e
+
     def cadastrar_webhook(
         self,
         webhook: Dict,

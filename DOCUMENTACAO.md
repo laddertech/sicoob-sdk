@@ -256,6 +256,29 @@ Operações com boletos bancários.
     )
     ```
 
+- `atualizar_webhook(id_webhook, webhook, client_id)`:
+  - Atualiza um webhook cadastrado
+  - Parâmetros:
+    - `id_webhook` (int): Identificador único do webhook
+    - `webhook` (dict): Dicionário com os dados do webhook para atualização contendo:
+      - `url` (str): Nova URL do webhook (obrigatório)
+      - `email` (str, opcional): Novo email do associado
+    - `client_id` (str): ClientId para autenticação
+  - Retorna: None em caso de sucesso (status 204)
+  - Observação: Ao modificar a URL, a situação do webhook será automaticamente alterada para '1 - Aguardando validação' e permanecerá assim até que a nova URL seja validada com sucesso.
+  - Exceções: `BoletoWebhookError` em caso de falha (status 400, 406, 500)
+  - Exemplo:
+    ```python
+    sicoob.cobranca.boleto.atualizar_webhook(
+        id_webhook=4,
+        webhook={
+            "url": "https://new-webhook.example.com/notificacoes",
+            "email": "novo-email@empresa.com"
+        },
+        client_id="client-id-123"
+    )
+    ```
+
 ### API de PIX
 **Arquivo:** `sicoob/pix.py`
 

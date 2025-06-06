@@ -246,6 +246,174 @@ def test_consultar_boletos_por_pagador_erro_generico(boleto_client):
     assert exc_info.value.numero_cpf_cnpj == "12345678901"
 
 
+def test_atualizar_webhook_sucesso(boleto_client):
+    """Testa a atualização de webhook com sucesso (status 204)"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.status_code = 204
+    boleto_client.session.patch.return_value = mock_response
+
+    # Dados de teste
+    id_webhook = 123
+    webhook = {
+        "url": "https://new-webhook.example.com/notificacoes",
+        "email": "novo-email@empresa.com"
+    }
+    client_id = "client-id-123"
+
+    # Chama o método
+    result = boleto_client.atualizar_webhook(
+        id_webhook=id_webhook,
+        webhook=webhook,
+        client_id=client_id
+    )
+
+    # Verificações
+    assert result is None  # Método deve retornar None em caso de sucesso
+    boleto_client.session.patch.assert_called_once()
+    args, kwargs = boleto_client.session.patch.call_args
+    assert f"webhooks/{id_webhook}" in args[0]
+    assert kwargs["json"] == webhook
+    assert kwargs["headers"]["client_id"] == client_id
+
+
+def test_atualizar_webhook_erro_negocio(boleto_client):
+    """Testa erro de negócio (400) na atualização de webhook"""
+    # Configura o mock para erro 400
+    mock_response = Mock()
+    mock_response.status_code = 400
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "URL de webhook inválida",
+            "codigo": "ERR001"
+        }]
+    }
+    boleto_client.session.patch.return_value = mock_response
+
+    # Dados de teste
+    id_webhook = 123
+    webhook = {
+        "url": "url-invalida",
+        "email": "novo-email@empresa.com"
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.atualizar_webhook(
+            id_webhook=id_webhook,
+            webhook=webhook,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[400] Falha na atualização do webhook: URL de webhook inválida" in str(exc_info.value)
+    assert exc_info.value.code == 400
+    assert exc_info.value.id_webhook == id_webhook
+    assert exc_info.value.dados_webhook == webhook
+
+
+def test_atualizar_webhook_erro_dados_inconsistentes(boleto_client):
+    """Testa erro de dados inconsistentes (406) na atualização de webhook"""
+    # Configura o mock para erro 406
+    mock_response = Mock()
+    mock_response.status_code = 406
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Email inválido",
+            "codigo": "ERR002"
+        }]
+    }
+    boleto_client.session.patch.return_value = mock_response
+
+    # Dados de teste
+    id_webhook = 123
+    webhook = {
+        "url": "https://new-webhook.example.com/notificacoes",
+        "email": "email-invalido"
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.atualizar_webhook(
+            id_webhook=id_webhook,
+            webhook=webhook,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[406] Falha na atualização do webhook: Email inválido" in str(exc_info.value)
+    assert exc_info.value.code == 406
+    assert exc_info.value.id_webhook == id_webhook
+    assert exc_info.value.dados_webhook == webhook
+
+
+def test_atualizar_webhook_erro_interno(boleto_client):
+    """Testa erro interno (500) na atualização de webhook"""
+    # Configura o mock para erro 500
+    mock_response = Mock()
+    mock_response.status_code = 500
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Erro interno no servidor",
+            "codigo": "ERR500"
+        }]
+    }
+    boleto_client.session.patch.return_value = mock_response
+
+    # Dados de teste
+    id_webhook = 123
+    webhook = {
+        "url": "https://new-webhook.example.com/notificacoes",
+        "email": "novo-email@empresa.com"
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.atualizar_webhook(
+            id_webhook=id_webhook,
+            webhook=webhook,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[500] Falha na atualização do webhook: Erro interno no servidor" in str(exc_info.value)
+    assert exc_info.value.code == 500
+    assert exc_info.value.id_webhook == id_webhook
+    assert exc_info.value.dados_webhook == webhook
+
+
+def test_atualizar_webhook_erro_comunicacao(boleto_client):
+    """Testa erro de comunicação na atualização de webhook"""
+    # Configura o mock para erro de comunicação
+    boleto_client.session.patch.side_effect = requests.exceptions.RequestException(
+        "Erro de conexão"
+    )
+
+    # Dados de teste
+    id_webhook = 123
+    webhook = {
+        "url": "https://new-webhook.example.com/notificacoes",
+        "email": "novo-email@empresa.com"
+    }
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.atualizar_webhook(
+            id_webhook=id_webhook,
+            webhook=webhook,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
+    assert exc_info.value.id_webhook == id_webhook
+    assert exc_info.value.dados_webhook == webhook
+
+
 def test_emitir_segunda_via_sucesso(boleto_client):
     """Testa a emissão de segunda via de boleto com sucesso"""
     # Configura o mock
