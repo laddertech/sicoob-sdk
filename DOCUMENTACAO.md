@@ -296,6 +296,69 @@ Operações com boletos bancários.
     )
     ```
 
+- `consultar_solicitacoes_webhook(id_webhook, data_solicitacao, client_id, pagina=None, codigo_solicitacao_situacao=None)`:
+  - Consulta as solicitações de notificação para um webhook com base na data de solicitação informada
+  - Retorna o histórico das tentativas de notificação, incluindo o status e a resposta da requisição
+  - Parâmetros:
+    - `id_webhook` (int, obrigatório): Identificador único do webhook
+    - `data_solicitacao` (str, obrigatório): Data da solicitação no formato yyyy-MM-dd
+    - `client_id` (str, obrigatório): ClientId utilizado na utilização do TOKEN
+    - `pagina` (int, opcional): Número da página a ser consultada
+    - `codigo_solicitacao_situacao` (int, opcional): Código da situação da solicitação do webhook:
+      - 3: Enviado com sucesso
+      - 6: Erro no envio
+  - Retorna: Estrutura de dados conforme exemplo abaixo (status 200)
+    ```json
+    {
+      "resultado": [
+        {
+          "paginalAtual": 1,
+          "totalPaginas": 2,
+          "totalRegistros": 100,
+          "webhookSolicitacoes": [
+            {
+              "codigoWebhookSituacao": 3,
+              "descricaoWebhookSituacao": "Validado com sucesso",
+              "codigoSolicitacaoSituacao": 3,
+              "descricaoSolicitacaoSituacao": "Enviado com sucesso",
+              "codigoTipoMovimento": 7,
+              "descricaoTipoMovimento": "Pagamento (Baixa operacional)",
+              "codigoPeriodoMovimento": 1,
+              "descricaoPeriodoMovimento": "Movimento atual (D0)",
+              "descricaoErroProcessamento": "Erro ao enviar notificação",
+              "dataHoraCadastro": "2024-09-04T15:43:56.000Z",
+              "validacaoWebhook": false,
+              "webhookNotificacoes": [
+                {
+                  "url": "https://webhook.com",
+                  "dataHoraInicio": "2024-09-08T15:50:38.077Z",
+                  "dataHoraFim": "2024-09-08T15:51:38.077Z",
+                  "tempoComunicao": 60,
+                  "codigoStatusRequisicao": 200,
+                  "descricaoMensagemRetorno": "{\"messsage\":\"Webhook recebido com sucesso!\"}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    ```
+  - Exceções: `BoletoWebhookError` em caso de falha com os seguintes status:
+    - 400: Erro de negócio (ex: data inválida)
+    - 406: Dados inconsistentes (ex: webhook não encontrado)
+    - 500: Erro interno no servidor
+  - Exemplo:
+    ```python
+    solicitacoes = sicoob.cobranca.boleto.consultar_solicitacoes_webhook(
+        id_webhook=123,
+        data_solicitacao="2025-06-01",
+        client_id="client-id-123",
+        pagina=1,
+        codigo_solicitacao_situacao=3  # Apenas sucessos
+    )
+    ```
+
 ### API de PIX
 **Arquivo:** `sicoob/pix.py`
 

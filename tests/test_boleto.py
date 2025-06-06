@@ -1738,3 +1738,188 @@ def test_excluir_webhook_erro_comunicacao(boleto_client):
     # Verificações
     assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
     assert exc_info.value.id_webhook == id_webhook
+
+
+def test_consultar_solicitacoes_webhook_sucesso(boleto_client):
+    """Testa a consulta de solicitações de webhook com sucesso"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "resultado": [{
+            "paginalAtual": 1,
+            "totalPaginas": 2,
+            "totalRegistros": 100,
+            "webhookSolicitacoes": [{
+                "codigoWebhookSituacao": 3,
+                "descricaoWebhookSituacao": "Validado com sucesso",
+                "codigoSolicitacaoSituacao": 3,
+                "descricaoSolicitacaoSituacao": "Enviado com sucesso",
+                "codigoTipoMovimento": 7,
+                "descricaoTipoMovimento": "Pagamento (Baixa operacional)",
+                "codigoPeriodoMovimento": 1,
+                "descricaoPeriodoMovimento": "Movimento atual (D0)",
+                "descricaoErroProcessamento": None,
+                "dataHoraCadastro": "2025-06-01T10:00:00.000Z",
+                "validacaoWebhook": True,
+                "webhookNotificacoes": [{
+                    "url": "https://webhook.example.com",
+                    "dataHoraInicio": "2025-06-01T10:05:00.000Z",
+                    "dataHoraFim": "2025-06-01T10:05:01.000Z",
+                    "tempoComunicao": 1,
+                    "codigoStatusRequisicao": 200,
+                    "descricaoMensagemRetorno": "{\"message\":\"Webhook recebido com sucesso!\"}"
+                }]
+            }]
+        }]
+    }
+    boleto_client.session.get.return_value = mock_response
+
+    # Dados de teste
+    id_webhook = 123
+    data_solicitacao = "2025-06-01"
+    client_id = "client-id-123"
+    pagina = 1
+    codigo_solicitacao_situacao = 3
+
+    # Chama o método
+    result = boleto_client.consultar_solicitacoes_webhook(
+        id_webhook=id_webhook,
+        data_solicitacao=data_solicitacao,
+        client_id=client_id,
+        pagina=pagina,
+        codigo_solicitacao_situacao=codigo_solicitacao_situacao
+    )
+
+    # Verificações
+    assert "resultado" in result
+    assert len(result["resultado"]) == 1
+    assert result["resultado"][0]["webhookSolicitacoes"][0]["codigoSolicitacaoSituacao"] == 3
+    boleto_client.session.get.assert_called_once()
+    args, kwargs = boleto_client.session.get.call_args
+    assert f"webhooks/{id_webhook}/solicitacoes" in args[0]
+    assert kwargs["params"]["dataSolicitacao"] == data_solicitacao
+    assert kwargs["params"]["pagina"] == pagina
+    assert kwargs["params"]["codigoSolicitacaoSituacao"] == codigo_solicitacao_situacao
+    assert kwargs["headers"]["client_id"] == client_id
+
+
+def test_consultar_solicitacoes_webhook_erro_negocio(boleto_client):
+    """Testa erro de negócio (400) na consulta de solicitações de webhook"""
+    # Configura o mock para erro 400
+    mock_response = Mock()
+    mock_response.status_code = 400
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Data de solicitação inválida",
+            "codigo": "ERR001"
+        }]
+    }
+    boleto_client.session.get.return_value = mock_response
+
+    # Dados de teste
+    id_webhook = 123
+    data_solicitacao = "data-invalida"
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.consultar_solicitacoes_webhook(
+            id_webhook=id_webhook,
+            data_solicitacao=data_solicitacao,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[400] Falha na consulta das solicitações do webhook: Data de solicitação inválida" in str(exc_info.value)
+    assert exc_info.value.code == 400
+    assert exc_info.value.id_webhook == id_webhook
+
+
+def test_consultar_solicitacoes_webhook_erro_dados_inconsistentes(boleto_client):
+    """Testa erro de dados inconsistentes (406) na consulta de solicitações de webhook"""
+    # Configura o mock para erro 406
+    mock_response = Mock()
+    mock_response.status_code = 406
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Webhook não encontrado",
+            "codigo": "ERR002"
+        }]
+    }
+    boleto_client.session.get.return_value = mock_response
+
+    # Dados de teste
+    id_webhook = 999  # Não existe
+    data_solicitacao = "2025-06-01"
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.consultar_solicitacoes_webhook(
+            id_webhook=id_webhook,
+            data_solicitacao=data_solicitacao,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[406] Falha na consulta das solicitações do webhook: Webhook não encontrado" in str(exc_info.value)
+    assert exc_info.value.code == 406
+    assert exc_info.value.id_webhook == id_webhook
+
+
+def test_consultar_solicitacoes_webhook_erro_interno(boleto_client):
+    """Testa erro interno (500) na consulta de solicitações de webhook"""
+    # Configura o mock para erro 500
+    mock_response = Mock()
+    mock_response.status_code = 500
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Erro interno no servidor",
+            "codigo": "ERR500"
+        }]
+    }
+    boleto_client.session.get.return_value = mock_response
+
+    # Dados de teste
+    id_webhook = 123
+    data_solicitacao = "2025-06-01"
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.consultar_solicitacoes_webhook(
+            id_webhook=id_webhook,
+            data_solicitacao=data_solicitacao,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[500] Falha na consulta das solicitações do webhook: Erro interno no servidor" in str(exc_info.value)
+    assert exc_info.value.code == 500
+    assert exc_info.value.id_webhook == id_webhook
+
+
+def test_consultar_solicitacoes_webhook_erro_comunicacao(boleto_client):
+    """Testa erro de comunicação na consulta de solicitações de webhook"""
+    # Configura o mock para erro de comunicação
+    boleto_client.session.get.side_effect = requests.exceptions.RequestException(
+        "Erro de conexão"
+    )
+
+    # Dados de teste
+    id_webhook = 123
+    data_solicitacao = "2025-06-01"
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.consultar_solicitacoes_webhook(
+            id_webhook=id_webhook,
+            data_solicitacao=data_solicitacao,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
+    assert exc_info.value.id_webhook == id_webhook
