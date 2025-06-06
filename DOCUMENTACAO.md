@@ -277,6 +277,23 @@ Operações com boletos bancários.
         },
         client_id="client-id-123"
     )
+
+- `excluir_webhook(id_webhook, client_id)`:
+  - Remove permanentemente um webhook cadastrado, encerrando o envio de notificações para a URL vinculada
+  - Parâmetros:
+    - `id_webhook` (int): Identificador único do webhook (obrigatório)
+    - `client_id` (str): ClientId para autenticação (obrigatório)
+  - Retorna: None em caso de sucesso (status 204)
+  - Exceções: `BoletoWebhookError` em caso de falha com os seguintes status:
+    - 400: Erro de negócio (ex: webhook já excluído)
+    - 406: Dados inconsistentes (ex: webhook não encontrado)
+    - 500: Erro interno no servidor
+  - Exemplo:
+    ```python
+    sicoob.cobranca.boleto.excluir_webhook(
+        id_webhook=123,
+        client_id="client-id-123"
+    )
     ```
 
 ### API de PIX

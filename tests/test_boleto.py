@@ -1600,3 +1600,141 @@ def test_consultar_webhook_erro_comunicacao(boleto_client):
     # Verificações
     assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
     assert exc_info.value.id_webhook == id_webhook
+
+
+def test_excluir_webhook_sucesso(boleto_client):
+    """Testa a exclusão de webhook com sucesso (status 204)"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.status_code = 204
+    boleto_client.session.delete.return_value = mock_response
+
+    # Dados de teste
+    id_webhook = 123
+    client_id = "client-id-123"
+
+    # Chama o método
+    result = boleto_client.excluir_webhook(
+        id_webhook=id_webhook,
+        client_id=client_id
+    )
+
+    # Verificações
+    assert result is None  # Método deve retornar None em caso de sucesso
+    boleto_client.session.delete.assert_called_once()
+    args, kwargs = boleto_client.session.delete.call_args
+    assert f"webhooks/{id_webhook}" in args[0]
+    assert kwargs["headers"]["client_id"] == client_id
+
+
+def test_excluir_webhook_erro_negocio(boleto_client):
+    """Testa erro de negócio (400) na exclusão de webhook"""
+    # Configura o mock para erro 400
+    mock_response = Mock()
+    mock_response.status_code = 400
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Webhook já excluído",
+            "codigo": "ERR001"
+        }]
+    }
+    boleto_client.session.delete.return_value = mock_response
+
+    # Dados de teste
+    id_webhook = 123
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.excluir_webhook(
+            id_webhook=id_webhook,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[400] Falha na exclusão do webhook: Webhook já excluído" in str(exc_info.value)
+    assert exc_info.value.code == 400
+    assert exc_info.value.id_webhook == id_webhook
+
+
+def test_excluir_webhook_erro_dados_inconsistentes(boleto_client):
+    """Testa erro de dados inconsistentes (406) na exclusão de webhook"""
+    # Configura o mock para erro 406
+    mock_response = Mock()
+    mock_response.status_code = 406
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Webhook não encontrado",
+            "codigo": "ERR002"
+        }]
+    }
+    boleto_client.session.delete.return_value = mock_response
+
+    # Dados de teste
+    id_webhook = 999  # Não existe
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.excluir_webhook(
+            id_webhook=id_webhook,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[406] Falha na exclusão do webhook: Webhook não encontrado" in str(exc_info.value)
+    assert exc_info.value.code == 406
+    assert exc_info.value.id_webhook == id_webhook
+
+
+def test_excluir_webhook_erro_interno(boleto_client):
+    """Testa erro interno (500) na exclusão de webhook"""
+    # Configura o mock para erro 500
+    mock_response = Mock()
+    mock_response.status_code = 500
+    mock_response.json.return_value = {
+        "mensagens": [{
+            "mensagem": "Erro interno no servidor",
+            "codigo": "ERR500"
+        }]
+    }
+    boleto_client.session.delete.return_value = mock_response
+
+    # Dados de teste
+    id_webhook = 123
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.excluir_webhook(
+            id_webhook=id_webhook,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "[500] Falha na exclusão do webhook: Erro interno no servidor" in str(exc_info.value)
+    assert exc_info.value.code == 500
+    assert exc_info.value.id_webhook == id_webhook
+
+
+def test_excluir_webhook_erro_comunicacao(boleto_client):
+    """Testa erro de comunicação na exclusão de webhook"""
+    # Configura o mock para erro de comunicação
+    boleto_client.session.delete.side_effect = requests.exceptions.RequestException(
+        "Erro de conexão"
+    )
+
+    # Dados de teste
+    id_webhook = 123
+    client_id = "client-id-123"
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoWebhookError) as exc_info:
+        boleto_client.excluir_webhook(
+            id_webhook=id_webhook,
+            client_id=client_id
+        )
+
+    # Verificações
+    assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
+    assert exc_info.value.id_webhook == id_webhook
