@@ -63,6 +63,17 @@ Operações com boletos bancários.
 #### Métodos:
 - `emitir_boleto(dados_boleto)`: Emite novo boleto
 - `consultar_boleto(nosso_numero)`: Consulta boleto existente
+- `consultar_boletos_por_pagador(numero_cpf_cnpj, numero_cliente, client_id, codigo_situacao=None, data_inicio=None, data_fim=None)`:
+  - Consulta lista de boletos por pagador
+  - Parâmetros:
+    - `numero_cpf_cnpj` (str): CPF/CNPJ do pagador (máx 14 caracteres)
+    - `numero_cliente` (int): Número do contrato do beneficiário
+    - `client_id` (str): ClientId para autenticação
+    - `codigo_situacao` (int, opcional): Código da situação (1-Em Aberto, 2-Baixado, 3-Liquidado)
+    - `data_inicio` (str, opcional): Data de vencimento inicial (formato yyyy-MM-dd)
+    - `data_fim` (str, opcional): Data de vencimento final (formato yyyy-MM-dd)
+  - Retorna: Lista de boletos encontrados
+  - Exceções: `BoletoConsultaPagadorError` em caso de falha
 
 ### API de PIX
 **Arquivo:** `sicoob/pix.py`
@@ -169,6 +180,15 @@ boleto = sicoob.cobranca.boleto.emitir_boleto({
     "modalidade": 1,
     "valor": 100.50
 })
+
+boletos_por_pagador = sicoob.cobranca.boleto.consultar_boletos_por_pagador(
+    numero_cpf_cnpj="12345678901",
+    numero_cliente=123456,
+    client_id="client-id-123",
+    codigo_situacao=1,  # Em Aberto
+    data_inicio="2025-01-01",
+    data_fim="2025-06-30"
+)
 
 pix = sicoob.cobranca.pix.criar_cobranca_pix(
     "tx123", 

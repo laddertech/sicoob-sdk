@@ -5,6 +5,7 @@ from .api_client import APIClientBase
 from .exceptions import (
     BoletoEmissaoError,
     BoletoConsultaError,
+    BoletoConsultaPagadorError,
 )
 
 
@@ -58,6 +59,62 @@ class BoletoAPI(APIClientBase):
             raise BoletoEmissaoError(
                 f"Falha na comunicação com API de boletos: {str(e)}",
                 dados_boleto=dados_boleto,
+            ) from e
+
+    def consultar_boletos_por_pagador(
+        self,
+        numero_cpf_cnpj: str,
+        numero_cliente: int,
+        client_id: str,
+        codigo_situacao: Optional[int] = None,
+        data_inicio: Optional[str] = None,
+        data_fim: Optional[str] = None,
+    ) -> Dict:
+        """Consulta lista de boletos por pagador
+
+        Args:
+            numero_cpf_cnpj: CPF ou CNPJ do pagador (máx 14 caracteres)
+            numero_cliente: Número que identifica o contrato do beneficiário no Sisbr
+            client_id: ClientId utilizado na utilização do TOKEN
+            codigo_situacao: Código da Situação do Boleto (1-Em Aberto, 2-Baixado, 3-Liquidado)
+            data_inicio: Data de Vencimento Inicial (formato yyyy-MM-dd)
+            data_fim: Data de Vencimento Final (formato yyyy-MM-dd)
+
+        Returns:
+            Lista de boletos encontrados
+
+        Raises:
+            BoletoConsultaPagadorError: Em caso de falha na requisição
+        """
+        try:
+            params = {
+                "numeroCliente": numero_cliente,
+            }
+
+            if codigo_situacao:
+                params["codigoSituacao"] = codigo_situacao
+            if data_inicio:
+                params["dataInicio"] = data_inicio
+            if data_fim:
+                params["dataFim"] = data_fim
+
+            url = f"{self._get_base_url()}/cobranca-bancaria/v3/pagadores/{numero_cpf_cnpj}/boletos"
+            headers = self._get_headers(scope="boletos_consulta")
+            headers["client_id"] = client_id
+
+            response = self.session.get(url, params=params, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            if e.response is not None:
+                raise BoletoConsultaPagadorError(
+                    f"Falha na consulta de boletos por pagador - Status: {e.response.status_code}",
+                    code=e.response.status_code,
+                    numero_cpf_cnpj=numero_cpf_cnpj,
+                ) from e
+            raise BoletoConsultaPagadorError(
+                f"Falha na comunicação com API de boletos: {str(e)}",
+                numero_cpf_cnpj=numero_cpf_cnpj,
             ) from e
 
     def consultar_boleto(

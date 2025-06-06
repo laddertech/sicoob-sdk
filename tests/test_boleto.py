@@ -2,7 +2,7 @@ import pytest
 import requests
 from unittest.mock import Mock
 from sicoob.boleto import BoletoAPI
-from sicoob.exceptions import BoletoConsultaError
+from sicoob.exceptions import BoletoConsultaError, BoletoConsultaPagadorError
 
 
 @pytest.fixture
@@ -139,3 +139,99 @@ def test_consultar_boleto_erro_generico(boleto_client):
         boleto_client.consultar_boleto(
             numero_cliente=123456, codigo_modalidade=1, nosso_numero="123456789"
         )
+
+
+def test_consultar_boletos_por_pagador_sucesso(boleto_client):
+    """Testa a consulta de boletos por pagador com sucesso"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "boletos": [
+            {"nossoNumero": "123", "situacao": "EM_ABERTO"},
+            {"nossoNumero": "456", "situacao": "LIQUIDADO"}
+        ]
+    }
+    boleto_client.session.get.return_value = mock_response
+
+    # Chama o método com todos os parâmetros
+    result = boleto_client.consultar_boletos_por_pagador(
+        numero_cpf_cnpj="12345678901",
+        numero_cliente=123456,
+        client_id="client-id-123",
+        codigo_situacao=1,
+        data_inicio="2025-01-01",
+        data_fim="2025-06-30"
+    )
+
+    # Verificações
+    assert len(result["boletos"]) == 2
+    boleto_client.session.get.assert_called_once()
+    args, kwargs = boleto_client.session.get.call_args
+    assert "pagadores/12345678901/boletos" in args[0]
+    assert kwargs["params"]["numeroCliente"] == 123456
+    assert kwargs["params"]["codigoSituacao"] == 1
+    assert kwargs["params"]["dataInicio"] == "2025-01-01"
+    assert kwargs["params"]["dataFim"] == "2025-06-30"
+    assert kwargs["headers"]["client_id"] == "client-id-123"
+
+
+def test_consultar_boletos_por_pagador_apenas_obrigatorios(boleto_client):
+    """Testa a consulta de boletos por pagador apenas com parâmetros obrigatórios"""
+    # Configura o mock
+    mock_response = Mock()
+    mock_response.json.return_value = {"boletos": []}
+    boleto_client.session.get.return_value = mock_response
+
+    # Chama o método apenas com parâmetros obrigatórios
+    result = boleto_client.consultar_boletos_por_pagador(
+        numero_cpf_cnpj="12345678901",
+        numero_cliente=123456,
+        client_id="client-id-123"
+    )
+
+    # Verificações
+    assert len(result["boletos"]) == 0
+    args, kwargs = boleto_client.session.get.call_args
+    assert "pagadores/12345678901/boletos" in args[0]
+    assert kwargs["params"]["numeroCliente"] == 123456
+    assert "codigoSituacao" not in kwargs["params"]
+    assert "dataInicio" not in kwargs["params"]
+    assert "dataFim" not in kwargs["params"]
+
+
+def test_consultar_boletos_por_pagador_erro_http(boleto_client):
+    """Testa a consulta de boletos por pagador com erro HTTP"""
+    # Configura o mock para erro HTTP
+    mock_response = Mock()
+    http_error = requests.exceptions.HTTPError("500 Server Error")
+    http_error.response = mock_response
+    mock_response.status_code = 500
+    boleto_client.session.get.side_effect = http_error
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoConsultaPagadorError) as exc_info:
+        boleto_client.consultar_boletos_por_pagador(
+            numero_cpf_cnpj="12345678901",
+            numero_cliente=123456,
+            client_id="client-id-123"
+        )
+    assert "[500] Falha na consulta de boletos por pagador - Status: 500" in str(exc_info.value)
+    assert exc_info.value.numero_cpf_cnpj == "12345678901"
+
+
+def test_consultar_boletos_por_pagador_erro_generico(boleto_client):
+    """Testa a consulta de boletos por pagador com erro genérico"""
+    # Configura o mock para erro genérico
+    boleto_client.session.get.side_effect = requests.exceptions.RequestException(
+        "Erro de conexão"
+    )
+
+    # Verifica se exceção é levantada
+    with pytest.raises(BoletoConsultaPagadorError) as exc_info:
+        boleto_client.consultar_boletos_por_pagador(
+            numero_cpf_cnpj="12345678901",
+            numero_cliente=123456,
+            client_id="client-id-123"
+        )
+    assert "Falha na comunicação com API de boletos: Erro de conexão" in str(exc_info.value)
+    assert exc_info.value.numero_cpf_cnpj == "12345678901"

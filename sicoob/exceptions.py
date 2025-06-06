@@ -30,6 +30,13 @@ class BoletoConsultaError(BoletoError):
         super().__init__(message, code)
 
 
+class BoletoConsultaPagadorError(BoletoError):
+    """Erro durante a consulta de boletos por pagador"""
+    def __init__(self, message: str, code: int = None, numero_cpf_cnpj: str = None):
+        self.numero_cpf_cnpj = numero_cpf_cnpj
+        super().__init__(message, code)
+
+
 class BoletoNaoEncontradoError(BoletoConsultaError):
     """Boleto não encontrado durante consulta"""
     def __init__(self, nosso_numero: str):
