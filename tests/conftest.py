@@ -14,7 +14,6 @@ def sicoob_client(mock_oauth_client):
     """Fixture para cliente Sicoob com autenticação mockada"""
     client = Sicoob(
         client_id="test_id",
-        client_secret="test_secret",
         certificado="test_cert.pem",
         chave_privada="test_key.key"
     )

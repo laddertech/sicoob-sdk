@@ -8,13 +8,12 @@ class OAuth2Client:
     """Cliente OAuth2 para autenticação com a API Sicoob"""
 
     def __init__(
-        self, client_id=None, client_secret=None, certificado=None, chave_privada=None
+        self, client_id=None, certificado=None, chave_privada=None
     ):
         """Inicializa o cliente OAuth2"""
         load_dotenv()
 
         self.client_id = client_id or os.getenv("SICOOB_CLIENT_ID")
-        self.client_secret = client_secret or os.getenv("SICOOB_CLIENT_SECRET")
         self.certificado = certificado or os.getenv("SICOOB_CERTIFICADO")
         self.chave_privada = chave_privada or os.getenv("SICOOB_CHAVE_PRIVADA")
 
