@@ -25,3 +25,14 @@ bump-major:
 # Limpar builds anteriores
 clean:
 	rm -rf dist/ build/ *.egg-info/
+
+# Verificação de estilo/lint
+lint:
+	ruff check .
+
+# Formatação automática
+format:
+	ruff format .
+
+# Verificar e corrigir automaticamente
+fix: lint format
