@@ -25,7 +25,7 @@ from .exceptions import (
     QrCodePixError
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.3"
 __all__ = [
     "Sicoob",
     "ContaCorrenteAPI",

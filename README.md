@@ -77,6 +77,40 @@ A API trata os seguintes casos de erro:
 - **Erros HTTP (400, 500, etc)**: Levanta exceção com código e mensagem
 - **Erros de conexão**: Levanta exceção com detalhes do erro
 
+## Versionamento e Deploy
+
+O projeto segue [Semantic Versioning](https://semver.org/). Para criar um novo release:
+
+1. Atualize a versão em:
+   - `setup.py`
+   - `pyproject.toml`
+   - `sicoob/__init__.py`
+
+2. Execute os testes:
+```bash
+make test
+```
+
+3. Crie um novo release no GitHub:
+   - Acesse "Releases" no repositório
+   - Clique em "Draft a new release"
+   - Defina a tag no formato `vX.Y.Z` (ex: `v0.1.3`)
+   - O GitHub Actions irá automaticamente:
+     - Construir o pacote (`make build`)
+     - Publicar no PyPI (`make publish`)
+
+### Comandos Úteis
+```bash
+# Construir pacote
+make build
+
+# Executar testes
+make test
+
+# Publicar no PyPI (requer TWINE_USERNAME e TWINE_PASSWORD)
+make publish
+```
+
 ## Links Úteis
 
 - [Documentação API Sicoob](https://developers.sicoob.com.br)
