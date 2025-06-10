@@ -1,13 +1,11 @@
 from typing import Dict
 import requests
 from .auth import OAuth2Client
+from .constants import BASE_URL, SANDBOX_URL
 
 
 class APIClientBase:
     """Classe base para APIs do Sicoob"""
-
-    BASE_URL = "https://api.sicoob.com.br"
-    SANDBOX_URL = "https://sandbox.sicoob.com.br/sicoob/sandbox"
 
     def __init__(
         self,
@@ -28,7 +26,7 @@ class APIClientBase:
 
     def _get_base_url(self) -> str:
         """Retorna a URL base conforme modo de operação"""
-        return self.SANDBOX_URL if self.sandbox_mode else self.BASE_URL
+        return SANDBOX_URL if self.sandbox_mode else BASE_URL
 
     def _get_headers(self, scope) -> Dict[str, str]:
         """Retorna headers padrão com token de acesso"""

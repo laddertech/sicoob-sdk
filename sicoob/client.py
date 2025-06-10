@@ -6,15 +6,14 @@ from .auth import OAuth2Client
 class Sicoob:
     """Cliente para API do Sicoob"""
 
-    BASE_URL = "https://api.sicoob.com.br"
-
-    def __init__(self, client_id=None, certificado=None, chave_privada=None):
+    def __init__(self, client_id=None, certificado=None, chave_privada=None, sandbox_mode=False):
         """Inicializa o cliente com credenciais"""
         load_dotenv()
 
         self.client_id = client_id or os.getenv("SICOOB_CLIENT_ID")
         self.certificado = certificado or os.getenv("SICOOB_CERTIFICADO")
         self.chave_privada = chave_privada or os.getenv("SICOOB_CHAVE_PRIVADA")
+        self.sandbox_mode = sandbox_mode
 
         if not all([self.client_id, self.certificado, self.chave_privada]):
             raise ValueError("Credenciais incompletas. Configure via parâmetros ou arquivo .env")
@@ -50,11 +49,11 @@ class Sicoob:
         """
         from .cobranca import BoletoAPI, PixAPI
         class CobrancaServices:
-            def __init__(self, oauth_client, session):
-                self.boleto = BoletoAPI(oauth_client, session)
-                self.pix = PixAPI(oauth_client, session)
+            def __init__(self, oauth_client, session, sandbox_mode):
+                self.boleto = BoletoAPI(oauth_client, session, sandbox_mode=sandbox_mode)
+                self.pix = PixAPI(oauth_client, session, sandbox_mode=sandbox_mode)
 
-        return CobrancaServices(self.oauth_client, self.session)
+        return CobrancaServices(self.oauth_client, self.session, self.sandbox_mode)
 
     @property
     def conta_corrente(self):
@@ -72,4 +71,4 @@ class Sicoob:
             >>> transferencia = sicoob.conta_corrente.transferencia(valor, conta_destino)
         """
         from .conta_corrente import ContaCorrenteAPI
-        return ContaCorrenteAPI(self.oauth_client, self.session)
+        return ContaCorrenteAPI(self.oauth_client, self.session, self.sandbox_mode)
