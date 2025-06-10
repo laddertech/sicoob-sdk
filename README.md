@@ -109,6 +109,31 @@ make test
 
 # Publicar no PyPI (requer TWINE_USERNAME e TWINE_PASSWORD)
 make publish
+
+# Incrementar versão (patch, minor ou major)
+make bump-patch   # Incrementa patch version (0.1.2 → 0.1.3)
+make bump-minor   # Incrementa minor version (0.1.2 → 0.2.0)
+make bump-major   # Incrementa major version (0.1.2 → 1.0.0)
+```
+
+### Como Incrementar a Versão
+1. Execute o comando apropriado:
+```bash
+make bump-patch   # Para correções de bugs
+make bump-minor   # Para novas funcionalidades compatíveis
+make bump-major   # Para mudanças incompatíveis
+```
+
+2. Verifique as alterações nos arquivos:
+```bash
+git diff
+```
+
+3. Commit e push das alterações:
+```bash
+git add .
+git commit -m "Bump version to X.Y.Z"
+git push
 ```
 
 ## Links Úteis

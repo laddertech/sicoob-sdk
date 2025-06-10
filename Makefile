@@ -1,4 +1,4 @@
-.PHONY: build test publish
+.PHONY: build test publish bump-patch bump-minor bump-major
 
 # Build do pacote
 build:
@@ -11,6 +11,16 @@ test:
 # Publicar no PyPI (requer TWINE_USERNAME e TWINE_PASSWORD)
 publish: build
 	twine upload dist/*
+
+# Incrementar versão (patch, minor, major)
+bump-patch:
+	python scripts/bump_version.py patch
+
+bump-minor:
+	python scripts/bump_version.py minor
+
+bump-major:
+	python scripts/bump_version.py major
 
 # Limpar builds anteriores
 clean:
