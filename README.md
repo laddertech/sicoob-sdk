@@ -16,7 +16,6 @@ Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
 
 ```ini
 SICOOB_CLIENT_ID=seu_client_id
-SICOOB_CLIENT_SECRET=seu_client_secret
 SICOOB_CERTIFICADO=caminho/para/certificado.pem
 SICOOB_CHAVE_PRIVADA=caminho/para/chave_privada.key
 ```
@@ -29,8 +28,7 @@ from sicoob import Sicoob
 # Inicializa o cliente
 cliente = Sicoob(
     client_id="seu_client_id",
-    client_secret="seu_client_secret",
-    certificado="caminho/para/certificado.pem",
+    certificado="caminho/para/certificado.pem", 
     chave_privada="caminho/para/chave_privada.key"
 )
 
