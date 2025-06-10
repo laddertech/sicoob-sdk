@@ -1,12 +1,8 @@
-from typing import Dict, List, Optional
 import requests
-from .auth import OAuth2Client
+
 from .api_client import APIClientBase
-from .exceptions import (
-    ExtratoError,
-    SaldoError,
-    TransferenciaError
-)
+from .auth import OAuth2Client
+from .exceptions import ExtratoError, SaldoError, TransferenciaError
 
 
 class ContaCorrenteAPI(APIClientBase):
@@ -17,7 +13,7 @@ class ContaCorrenteAPI(APIClientBase):
         oauth_client: OAuth2Client,
         session: requests.Session,
         sandbox_mode: bool = False,
-    ):
+    ) -> None:
         """Inicializa a API de conta corrente.
 
         Args:
@@ -26,7 +22,7 @@ class ContaCorrenteAPI(APIClientBase):
             sandbox_mode: Se True, usa URL de sandbox (default: False)
         """
         super().__init__(oauth_client, session, sandbox_mode)
-        self.base_path = "/conta-corrente/v4"
+        self.base_path = '/conta-corrente/v4'
 
     def extrato(
         self,
@@ -36,7 +32,7 @@ class ContaCorrenteAPI(APIClientBase):
         dia_final: int,
         numero_conta_corrente: int,
         agrupar_cnab: bool = False,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Obtém o extrato da conta corrente por período.
 
         Args:
@@ -54,36 +50,36 @@ class ContaCorrenteAPI(APIClientBase):
             ExtratoError: Em caso de falha na requisição de extrato
         """
         try:
-            headers = self._get_headers(scope="cco_consulta")
-            headers["client_id"] = str(self.oauth_client.client_id)
+            headers = self._get_headers(scope='cco_consulta')
+            headers['client_id'] = str(self.oauth_client.client_id)
 
             params = {
-                "diaInicial": dia_inicial,
-                "diaFinal": dia_final,
-                "numeroContaCorrente": numero_conta_corrente,
-                "agruparCNAB": str(agrupar_cnab).lower(),
+                'diaInicial': dia_inicial,
+                'diaFinal': dia_final,
+                'numeroContaCorrente': numero_conta_corrente,
+                'agruparCNAB': str(agrupar_cnab).lower(),
             }
 
-            url = f"{self._get_base_url()}{self.base_path}/extrato/{mes}/{ano}"
+            url = f'{self._get_base_url()}{self.base_path}/extrato/{mes}/{ano}'
             response = self.session.get(url, params=params, headers=headers)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
                 raise ExtratoError(
-                    f"Extrato não encontrado - Status: {e.response.status_code}",
+                    f'Extrato não encontrado - Status: {e.response.status_code}',
                     code=e.response.status_code,
-                    periodo=f"{dia_inicial}/{mes}/{ano}"
-                )
+                    periodo=f'{dia_inicial}/{mes}/{ano}',
+                ) from e
             raise ExtratoError(
-                f"Falha ao consultar extrato - Status: {e.response.status_code}",
+                f'Falha ao consultar extrato - Status: {e.response.status_code}',
                 code=e.response.status_code,
-                periodo=f"{dia_inicial}/{mes}/{ano}"
-            )
+                periodo=f'{dia_inicial}/{mes}/{ano}',
+            ) from e
         except Exception as e:
-            raise ExtratoError(f"Erro ao consultar extrato: {str(e)}")
+            raise ExtratoError(f'Erro ao consultar extrato: {e!s}') from e
 
-    def saldo(self, numero_conta: Optional[str] = None) -> Dict:
+    def saldo(self, numero_conta: str | None = None) -> dict:
         """Obtém o saldo atual da conta corrente.
 
         Args:
@@ -98,31 +94,33 @@ class ContaCorrenteAPI(APIClientBase):
         try:
             params = {}
             if numero_conta:
-                params["numeroConta"] = numero_conta
+                params['numeroConta'] = numero_conta
 
-            url = f"{self._get_base_url()}{self.base_path}/saldo"
+            url = f'{self._get_base_url()}{self.base_path}/saldo'
             response = self.session.get(
-                url, params=params, headers=self._get_headers(scope="cco_consulta")
+                url, params=params, headers=self._get_headers(scope='cco_consulta')
             )
             response.raise_for_status()
             return response.json()
         except requests.exceptions.HTTPError as e:
             raise SaldoError(
-                f"Falha na consulta de saldo - Status: {e.response.status_code}",
+                f'Falha na consulta de saldo - Status: {e.response.status_code}',
                 code=e.response.status_code,
-                conta=numero_conta
-            )
+                conta=numero_conta,
+            ) from e
         except Exception as e:
-            raise SaldoError(f"Erro ao consultar saldo: {str(e)}", conta=numero_conta)
+            raise SaldoError(
+                f'Erro ao consultar saldo: {e!s}', conta=numero_conta
+            ) from e
 
     def transferencia(
         self,
         valor: float,
         conta_destino: str,
-        tipo_transferencia: str = "TED",
-        descricao: Optional[str] = None,
-        numero_conta: Optional[str] = None,
-    ) -> Dict:
+        tipo_transferencia: str = 'TED',
+        descricao: str | None = None,
+        numero_conta: str | None = None,
+    ) -> dict:
         """Realiza uma transferência entre contas.
 
         Args:
@@ -140,26 +138,28 @@ class ContaCorrenteAPI(APIClientBase):
         """
         try:
             payload = {
-                "valor": valor,
-                "contaDestino": conta_destino,
-                "tipoTransferencia": tipo_transferencia,
+                'valor': valor,
+                'contaDestino': conta_destino,
+                'tipoTransferencia': tipo_transferencia,
             }
             if descricao:
-                payload["descricao"] = descricao
+                payload['descricao'] = descricao
             if numero_conta:
-                payload["numeroConta"] = numero_conta
+                payload['numeroConta'] = numero_conta
 
-            url = f"{self._get_base_url()}{self.base_path}/transferencia"
+            url = f'{self._get_base_url()}{self.base_path}/transferencia'
             response = self.session.post(
-                url, json=payload, headers=self._get_headers(scope="cco_transferencias")
+                url, json=payload, headers=self._get_headers(scope='cco_transferencias')
             )
             response.raise_for_status()
             return response.json()
         except requests.exceptions.HTTPError as e:
             raise TransferenciaError(
-                f"Falha na transferência - Status: {e.response.status_code}",
+                f'Falha na transferência - Status: {e.response.status_code}',
                 code=e.response.status_code,
-                dados=payload
-            )
+                dados=payload,
+            ) from e
         except Exception as e:
-            raise TransferenciaError(f"Erro na transferência: {str(e)}", dados=payload)
+            raise TransferenciaError(
+                f'Erro na transferência: {e!s}', dados=payload
+            ) from e

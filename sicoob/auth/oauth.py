@@ -1,28 +1,33 @@
 import os
 import time
-from dotenv import load_dotenv
+
 import requests
+from constants import AUTH_URL
+from dotenv import load_dotenv
 
 
 class OAuth2Client:
     """Cliente OAuth2 para autenticação com a API Sicoob"""
 
     def __init__(
-        self, client_id=None, certificado=None, chave_privada=None
-    ):
+        self,
+        client_id: str | None = None,
+        certificado: str | None = None,
+        chave_privada: str | None = None,
+    ) -> None:
         """Inicializa o cliente OAuth2"""
         load_dotenv()
 
-        self.client_id = client_id or os.getenv("SICOOB_CLIENT_ID")
-        self.certificado = certificado or os.getenv("SICOOB_CERTIFICADO")
-        self.chave_privada = chave_privada or os.getenv("SICOOB_CHAVE_PRIVADA")
+        self.client_id = client_id or os.getenv('SICOOB_CLIENT_ID')
+        self.certificado = certificado or os.getenv('SICOOB_CERTIFICADO')
+        self.chave_privada = chave_privada or os.getenv('SICOOB_CHAVE_PRIVADA')
 
-        self.token_url = "https://auth.sicoob.com.br/auth/realms/cooperado/protocol/openid-connect/token"
+        self.token_url = AUTH_URL  # URL de autenticação OAuth2
         self.token_cache = {}  # Cache de tokens por escopo
         self.session = requests.Session()
         self.session.cert = (self.certificado, self.chave_privada)
 
-    def get_access_token(self, scope=None):
+    def get_access_token(self, scope: str | None = None) -> str:
         """Obtém ou renova o token de acesso para o escopo especificado
 
         Args:
@@ -36,33 +41,33 @@ class OAuth2Client:
         """
         # Usa escopo padrão se não especificado (para compatibilidade)
         if scope is None:
-            scope = "cco_extrato cco_consulta"
+            scope = 'cco_extrato cco_consulta'
 
         # Verifica se já existe token válido para este escopo
         if scope in self.token_cache and not self._is_token_expired(scope):
-            return self.token_cache[scope]["access_token"]
+            return self.token_cache[scope]['access_token']
 
         token_data = {
-            "grant_type": "client_credentials",
-            "client_id": self.client_id,
-            "scope": scope,
+            'grant_type': 'client_credentials',
+            'client_id': self.client_id,
+            'scope': scope,
         }
 
         response = self.session.post(self.token_url, data=token_data)
         response.raise_for_status()
 
         token_info = response.json()
-        token_info["expires_at"] = time.time() + token_info["expires_in"]
+        token_info['expires_at'] = time.time() + token_info['expires_in']
 
         # Armazena o token no cache por escopo
         self.token_cache[scope] = token_info
 
-        return token_info["access_token"]
+        return token_info['access_token']
 
-    def _is_token_expired(self, scope):
+    def _is_token_expired(self, scope: str) -> bool:
         """Verifica se o token para o escopo especificado expirou"""
-        if scope not in self.token_cache or "expires_at" not in self.token_cache[scope]:
+        if scope not in self.token_cache or 'expires_at' not in self.token_cache[scope]:
             return True
         return (
-            time.time() >= self.token_cache[scope]["expires_at"] - 60
+            time.time() >= self.token_cache[scope]['expires_at'] - 60
         )  # 60s de margem

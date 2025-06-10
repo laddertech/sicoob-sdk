@@ -1,8 +1,9 @@
-import re
 import argparse
+import re
 from pathlib import Path
 
-def get_current_version(file_path):
+
+def get_current_version(file_path: str) -> str | None:
     """Extrai a versão atual do arquivo"""
     content = file_path.read_text()
 
@@ -15,32 +16,28 @@ def get_current_version(file_path):
 
     return match.group(1) if match else None
 
-def update_version(file_path, new_version):
+
+def update_version(file_path: str, new_version: str) -> None:
     """Atualiza a versão no arquivo"""
     content = file_path.read_text()
 
     if file_path.name == 'pyproject.toml':
         new_content = re.sub(
-            r'(version\s*=\s*")[\d.]+(")',
-            fr'\g<1>{new_version}\g<2>',
-            content
+            r'(version\s*=\s*")[\d.]+(")', rf'\g<1>{new_version}\g<2>', content
         )
     elif file_path.name == 'setup.py':
         new_content = re.sub(
-            r'(version\s*=\s*")[\d.]+(")',
-            fr'\g<1>{new_version}\g<2>',
-            content
+            r'(version\s*=\s*")[\d.]+(")', rf'\g<1>{new_version}\g<2>', content
         )
     elif file_path.name == '__init__.py':
         new_content = re.sub(
-            r'(__version__\s*=\s*")[\d.]+(")',
-            fr'\g<1>{new_version}\g<2>',
-            content
+            r'(__version__\s*=\s*")[\d.]+(")', rf'\g<1>{new_version}\g<2>', content
         )
 
     file_path.write_text(new_content)
 
-def bump_version(version, part='patch'):
+
+def bump_version(version: str, part: str = 'patch') -> str:
     """Incrementa a versão de acordo com semantic versioning"""
     major, minor, patch = map(int, version.split('.'))
 
@@ -54,41 +51,43 @@ def bump_version(version, part='patch'):
     else:  # patch
         patch += 1
 
-    return f"{major}.{minor}.{patch}"
+    return f'{major}.{minor}.{patch}'
 
-def main():
+
+def main() -> None:
     parser = argparse.ArgumentParser(description='Bump version in project files')
-    parser.add_argument('part', type=str, choices=['major', 'minor', 'patch'],
-                       help='Which part of version to bump')
+    parser.add_argument(
+        'part',
+        type=str,
+        choices=['major', 'minor', 'patch'],
+        help='Which part of version to bump',
+    )
     args = parser.parse_args()
 
     # Arquivos que contém a versão
-    files = [
-        Path('pyproject.toml'),
-        Path('setup.py'),
-        Path('sicoob/__init__.py')
-    ]
+    files = [Path('pyproject.toml'), Path('setup.py'), Path('sicoob/__init__.py')]
 
     # Verifica se todos os arquivos existem
     for file in files:
         if not file.exists():
-            print(f"Error: {file} not found")
+            print(f'Error: {file} not found')
             return
 
     # Pega a versão atual (usando setup.py como referência)
     current_version = get_current_version(files[0])
     if not current_version:
-        print("Error: Could not determine current version")
+        print('Error: Could not determine current version')
         return
 
     # Calcula nova versão
     new_version = bump_version(current_version, args.part)
-    print(f"Bumping version from {current_version} to {new_version}")
+    print(f'Bumping version from {current_version} to {new_version}')
 
     # Atualiza todos os arquivos
     for file in files:
         update_version(file, new_version)
-        print(f"Updated {file}")
+        print(f'Updated {file}')
+
 
 if __name__ == '__main__':
     main()

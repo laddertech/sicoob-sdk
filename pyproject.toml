@@ -13,8 +13,43 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    "build>=1.2.2.post1",
-    "twine>=6.1.0",
-    "ruff>=0.4.2",
+dev = ["build>=1.2.2.post1", "twine>=6.1.0", "ruff>=0.4.2"]
+
+
+[tool.ruff]
+# Configurações base do Ruff
+line-length = 88
+exclude = [
+    ".venv",
+    "build",
+    "dist",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
 ]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C",   # flake8-comprehensions
+    "UP",  # pyupgrade
+    "YTT", # flake8-2020
+    "ANN", # flake8-annotations
+    "S",   # flake8-bandit
+    "RUF", # Ruff-specific rules
+]
+ignore = [
+    "E501", # Line too long (handled by black)
+    "S101", # Use of print (handled by black)
+]
+
+# Configurações específicas
+[tool.ruff.lint.isort]
+known-first-party = ["sicoob"]
+
+[tool.ruff.format]
+quote-style = "single"

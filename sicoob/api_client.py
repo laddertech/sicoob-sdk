@@ -1,5 +1,5 @@
-from typing import Dict
 import requests
+
 from .auth import OAuth2Client
 from .constants import BASE_URL, SANDBOX_URL
 
@@ -12,7 +12,7 @@ class APIClientBase:
         oauth_client: OAuth2Client,
         session: requests.Session,
         sandbox_mode: bool = False,
-    ):
+    ) -> None:
         """Inicializa com cliente OAuth e sessão HTTP existente
 
         Args:
@@ -28,11 +28,11 @@ class APIClientBase:
         """Retorna a URL base conforme modo de operação"""
         return SANDBOX_URL if self.sandbox_mode else BASE_URL
 
-    def _get_headers(self, scope) -> Dict[str, str]:
+    def _get_headers(self, scope: str) -> dict[str, str]:
         """Retorna headers padrão com token de acesso"""
         token = self.oauth_client.get_access_token(scope)
         return {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
         }

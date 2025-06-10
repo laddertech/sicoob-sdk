@@ -2,4 +2,4 @@
 
 from .oauth import OAuth2Client
 
-__all__ = ["OAuth2Client"]
+__all__ = ['OAuth2Client']

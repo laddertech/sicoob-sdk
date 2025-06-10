@@ -1,4 +1,3 @@
-from typing import Dict, Optional
 import requests
 
 from .api_client import APIClientBase
@@ -6,10 +5,10 @@ from .exceptions import (
     BoletoAlteracaoError,
     BoletoAlteracaoPagadorError,
     BoletoBaixaError,
-    BoletoEmissaoError,
     BoletoConsultaError,
-    BoletoConsultaPagadorError,
     BoletoConsultaFaixaError,
+    BoletoConsultaPagadorError,
+    BoletoEmissaoError,
     BoletoWebhookError,
 )
 
@@ -36,7 +35,7 @@ class BoletoAPI(APIClientBase):
         >>> boleto = boleto_api.emitir_boleto(dados)
     """
 
-    def emitir_boleto(self, dados_boleto: Dict) -> Dict:
+    def emitir_boleto(self, dados_boleto: dict) -> dict:
         """Emite um novo boleto bancário
 
         Args:
@@ -49,20 +48,20 @@ class BoletoAPI(APIClientBase):
             Exception: Em caso de falha na requisição
         """
         try:
-            url = f"{self._get_base_url()}/cobranca-bancaria/v3/boletos"
-            headers = self._get_headers(scope="boletos_inclusao")
+            url = f'{self._get_base_url()}/cobranca-bancaria/v3/boletos'
+            headers = self._get_headers(scope='boletos_inclusao')
             response = self.session.post(url, json=dados_boleto, headers=headers)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoEmissaoError(
-                    f"Falha na emissão do boleto - Status: {e.response.status_code}",
+                    f'Falha na emissão do boleto - Status: {e.response.status_code}',
                     code=e.response.status_code,
                     dados_boleto=dados_boleto,
                 ) from e
             raise BoletoEmissaoError(
-                f"Falha na comunicação com API de boletos: {str(e)}",
+                f'Falha na comunicação com API de boletos: {e!s}',
                 dados_boleto=dados_boleto,
             ) from e
 
@@ -71,10 +70,10 @@ class BoletoAPI(APIClientBase):
         numero_cpf_cnpj: str,
         numero_cliente: int,
         client_id: str,
-        codigo_situacao: Optional[int] = None,
-        data_inicio: Optional[str] = None,
-        data_fim: Optional[str] = None,
-    ) -> Dict:
+        codigo_situacao: int | None = None,
+        data_inicio: str | None = None,
+        data_fim: str | None = None,
+    ) -> dict:
         """Consulta lista de boletos por pagador
 
         Args:
@@ -93,19 +92,19 @@ class BoletoAPI(APIClientBase):
         """
         try:
             params = {
-                "numeroCliente": numero_cliente,
+                'numeroCliente': numero_cliente,
             }
 
             if codigo_situacao:
-                params["codigoSituacao"] = codigo_situacao
+                params['codigoSituacao'] = codigo_situacao
             if data_inicio:
-                params["dataInicio"] = data_inicio
+                params['dataInicio'] = data_inicio
             if data_fim:
-                params["dataFim"] = data_fim
+                params['dataFim'] = data_fim
 
-            url = f"{self._get_base_url()}/cobranca-bancaria/v3/pagadores/{numero_cpf_cnpj}/boletos"
-            headers = self._get_headers(scope="boletos_consulta")
-            headers["client_id"] = client_id
+            url = f'{self._get_base_url()}/cobranca-bancaria/v3/pagadores/{numero_cpf_cnpj}/boletos'
+            headers = self._get_headers(scope='boletos_consulta')
+            headers['client_id'] = client_id
 
             response = self.session.get(url, params=params, headers=headers)
             response.raise_for_status()
@@ -113,12 +112,12 @@ class BoletoAPI(APIClientBase):
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoConsultaPagadorError(
-                    f"Falha na consulta de boletos por pagador - Status: {e.response.status_code}",
+                    f'Falha na consulta de boletos por pagador - Status: {e.response.status_code}',
                     code=e.response.status_code,
                     numero_cpf_cnpj=numero_cpf_cnpj,
                 ) from e
             raise BoletoConsultaPagadorError(
-                f"Falha na comunicação com API de boletos: {str(e)}",
+                f'Falha na comunicação com API de boletos: {e!s}',
                 numero_cpf_cnpj=numero_cpf_cnpj,
             ) from e
 
@@ -126,13 +125,13 @@ class BoletoAPI(APIClientBase):
         self,
         numero_cliente: int,
         codigo_modalidade: int,
-        nosso_numero: Optional[int] = None,
-        linha_digitavel: Optional[str] = None,
-        codigo_barras: Optional[str] = None,
+        nosso_numero: int | None = None,
+        linha_digitavel: str | None = None,
+        codigo_barras: str | None = None,
         gerar_pdf: bool = False,
-        numero_contrato_cobranca: Optional[int] = None,
-        client_id: Optional[str] = None,
-    ) -> Dict:
+        numero_contrato_cobranca: int | None = None,
+        client_id: str | None = None,
+    ) -> dict:
         """Emite segunda via de um boleto existente
 
         Args:
@@ -154,30 +153,30 @@ class BoletoAPI(APIClientBase):
         """
         try:
             params = {
-                "numeroCliente": numero_cliente,
-                "codigoModalidade": codigo_modalidade,
-                "gerarPdf": "true" if gerar_pdf else "false"
+                'numeroCliente': numero_cliente,
+                'codigoModalidade': codigo_modalidade,
+                'gerarPdf': 'true' if gerar_pdf else 'false',
             }
 
             if nosso_numero:
-                params["nossoNumero"] = nosso_numero
+                params['nossoNumero'] = nosso_numero
             elif linha_digitavel:
-                params["linhaDigitavel"] = linha_digitavel
+                params['linhaDigitavel'] = linha_digitavel
             elif codigo_barras:
-                params["codigoBarras"] = codigo_barras
+                params['codigoBarras'] = codigo_barras
             else:
                 raise ValueError(
-                    "Deve ser fornecido pelo menos um identificador de boleto "
-                    "(nossoNumero, linhaDigitavel ou codigoBarras)"
+                    'Deve ser fornecido pelo menos um identificador de boleto '
+                    '(nossoNumero, linhaDigitavel ou codigoBarras)'
                 )
 
             if numero_contrato_cobranca:
-                params["numeroContratoCobranca"] = numero_contrato_cobranca
+                params['numeroContratoCobranca'] = numero_contrato_cobranca
 
-            url = f"{self._get_base_url()}/cobranca-bancaria/v3/boletos/segunda-via"
-            headers = self._get_headers(scope="boletos_inclusao")
+            url = f'{self._get_base_url()}/cobranca-bancaria/v3/boletos/segunda-via'
+            headers = self._get_headers(scope='boletos_inclusao')
             if client_id:
-                headers["client_id"] = client_id
+                headers['client_id'] = client_id
 
             response = self.session.get(url, params=params, headers=headers)
             response.raise_for_status()
@@ -185,12 +184,12 @@ class BoletoAPI(APIClientBase):
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoEmissaoError(
-                    f"Falha na emissão da segunda via - Status: {e.response.status_code}",
+                    f'Falha na emissão da segunda via - Status: {e.response.status_code}',
                     code=e.response.status_code,
                     dados_boleto=params,
                 ) from e
             raise BoletoEmissaoError(
-                f"Falha na comunicação com API de boletos: {str(e)}",
+                f'Falha na comunicação com API de boletos: {e!s}',
                 dados_boleto=params,
             ) from e
 
@@ -200,8 +199,8 @@ class BoletoAPI(APIClientBase):
         codigo_modalidade: int,
         quantidade: int,
         client_id: str,
-        numero_contrato_cobranca: Optional[int] = None,
-    ) -> Dict:
+        numero_contrato_cobranca: int | None = None,
+    ) -> dict:
         """Consulta faixas de nosso número disponíveis
 
         Args:
@@ -222,17 +221,17 @@ class BoletoAPI(APIClientBase):
         """
         try:
             params = {
-                "numeroCliente": numero_cliente,
-                "codigoModalidade": codigo_modalidade,
-                "quantidade": quantidade,
+                'numeroCliente': numero_cliente,
+                'codigoModalidade': codigo_modalidade,
+                'quantidade': quantidade,
             }
 
             if numero_contrato_cobranca:
-                params["numeroContratoCobranca"] = numero_contrato_cobranca
+                params['numeroContratoCobranca'] = numero_contrato_cobranca
 
-            url = f"{self._get_base_url()}/cobranca-bancaria/v3/boletos/faixas-nosso-numero"
-            headers = self._get_headers(scope="boletos_consulta")
-            headers["client_id"] = client_id
+            url = f'{self._get_base_url()}/cobranca-bancaria/v3/boletos/faixas-nosso-numero'
+            headers = self._get_headers(scope='boletos_consulta')
+            headers['client_id'] = client_id
 
             response = self.session.get(url, params=params, headers=headers)
 
@@ -240,36 +239,38 @@ class BoletoAPI(APIClientBase):
             if response.status_code in (400, 406, 500):
                 error_data = response.json()
                 raise BoletoConsultaFaixaError(
-                    f"Falha na consulta de faixas: {error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')}",
+                    f'Falha na consulta de faixas: {error_data.get("mensagens", [{}])[0].get("mensagem", "Erro desconhecido")}',
                     code=response.status_code,
-                    numero_cliente=numero_cliente
+                    numero_cliente=numero_cliente,
                 )
 
             response.raise_for_status()
 
             data = response.json()
             # Ajusta para a estrutura esperada (array resultado)
-            if "resultado" in data and len(data["resultado"]) > 0:
-                faixa = data["resultado"][0]
+            if 'resultado' in data and len(data['resultado']) > 0:
+                faixa = data['resultado'][0]
                 # Converte validaDigitoVerificadorNossoNumero para int (0/1) se for boolean
-                if isinstance(faixa.get("validaDigitoVerificadorNossoNumero"), bool):
-                    faixa["validaDigitoVerificadorNossoNumero"] = 1 if faixa["validaDigitoVerificadorNossoNumero"] else 0
+                if isinstance(faixa.get('validaDigitoVerificadorNossoNumero'), bool):
+                    faixa['validaDigitoVerificadorNossoNumero'] = (
+                        1 if faixa['validaDigitoVerificadorNossoNumero'] else 0
+                    )
                 return faixa
 
             raise BoletoConsultaFaixaError(
-                "Nenhuma faixa disponível encontrada",
+                'Nenhuma faixa disponível encontrada',
                 code=404,
-                numero_cliente=numero_cliente
+                numero_cliente=numero_cliente,
             )
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoConsultaFaixaError(
-                    f"Falha na consulta de faixas - Status: {e.response.status_code}",
+                    f'Falha na consulta de faixas - Status: {e.response.status_code}',
                     code=e.response.status_code,
                     numero_cliente=numero_cliente,
                 ) from e
             raise BoletoConsultaFaixaError(
-                f"Falha na comunicação com API de boletos: {str(e)}",
+                f'Falha na comunicação com API de boletos: {e!s}',
                 numero_cliente=numero_cliente,
             ) from e
 
@@ -277,12 +278,12 @@ class BoletoAPI(APIClientBase):
         self,
         numero_cliente: int,
         codigo_modalidade: int,
-        nosso_numero: Optional[int] = None,
-        linha_digitavel: Optional[str] = None,
-        codigo_barras: Optional[str] = None,
-        numero_contrato_cobranca: Optional[int] = None,
-        client_id: Optional[str] = None,
-    ) -> Optional[Dict]:
+        nosso_numero: int | None = None,
+        linha_digitavel: str | None = None,
+        codigo_barras: str | None = None,
+        numero_contrato_cobranca: int | None = None,
+        client_id: str | None = None,
+    ) -> dict | None:
         """Consulta um boleto existente conforme parâmetros da API Sicoob
 
         Args:
@@ -302,31 +303,29 @@ class BoletoAPI(APIClientBase):
         """
         try:
             params = {
-                "numeroCliente": numero_cliente,
-                "codigoModalidade": codigo_modalidade,
+                'numeroCliente': numero_cliente,
+                'codigoModalidade': codigo_modalidade,
             }
 
             if nosso_numero:
-                params["nossoNumero"] = nosso_numero
+                params['nossoNumero'] = nosso_numero
             elif linha_digitavel:
-                params["linhaDigitavel"] = linha_digitavel
+                params['linhaDigitavel'] = linha_digitavel
             elif codigo_barras:
-                params["codigoBarras"] = codigo_barras
+                params['codigoBarras'] = codigo_barras
             else:
                 raise ValueError(
-                    (
-                        "Deve ser fornecido pelo menos um identificador de boleto "
-                        "(nossoNumero, linhaDigitavel ou codigoBarras)"
-                    )
+                    'Deve ser fornecido pelo menos um identificador de boleto '
+                    '(nossoNumero, linhaDigitavel ou codigoBarras)'
                 )
 
             if numero_contrato_cobranca:
-                params["numeroContratoCobranca"] = numero_contrato_cobranca
+                params['numeroContratoCobranca'] = numero_contrato_cobranca
 
-            url = f"{self._get_base_url()}/cobranca-bancaria/v3/boletos"
-            headers = self._get_headers(scope="boletos_consulta")
+            url = f'{self._get_base_url()}/cobranca-bancaria/v3/boletos'
+            headers = self._get_headers(scope='boletos_consulta')
             if client_id:
-                headers["client_id"] = client_id
+                headers['client_id'] = client_id
 
             response = self.session.get(url, params=params, headers=headers)
             response.raise_for_status()
@@ -336,20 +335,19 @@ class BoletoAPI(APIClientBase):
                 if e.response.status_code == 404:
                     return None
                 raise BoletoConsultaError(
-                    f"Falha na consulta do boleto - Status: {e.response.status_code}",
+                    f'Falha na consulta do boleto - Status: {e.response.status_code}',
                     code=e.response.status_code,
-                    nosso_numero=str(params.get("nossoNumero", "")),
+                    nosso_numero=str(params.get('nossoNumero', '')),
                 ) from e
             raise BoletoConsultaError(
-                f"Falha na comunicação com API de boletos: {str(e)}",
-                nosso_numero=str(params.get("nossoNumero", "")),
+                f'Falha na comunicação com API de boletos: {e!s}',
+                nosso_numero=str(params.get('nossoNumero', '')),
             ) from e
-
 
     def baixar_boleto(
         self,
         nosso_numero: int,
-        dados_boleto: Dict,
+        dados_boleto: dict,
         client_id: str,
     ) -> None:
         """Comanda a baixa de um boleto existente
@@ -368,9 +366,9 @@ class BoletoAPI(APIClientBase):
             BoletoBaixaError: Em caso de falha na requisição com status 400, 406 ou 500
         """
         try:
-            url = f"{self._get_base_url()}/cobranca-bancaria/v3/boletos/{nosso_numero}/baixar"
-            headers = self._get_headers(scope="boletos_baixa")
-            headers["client_id"] = client_id
+            url = f'{self._get_base_url()}/cobranca-bancaria/v3/boletos/{nosso_numero}/baixar'
+            headers = self._get_headers(scope='boletos_baixa')
+            headers['client_id'] = client_id
 
             response = self.session.post(url, json=dados_boleto, headers=headers)
 
@@ -378,39 +376,39 @@ class BoletoAPI(APIClientBase):
             if response.status_code in (400, 406, 500):
                 error_data = response.json()
                 raise BoletoBaixaError(
-                    f"Falha na baixa do boleto: {error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')}",
+                    f'Falha na baixa do boleto: {error_data.get("mensagens", [{}])[0].get("mensagem", "Erro desconhecido")}',
                     code=response.status_code,
                     nosso_numero=nosso_numero,
-                    dados_boleto=dados_boleto
+                    dados_boleto=dados_boleto,
                 )
 
             # Verifica se o status é 204 (No Content)
             if response.status_code != 204:
                 raise BoletoBaixaError(
-                    f"Resposta inesperada da API: {response.status_code}",
+                    f'Resposta inesperada da API: {response.status_code}',
                     code=response.status_code,
                     nosso_numero=nosso_numero,
-                    dados_boleto=dados_boleto
+                    dados_boleto=dados_boleto,
                 )
 
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoBaixaError(
-                    f"Falha na baixa do boleto - Status: {e.response.status_code}",
+                    f'Falha na baixa do boleto - Status: {e.response.status_code}',
                     code=e.response.status_code,
                     nosso_numero=nosso_numero,
-                    dados_boleto=dados_boleto
+                    dados_boleto=dados_boleto,
                 ) from e
             raise BoletoBaixaError(
-                f"Falha na comunicação com API de boletos: {str(e)}",
+                f'Falha na comunicação com API de boletos: {e!s}',
                 nosso_numero=nosso_numero,
-                dados_boleto=dados_boleto
+                dados_boleto=dados_boleto,
             ) from e
 
     def alterar_boleto(
         self,
         nosso_numero: int,
-        dados_alteracao: Dict,
+        dados_alteracao: dict,
         client_id: str,
     ) -> None:
         """Altera dados de um boleto existente
@@ -427,9 +425,9 @@ class BoletoAPI(APIClientBase):
             BoletoAlteracaoError: Em caso de falha na requisição com status 400, 406 ou 500
         """
         try:
-            url = f"{self._get_base_url()}/cobranca-bancaria/v3/boletos/{nosso_numero}"
-            headers = self._get_headers(scope="boletos_alteracao")
-            headers["client_id"] = client_id
+            url = f'{self._get_base_url()}/cobranca-bancaria/v3/boletos/{nosso_numero}'
+            headers = self._get_headers(scope='boletos_alteracao')
+            headers['client_id'] = client_id
 
             response = self.session.patch(url, json=dados_alteracao, headers=headers)
 
@@ -437,38 +435,38 @@ class BoletoAPI(APIClientBase):
             if response.status_code in (400, 406, 500):
                 error_data = response.json()
                 raise BoletoAlteracaoError(
-                    f"Falha na alteração do boleto: {error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')}",
+                    f'Falha na alteração do boleto: {error_data.get("mensagens", [{}])[0].get("mensagem", "Erro desconhecido")}',
                     code=response.status_code,
                     nosso_numero=str(nosso_numero),
-                    dados_alteracao=dados_alteracao
+                    dados_alteracao=dados_alteracao,
                 )
 
             # Verifica se o status é 204 (No Content)
             if response.status_code != 204:
                 raise BoletoAlteracaoError(
-                    f"Resposta inesperada da API: {response.status_code}",
+                    f'Resposta inesperada da API: {response.status_code}',
                     code=response.status_code,
                     nosso_numero=str(nosso_numero),
-                    dados_alteracao=dados_alteracao
+                    dados_alteracao=dados_alteracao,
                 )
 
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoAlteracaoError(
-                    f"Falha na alteração do boleto - Status: {e.response.status_code}",
+                    f'Falha na alteração do boleto - Status: {e.response.status_code}',
                     code=e.response.status_code,
                     nosso_numero=str(nosso_numero),
-                    dados_alteracao=dados_alteracao
+                    dados_alteracao=dados_alteracao,
                 ) from e
             raise BoletoAlteracaoError(
-                f"Falha na comunicação com API de boletos: {str(e)}",
+                f'Falha na comunicação com API de boletos: {e!s}',
                 nosso_numero=str(nosso_numero),
-                dados_alteracao=dados_alteracao
+                dados_alteracao=dados_alteracao,
             ) from e
 
     def alterar_pagador(
         self,
-        pagador: Dict,
+        pagador: dict,
         client_id: str,
     ) -> None:
         """Altera informações do cadastro do pagador
@@ -493,9 +491,9 @@ class BoletoAPI(APIClientBase):
             BoletoAlteracaoPagadorError: Em caso de falha na requisição com status 400, 406 ou 500
         """
         try:
-            url = f"{self._get_base_url()}/cobranca-bancaria/v3/pagadores"
-            headers = self._get_headers(scope="boletos_alteracao")
-            headers["client_id"] = client_id
+            url = f'{self._get_base_url()}/cobranca-bancaria/v3/pagadores'
+            headers = self._get_headers(scope='boletos_alteracao')
+            headers['client_id'] = client_id
 
             response = self.session.put(url, json=pagador, headers=headers)
 
@@ -503,42 +501,41 @@ class BoletoAPI(APIClientBase):
             if response.status_code in (400, 406, 500):
                 error_data = response.json()
                 raise BoletoAlteracaoPagadorError(
-                    f"Falha na alteração do pagador: {error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')}",
+                    f'Falha na alteração do pagador: {error_data.get("mensagens", [{}])[0].get("mensagem", "Erro desconhecido")}',
                     code=response.status_code,
-                    numero_cpf_cnpj=pagador.get("numeroCpfCnpj"),
-                    dados_pagador=pagador
+                    numero_cpf_cnpj=pagador.get('numeroCpfCnpj'),
+                    dados_pagador=pagador,
                 )
 
             # Verifica se o status é 204 (No Content)
             if response.status_code != 204:
                 raise BoletoAlteracaoPagadorError(
-                    f"Resposta inesperada da API: {response.status_code}",
+                    f'Resposta inesperada da API: {response.status_code}',
                     code=response.status_code,
-                    numero_cpf_cnpj=pagador.get("numeroCpfCnpj"),
-                    dados_pagador=pagador
+                    numero_cpf_cnpj=pagador.get('numeroCpfCnpj'),
+                    dados_pagador=pagador,
                 )
 
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoAlteracaoPagadorError(
-                    f"Falha na alteração do pagador - Status: {e.response.status_code}",
+                    f'Falha na alteração do pagador - Status: {e.response.status_code}',
                     code=e.response.status_code,
-                    numero_cpf_cnpj=pagador.get("numeroCpfCnpj"),
-                    dados_pagador=pagador
+                    numero_cpf_cnpj=pagador.get('numeroCpfCnpj'),
+                    dados_pagador=pagador,
                 ) from e
             raise BoletoAlteracaoPagadorError(
-                f"Falha na comunicação com API de boletos: {str(e)}",
-                numero_cpf_cnpj=pagador.get("numeroCpfCnpj"),
-                dados_pagador=pagador
+                f'Falha na comunicação com API de boletos: {e!s}',
+                numero_cpf_cnpj=pagador.get('numeroCpfCnpj'),
+                dados_pagador=pagador,
             ) from e
-
 
     def consultar_webhook(
         self,
         id_webhook: int,
         codigo_tipo_movimento: int,
         client_id: str,
-    ) -> Dict:
+    ) -> dict:
         """Consulta os detalhes de um webhook cadastrado
 
         Args:
@@ -573,24 +570,26 @@ class BoletoAPI(APIClientBase):
         """
         try:
             params = {
-                "idWebhook": id_webhook,
-                "codigoTipoMovimento": codigo_tipo_movimento
+                'idWebhook': id_webhook,
+                'codigoTipoMovimento': codigo_tipo_movimento,
             }
 
-            url = f"{self._get_base_url()}/cobranca-bancaria/v3/webhooks"
-            headers = self._get_headers(scope="boletos_webhook")
-            headers["client_id"] = client_id
+            url = f'{self._get_base_url()}/cobranca-bancaria/v3/webhooks'
+            headers = self._get_headers(scope='boletos_webhook')
+            headers['client_id'] = client_id
 
             response = self.session.get(url, params=params, headers=headers)
 
             # Trata erros específicos com códigos 400, 406, 500
             if response.status_code in (400, 406, 500):
                 error_data = response.json()
-                error_msg = error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')
+                error_msg = error_data.get('mensagens', [{}])[0].get(
+                    'mensagem', 'Erro desconhecido'
+                )
                 raise BoletoWebhookError(
-                    f"Falha na consulta do webhook: {error_msg}",
+                    f'Falha na consulta do webhook: {error_msg}',
                     code=response.status_code,
-                    id_webhook=id_webhook
+                    id_webhook=id_webhook,
                 )
 
             response.raise_for_status()
@@ -599,19 +598,19 @@ class BoletoAPI(APIClientBase):
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoWebhookError(
-                    f"Falha na consulta do webhook - Status: {e.response.status_code}",
+                    f'Falha na consulta do webhook - Status: {e.response.status_code}',
                     code=e.response.status_code,
-                    id_webhook=id_webhook
+                    id_webhook=id_webhook,
                 ) from e
             raise BoletoWebhookError(
-                f"Falha na comunicação com API de boletos: {str(e)}",
-                id_webhook=id_webhook
+                f'Falha na comunicação com API de boletos: {e!s}',
+                id_webhook=id_webhook,
             ) from e
 
     def atualizar_webhook(
         self,
         id_webhook: int,
-        webhook: Dict,
+        webhook: dict,
         client_id: str,
     ) -> None:
         """Atualiza um webhook cadastrado
@@ -630,44 +629,46 @@ class BoletoAPI(APIClientBase):
             BoletoWebhookError: Em caso de falha na requisição com status 400, 406 ou 500
         """
         try:
-            url = f"{self._get_base_url()}/cobranca-bancaria/v3/webhooks/{id_webhook}"
-            headers = self._get_headers(scope="boletos_webhook")
-            headers["client_id"] = client_id
+            url = f'{self._get_base_url()}/cobranca-bancaria/v3/webhooks/{id_webhook}'
+            headers = self._get_headers(scope='boletos_webhook')
+            headers['client_id'] = client_id
 
             response = self.session.patch(url, json=webhook, headers=headers)
 
             # Trata erros específicos com códigos 400, 406, 500
             if response.status_code in (400, 406, 500):
                 error_data = response.json()
-                error_msg = error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')
+                error_msg = error_data.get('mensagens', [{}])[0].get(
+                    'mensagem', 'Erro desconhecido'
+                )
                 raise BoletoWebhookError(
-                    f"Falha na atualização do webhook: {error_msg}",
+                    f'Falha na atualização do webhook: {error_msg}',
                     code=response.status_code,
                     id_webhook=id_webhook,
-                    dados_webhook=webhook
+                    dados_webhook=webhook,
                 )
 
             # Verifica se o status é 204 (No Content)
             if response.status_code != 204:
                 raise BoletoWebhookError(
-                    f"Resposta inesperada da API: {response.status_code}",
+                    f'Resposta inesperada da API: {response.status_code}',
                     code=response.status_code,
                     id_webhook=id_webhook,
-                    dados_webhook=webhook
+                    dados_webhook=webhook,
                 )
 
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoWebhookError(
-                    f"Falha na atualização do webhook - Status: {e.response.status_code}",
+                    f'Falha na atualização do webhook - Status: {e.response.status_code}',
                     code=e.response.status_code,
                     id_webhook=id_webhook,
-                    dados_webhook=webhook
+                    dados_webhook=webhook,
                 ) from e
             raise BoletoWebhookError(
-                f"Falha na comunicação com API de boletos: {str(e)}",
+                f'Falha na comunicação com API de boletos: {e!s}',
                 id_webhook=id_webhook,
-                dados_webhook=webhook
+                dados_webhook=webhook,
             ) from e
 
     def excluir_webhook(
@@ -688,40 +689,42 @@ class BoletoAPI(APIClientBase):
             BoletoWebhookError: Em caso de falha na requisição com status 400, 406 ou 500
         """
         try:
-            url = f"{self._get_base_url()}/cobranca-bancaria/v3/webhooks/{id_webhook}"
-            headers = self._get_headers(scope="boletos_webhook")
-            headers["client_id"] = client_id
+            url = f'{self._get_base_url()}/cobranca-bancaria/v3/webhooks/{id_webhook}'
+            headers = self._get_headers(scope='boletos_webhook')
+            headers['client_id'] = client_id
 
             response = self.session.delete(url, headers=headers)
 
             # Trata erros específicos com códigos 400, 406, 500
             if response.status_code in (400, 406, 500):
                 error_data = response.json()
-                error_msg = error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')
+                error_msg = error_data.get('mensagens', [{}])[0].get(
+                    'mensagem', 'Erro desconhecido'
+                )
                 raise BoletoWebhookError(
-                    f"Falha na exclusão do webhook: {error_msg}",
+                    f'Falha na exclusão do webhook: {error_msg}',
                     code=response.status_code,
-                    id_webhook=id_webhook
+                    id_webhook=id_webhook,
                 )
 
             # Verifica se o status é 204 (No Content)
             if response.status_code != 204:
                 raise BoletoWebhookError(
-                    f"Resposta inesperada da API: {response.status_code}",
+                    f'Resposta inesperada da API: {response.status_code}',
                     code=response.status_code,
-                    id_webhook=id_webhook
+                    id_webhook=id_webhook,
                 )
 
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoWebhookError(
-                    f"Falha na exclusão do webhook - Status: {e.response.status_code}",
+                    f'Falha na exclusão do webhook - Status: {e.response.status_code}',
                     code=e.response.status_code,
-                    id_webhook=id_webhook
+                    id_webhook=id_webhook,
                 ) from e
             raise BoletoWebhookError(
-                f"Falha na comunicação com API de boletos: {str(e)}",
-                id_webhook=id_webhook
+                f'Falha na comunicação com API de boletos: {e!s}',
+                id_webhook=id_webhook,
             ) from e
 
     def consultar_solicitacoes_webhook(
@@ -729,9 +732,9 @@ class BoletoAPI(APIClientBase):
         id_webhook: int,
         data_solicitacao: str,
         client_id: str,
-        pagina: Optional[int] = None,
-        codigo_solicitacao_situacao: Optional[int] = None,
-    ) -> Dict:
+        pagina: int | None = None,
+        codigo_solicitacao_situacao: int | None = None,
+    ) -> dict:
         """Consulta as solicitações de notificação para um webhook cadastrado
 
         Args:
@@ -782,29 +785,29 @@ class BoletoAPI(APIClientBase):
             BoletoWebhookError: Em caso de falha na requisição com status 400, 406 ou 500
         """
         try:
-            params = {
-                "dataSolicitacao": data_solicitacao
-            }
+            params = {'dataSolicitacao': data_solicitacao}
 
             if pagina is not None:
-                params["pagina"] = pagina
+                params['pagina'] = pagina
             if codigo_solicitacao_situacao is not None:
-                params["codigoSolicitacaoSituacao"] = codigo_solicitacao_situacao
+                params['codigoSolicitacaoSituacao'] = codigo_solicitacao_situacao
 
-            url = f"{self._get_base_url()}/cobranca-bancaria/v3/webhooks/{id_webhook}/solicitacoes"
-            headers = self._get_headers(scope="boletos_webhook")
-            headers["client_id"] = client_id
+            url = f'{self._get_base_url()}/cobranca-bancaria/v3/webhooks/{id_webhook}/solicitacoes'
+            headers = self._get_headers(scope='boletos_webhook')
+            headers['client_id'] = client_id
 
             response = self.session.get(url, params=params, headers=headers)
 
             # Trata erros específicos com códigos 400, 406, 500
             if response.status_code in (400, 406, 500):
                 error_data = response.json()
-                error_msg = error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')
+                error_msg = error_data.get('mensagens', [{}])[0].get(
+                    'mensagem', 'Erro desconhecido'
+                )
                 raise BoletoWebhookError(
-                    f"Falha na consulta das solicitações do webhook: {error_msg}",
+                    f'Falha na consulta das solicitações do webhook: {error_msg}',
                     code=response.status_code,
-                    id_webhook=id_webhook
+                    id_webhook=id_webhook,
                 )
 
             response.raise_for_status()
@@ -813,20 +816,20 @@ class BoletoAPI(APIClientBase):
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoWebhookError(
-                    f"Falha na consulta das solicitações do webhook - Status: {e.response.status_code}",
+                    f'Falha na consulta das solicitações do webhook - Status: {e.response.status_code}',
                     code=e.response.status_code,
-                    id_webhook=id_webhook
+                    id_webhook=id_webhook,
                 ) from e
             raise BoletoWebhookError(
-                f"Falha na comunicação com API de boletos: {str(e)}",
-                id_webhook=id_webhook
+                f'Falha na comunicação com API de boletos: {e!s}',
+                id_webhook=id_webhook,
             ) from e
 
     def cadastrar_webhook(
         self,
-        webhook: Dict,
+        webhook: dict,
         client_id: str,
-    ) -> Dict:
+    ) -> dict:
         """Cadastra um webhook para receber notificações de acordo com o tipo de movimento
 
         Args:
@@ -845,46 +848,51 @@ class BoletoAPI(APIClientBase):
         """
         try:
             # Valida parâmetros obrigatórios
-            if not all(key in webhook for key in ["url", "codigoTipoMovimento", "codigoPeriodoMovimento"]):
-                raise ValueError("Parâmetros obrigatórios do webhook não informados")
+            if not all(
+                key in webhook
+                for key in ['url', 'codigoTipoMovimento', 'codigoPeriodoMovimento']
+            ):
+                raise ValueError('Parâmetros obrigatórios do webhook não informados')
 
-            url = f"{self._get_base_url()}/cobranca-bancaria/v3/webhooks"
-            headers = self._get_headers(scope="boletos_webhook")
-            headers["client_id"] = client_id
+            url = f'{self._get_base_url()}/cobranca-bancaria/v3/webhooks'
+            headers = self._get_headers(scope='boletos_webhook')
+            headers['client_id'] = client_id
 
             response = self.session.post(url, json=webhook, headers=headers)
 
             # Trata erros específicos com códigos 400, 406, 500
             if response.status_code in (400, 406, 500):
                 error_data = response.json()
-                error_msg = error_data.get('mensagens', [{}])[0].get('mensagem', 'Erro desconhecido')
+                error_msg = error_data.get('mensagens', [{}])[0].get(
+                    'mensagem', 'Erro desconhecido'
+                )
                 raise BoletoWebhookError(
-                    f"Falha no cadastro do webhook: {error_msg}",
+                    f'Falha no cadastro do webhook: {error_msg}',
                     code=response.status_code,
-                    url=webhook.get("url"),
-                    dados_webhook=webhook
+                    url=webhook.get('url'),
+                    dados_webhook=webhook,
                 )
 
             # Verifica se o status é 201 (Created)
             if response.status_code != 201:
                 raise BoletoWebhookError(
-                    f"Resposta inesperada da API: {response.status_code}",
+                    f'Resposta inesperada da API: {response.status_code}',
                     code=response.status_code,
-                    url=webhook.get("url"),
-                    dados_webhook=webhook
+                    url=webhook.get('url'),
+                    dados_webhook=webhook,
                 )
 
             return response.json()
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoWebhookError(
-                    f"Falha no cadastro do webhook - Status: {e.response.status_code}",
+                    f'Falha no cadastro do webhook - Status: {e.response.status_code}',
                     code=e.response.status_code,
-                    url=webhook.get("url"),
-                    dados_webhook=webhook
+                    url=webhook.get('url'),
+                    dados_webhook=webhook,
                 ) from e
             raise BoletoWebhookError(
-                f"Falha na comunicação com API de boletos: {str(e)}",
-                url=webhook.get("url"),
-                dados_webhook=webhook
+                f'Falha na comunicação com API de boletos: {e!s}',
+                url=webhook.get('url'),
+                dados_webhook=webhook,
             ) from e
