@@ -1,8 +1,7 @@
 from unittest.mock import Mock, patch
 import pytest
 
-from client import Sicoob
-from sicoob.auth.oauth import OAuth2Client
+from sicoob.client import Sicoob
 
 
 def test_client_init(sicoob_client: Sicoob) -> None:
