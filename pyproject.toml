@@ -10,6 +10,7 @@ dependencies = [
     # Testes
     "pytest>=7.0.0",
     "pytest-mock>=3.6.1",
+    "requests-pkcs12>=1.25",
 ]
 
 [dependency-groups]

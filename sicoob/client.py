@@ -24,28 +24,54 @@ class Sicoob:
         client_id: str | None = None,
         certificado: str | None = None,
         chave_privada: str | None = None,
+        certificado_pfx: str | None = None,
+        senha_pfx: str | None = None,
         sandbox_mode: bool = False,
     ) -> None:
-        """Inicializa o cliente com credenciais"""
+        """Inicializa o cliente com credenciais
+
+        Args:
+            client_id: Client ID para autenticação OAuth2
+            certificado: Path para o certificado PEM (opcional)
+            chave_privada: Path para a chave privada PEM (opcional)
+            certificado_pfx: Path para o certificado PFX (opcional)
+            senha_pfx: Senha do certificado PFX (opcional)
+            sandbox_mode: Modo sandbox (default: False)
+        """
         load_dotenv()
 
         self.client_id = client_id or os.getenv('SICOOB_CLIENT_ID')
         self.certificado = certificado or os.getenv('SICOOB_CERTIFICADO')
         self.chave_privada = chave_privada or os.getenv('SICOOB_CHAVE_PRIVADA')
+        self.certificado_pfx = certificado_pfx or os.getenv('SICOOB_CERTIFICADO_PFX')
+        self.senha_pfx = senha_pfx or os.getenv('SICOOB_SENHA_PFX')
         self.sandbox_mode = sandbox_mode
 
-        if not all([self.client_id, self.certificado, self.chave_privada]):
+        # Valida credenciais mínimas
+        if not self.client_id:
+            raise ValueError('client_id é obrigatório')
+
+        # Verifica se pelo menos um conjunto de credenciais foi fornecido explicitamente
+        has_pem = bool(certificado and chave_privada)
+        has_pfx = bool(certificado_pfx and senha_pfx)
+
+        if not (has_pem or has_pfx):
             raise ValueError(
-                'Credenciais incompletas. Configure via parâmetros ou arquivo .env'
+                'É necessário fornecer certificado e chave privada (PEM) '
+                'ou certificado PFX e senha explicitamente'
             )
 
         self.oauth_client = OAuth2Client(
             client_id=self.client_id,
             certificado=self.certificado,
             chave_privada=self.chave_privada,
+            certificado_pfx=self.certificado_pfx,
+            senha_pfx=self.senha_pfx,
         )
-        self.session = requests.Session()
-        self.session.cert = (self.certificado, self.chave_privada)
+
+        # Armazena a sessão do OAuth2Client
+        # para reutilização nas APIs
+        self.session = self.oauth_client.session
 
     def _get_token(self) -> dict[str, str]:
         """Obtém token de acesso usando OAuth2Client"""

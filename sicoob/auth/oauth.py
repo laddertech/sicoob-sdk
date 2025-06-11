@@ -1,6 +1,8 @@
 import os
 import time
 import requests
+import requests_pkcs12
+from typing import Union, BinaryIO
 from sicoob.constants import AUTH_URL
 from dotenv import load_dotenv
 
@@ -13,18 +15,46 @@ class OAuth2Client:
         client_id: str | None = None,
         certificado: str | None = None,
         chave_privada: str | None = None,
+        certificado_pfx: Union[str, bytes, BinaryIO] | None = None,
+        senha_pfx: str | None = None,
     ) -> None:
-        """Inicializa o cliente OAuth2"""
+        """Inicializa o cliente OAuth2
+
+        Args:
+            client_id: Client ID para autenticação OAuth2
+            certificado: Path para o certificado PEM (opcional)
+            chave_privada: Path para a chave privada PEM (opcional)
+            certificado_pfx: Path ou dados do certificado PFX (opcional)
+            senha_pfx: Senha do certificado PFX (opcional)
+        """
         load_dotenv()
 
         self.client_id = client_id or os.getenv('SICOOB_CLIENT_ID')
         self.certificado = certificado or os.getenv('SICOOB_CERTIFICADO')
         self.chave_privada = chave_privada or os.getenv('SICOOB_CHAVE_PRIVADA')
+        self.certificado_pfx = certificado_pfx or os.getenv('SICOOB_CERTIFICADO_PFX')
+        self.senha_pfx = senha_pfx or os.getenv('SICOOB_SENHA_PFX')
 
         self.token_url = AUTH_URL  # URL de autenticação OAuth2
         self.token_cache = {}  # Cache de tokens por escopo
         self.session = requests.Session()
-        self.session.cert = (self.certificado, self.chave_privada)
+
+        if self.certificado_pfx and self.senha_pfx:
+            # Configura autenticação com PFX
+            pkcs12_adapter = requests_pkcs12.Pkcs12Adapter(
+                pkcs12_data=self.certificado_pfx if isinstance(self.certificado_pfx, bytes) else None,
+                pkcs12_filename=self.certificado_pfx if isinstance(self.certificado_pfx, str) else None,
+                pkcs12_password=self.senha_pfx
+            )
+            self.session.mount('https://', pkcs12_adapter)
+        elif self.certificado and self.chave_privada:
+            # Configura autenticação com PEM (manter compatibilidade)
+            self.session.cert = (self.certificado, self.chave_privada)
+        else:
+            raise ValueError(
+                "É necessário fornecer certificado e chave privada (PEM) "
+                "ou certificado PFX e senha"
+            )
 
     def get_access_token(self, scope: str | None = None) -> str:
         """Obtém ou renova o token de acesso para o escopo especificado

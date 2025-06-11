@@ -36,9 +36,11 @@ cliente = Sicoob(
 extrato = cliente.conta_corrente.consulta_extrato(conta="12345", data_inicio="2023-01-01", data_fim="2023-01-31")
 ```
 
-## API de Boletos
+## API de Cobrança
 
-A classe `BoletoAPI` permite emitir e consultar boletos bancários:
+### Boletos Bancários
+
+A classe `BoletoAPI` oferece operações completas para gerenciamento de boletos:
 
 ```python
 from sicoob import Sicoob
@@ -50,32 +52,101 @@ cliente = Sicoob(
     chave_privada="caminho/para/chave_privada.key"
 )
 
-# Obtém instância do BoletoAPI
-boleto_api = cliente.boleto()
+# Operações com boletos
+boleto_api = cliente.cobranca.boleto()
 
-# Emitir boleto
-dados_boleto = {
+# Emissão
+boleto = boleto_api.emitir_boleto({
     "numeroContrato": 123456,
     "modalidade": 1,
     "valor": 100.50,
-    "beneficiario": {
-        "nome": "Nome Beneficiário",
-        "documento": "12345678901"
-    }
-}
-boleto = boleto_api.emitir_boleto(dados_boleto)
+    "beneficiario": {"nome": "Nome Beneficiário", "documento": "12345678901"}
+})
 
-# Consultar boleto
-nosso_numero = boleto["nossoNumero"]
-boleto_consultado = boleto_api.consultar_boleto(nosso_numero)
+# Consultas
+boleto_consultado = boleto_api.consultar_boleto(nosso_numero="123456789")
+boletos_pagador = boleto_api.consultar_boletos_por_pagador(cpf_cnpj="12345678901")
+faixas = boleto_api.consultar_faixas_nosso_numero()
+
+# Webhooks
+boleto_api.cadastrar_webhook(url="https://meusite.com/webhook")
+webhook = boleto_api.consultar_webhook()
+```
+
+### PIX
+
+A classe `PixAPI` implementa todas as operações PIX disponíveis:
+
+```python
+# Operações PIX
+pix_api = cliente.cobranca.pix()
+
+# Cobranças imediatas
+cobranca = pix_api.criar_cobranca_pix(
+    txid="tx123",
+    dados_cobranca={"valor": {"original": "100.50"}}
+)
+
+# Cobranças com vencimento
+cobranca_venc = pix_api.criar_cobranca_pix_com_vencimento(
+    txid="tx456",
+    dados_cobranca={"valor": {"original": "200.00"}, "calendario": {"dataDeVencimento": "2025-12-31"}}
+)
+
+# Webhooks PIX
+pix_api.configurar_webhook_pix(chave="123e4567-e89b-12d3-a456-426614174000", webhook_url="https://meusite.com/pix-webhook")
 ```
 
 ### Tratamento de Erros
 
-A API trata os seguintes casos de erro:
-- **404 Not Found**: Retorna `None` quando o boleto não existe
-- **Erros HTTP (400, 500, etc)**: Levanta exceção com código e mensagem
-- **Erros de conexão**: Levanta exceção com detalhes do erro
+O SDK possui exceções específicas para cada tipo de operação:
+
+```python
+from sicoob.exceptions import (
+    BoletoError, BoletoNaoEncontradoError,
+    PixError, CobrancaPixNaoEncontradaError,
+    ContaCorrenteError, TransferenciaError
+)
+
+try:
+    boleto = boleto_api.consultar_boleto("123456")
+except BoletoNaoEncontradoError:
+    print("Boleto não encontrado")
+except BoletoError as e:
+    print(f"Erro na API de boletos: {e}")
+
+try:
+    pix_api.criar_cobranca_pix("tx123", dados)
+except CobrancaPixError as e:
+    print(f"Erro na API PIX: {e}")
+```
+
+## Serviços de Conta Corrente
+
+A classe `ContaCorrenteAPI` oferece operações bancárias:
+
+```python
+conta_api = cliente.conta_corrente()
+
+# Consultas
+extrato = conta_api.extrato(
+    mes=6, 
+    ano=2025,
+    dia_inicial=1,
+    dia_final=30,
+    numero_conta_corrente="123456"
+)
+
+saldo = conta_api.saldo("123456")
+
+# Transferências
+transferencia = conta_api.transferencia({
+    "contaOrigem": "123456",
+    "contaDestino": "654321",
+    "valor": 1000.00,
+    "descricao": "Transferência entre contas"
+})
+```
 
 ## Versionamento e Deploy
 
@@ -124,17 +195,24 @@ make bump-minor   # Para novas funcionalidades compatíveis
 make bump-major   # Para mudanças incompatíveis
 ```
 
-2. Verifique as alterações nos arquivos:
+2. Execute os testes para garantir a qualidade:
+```bash
+make test
+```
+
+3. Verifique as alterações nos arquivos:
 ```bash
 git diff
 ```
 
-3. Commit e push das alterações:
+4. Commit e push das alterações:
 ```bash
 git add .
 git commit -m "Bump version to X.Y.Z"
 git push
 ```
+
+5. Crie um novo release no GitHub para disparar a publicação automática no PyPI
 
 ## Links Úteis
 
@@ -154,12 +232,14 @@ Biblioteca Python para integração com a API do Banco Sicoob, incluindo:
 1. [Classe Principal](#classe-sicoob)
 2. [Autenticação](#autenticação-oauth2)
 3. [Serviços](#serviços)
-   - [Boletos](#api-de-boletos)
-   - [PIX](#api-de-pix)
-   - [Conta Corrente](#api-de-conta-corrente)
+   - [Cobrança](#api-de-cobrança)
+     - [Boletos](#boletos-bancários)
+     - [PIX](#pix)
+   - [Conta Corrente](#serviços-de-conta-corrente)
 4. [Classe Base](#classe-base)
-5. [Diagrama de Relacionamentos](#diagrama-de-relacionamentos)
-6. [Exemplos de Uso](#exemplos-de-uso)
+5. [Tratamento de Erros](#tratamento-de-erros)
+6. [Diagrama de Relacionamentos](#diagrama-de-relacionamentos)
+7. [Exemplos de Uso](#exemplos-de-uso)
 
 ---
 
