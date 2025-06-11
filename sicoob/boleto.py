@@ -1,7 +1,7 @@
 import requests
 
-from .api_client import APIClientBase
-from .exceptions import (
+from sicoob.api_client import APIClientBase
+from sicoob.exceptions import (
     BoletoAlteracaoError,
     BoletoAlteracaoPagadorError,
     BoletoBaixaError,

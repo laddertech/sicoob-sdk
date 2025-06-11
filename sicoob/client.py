@@ -56,7 +56,7 @@ class Sicoob:
             raise Exception(f'Falha ao obter token de acesso: {e!s}') from e
 
     @property
-    def cobranca(self) -> 'CobrancaServices':
+    def cobranca(self) -> CobrancaServices:
         """Acesso às APIs de Cobrança (Boleto e PIX)
 
         Retorna um objeto com duas propriedades:

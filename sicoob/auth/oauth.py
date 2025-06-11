@@ -1,8 +1,7 @@
 import os
 import time
-
 import requests
-from constants import AUTH_URL
+from sicoob.constants import AUTH_URL
 from dotenv import load_dotenv
 
 

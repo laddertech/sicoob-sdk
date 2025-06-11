@@ -1,8 +1,8 @@
 import requests
 
-from .api_client import APIClientBase
-from .auth import OAuth2Client
-from .exceptions import ExtratoError, SaldoError, TransferenciaError
+from sicoob.api_client import APIClientBase
+from sicoob.auth import OAuth2Client
+from sicoob.exceptions import ExtratoError, SaldoError, TransferenciaError
 
 
 class ContaCorrenteAPI(APIClientBase):

@@ -1,7 +1,7 @@
 import requests
 
-from .auth import OAuth2Client
-from .constants import BASE_URL, SANDBOX_URL
+from sicoob.auth import OAuth2Client
+from sicoob.constants import BASE_URL, SANDBOX_URL
 
 
 class APIClientBase:
