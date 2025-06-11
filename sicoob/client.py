@@ -1,4 +1,5 @@
 import os
+from typing import BinaryIO, Union
 
 import requests
 from dotenv import load_dotenv
@@ -24,7 +25,7 @@ class Sicoob:
         client_id: str | None = None,
         certificado: str | None = None,
         chave_privada: str | None = None,
-        certificado_pfx: str | None = None,
+        certificado_pfx: Union[str, bytes, BinaryIO] | None = None,
         senha_pfx: str | None = None,
         sandbox_mode: bool = False,
     ) -> None:
@@ -34,7 +35,7 @@ class Sicoob:
             client_id: Client ID para autenticação OAuth2
             certificado: Path para o certificado PEM (opcional)
             chave_privada: Path para a chave privada PEM (opcional)
-            certificado_pfx: Path para o certificado PFX (opcional)
+            certificado_pfx: Path (str), bytes ou arquivo aberto (BinaryIO) do certificado PFX (opcional)
             senha_pfx: Senha do certificado PFX (opcional)
             sandbox_mode: Modo sandbox (default: False)
         """

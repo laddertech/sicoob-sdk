@@ -25,11 +25,18 @@ SICOOB_CHAVE_PRIVADA=caminho/para/chave_privada.key
 ```python
 from sicoob import Sicoob
 
-# Inicializa o cliente
+# Inicializa o cliente (usando certificado PEM)
 cliente = Sicoob(
     client_id="seu_client_id",
     certificado="caminho/para/certificado.pem", 
     chave_privada="caminho/para/chave_privada.key"
+)
+
+# Alternativa usando certificado PFX
+cliente_pfx = Sicoob(
+    client_id="seu_client_id",
+    certificado_pfx="caminho/para/certificado.pfx",  # ou bytes ou arquivo aberto
+    senha_pfx="senha_do_pfx"
 )
 
 # Exemplo: consulta de extratos
@@ -249,12 +256,13 @@ Cliente principal que fornece acesso a todos os serviços.
 **Arquivo:** `sicoob/client.py`
 
 #### Métodos:
-- `__init__(client_id=None, certificado=None, chave_privada=None, sandbox_mode=False)`
+- `__init__(client_id=None, certificado=None, chave_privada=None, certificado_pfx=None, senha_pfx=None, sandbox_mode=False)`
   - Inicializa o cliente com credenciais
   - Parâmetros:
     - `client_id`: Client ID fornecido pelo Sicoob
     - `certificado`: Caminho para o certificado .pem
-    - `chave_privada`: Caminho para a chave privada .key  
+    - `chave_privada`: Caminho para a chave privada .key
+    - `certificado_pfx`: Caminho (str), bytes ou arquivo aberto (BinaryIO) do certificado PFX (opcional)
     - `sandbox_mode`: Se True, usa ambiente sandbox (default: False)
 
 #### Propriedades:
