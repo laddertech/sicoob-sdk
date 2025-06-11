@@ -30,6 +30,21 @@ class APIClientBase:
 
     def _get_headers(self, scope: str) -> dict[str, str]:
         """Retorna headers padrão com token de acesso"""
+        if self.sandbox_mode:
+            import os
+            from dotenv import load_dotenv
+            load_dotenv()
+
+            token = os.getenv('SICOOB_SANDBOX_TOKEN', 'sandbox-token')
+            client_id = os.getenv('SICOOB_SANDBOX_CLIENT_ID', 'sandbox-client-id')
+
+            return {
+                'Authorization': f'Bearer {token}',
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'x-sandbox-client-id': client_id,
+            }
+
         token = self.oauth_client.get_access_token(scope)
         return {
             'Authorization': f'Bearer {token}',
