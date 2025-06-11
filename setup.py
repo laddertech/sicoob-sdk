@@ -12,6 +12,7 @@ setup(
     install_requires=[
         'requests>=2.25.1',
         'python-dotenv>=0.15.0',
+        'requests-pkcs12>=1.0',
     ],
     python_requires='>=3.7',
     classifiers=[
