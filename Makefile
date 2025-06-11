@@ -11,8 +11,7 @@ build: ## Build do pacote
 test: ## Executar testes
 	pytest tests/
 
-publish: ## Publicar no PyPI (requer TWINE_USERNAME e TWINE_PASSWORD)
-	build
+publish: build ## Publicar no PyPI (requer TWINE_USERNAME e TWINE_PASSWORD)
 	twine upload dist/*
 
 clean: ## Limpar builds anteriores
