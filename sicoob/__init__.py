@@ -25,7 +25,7 @@ from .exceptions import (
 )
 from .pix import PixAPI
 
-__version__ = '0.1.10'
+__version__ = '0.1.11'
 __all__ = [
     'AutenticacaoError',
     'BoletoAPI',
