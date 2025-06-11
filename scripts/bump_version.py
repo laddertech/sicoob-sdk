@@ -6,13 +6,14 @@ from pathlib import Path
 def get_current_version(file_path: str) -> str | None:
     """Extrai a versão atual do arquivo"""
     content = file_path.read_text()
+    match = None
 
     if file_path.name == 'pyproject.toml':
-        match = re.search(r'version\s*=\s*"([\d.]+)"', content)
+        match = re.search(r'version\s*=\s*["\']([\d.]+)["\']', content)
     elif file_path.name == 'setup.py':
-        match = re.search(r'version\s*=\s*"([\d.]+)"', content)
+        match = re.search(r'version\s*=\s*["\']([\d.]+)["\']', content)
     elif file_path.name == '__init__.py':
-        match = re.search(r'__version__\s*=\s*"([\d.]+)"', content)
+        match = re.search(r'__version__\s*=\s*["\']([\d.]+)["\']', content)
 
     return match.group(1) if match else None
 
@@ -20,18 +21,19 @@ def get_current_version(file_path: str) -> str | None:
 def update_version(file_path: str, new_version: str) -> None:
     """Atualiza a versão no arquivo"""
     content = file_path.read_text()
+    new_content = content  # Default to original content if no match
 
     if file_path.name == 'pyproject.toml':
         new_content = re.sub(
-            r'(version\s*=\s*")[\d.]+(")', rf'\g<1>{new_version}\g<2>', content
+            r'(version\s*=\s*["\'])[\d.]+(["\'])', rf'\g<1>{new_version}\g<2>', content
         )
     elif file_path.name == 'setup.py':
         new_content = re.sub(
-            r'(version\s*=\s*")[\d.]+(")', rf'\g<1>{new_version}\g<2>', content
+            r'(version\s*=\s*["\'])[\d.]+(["\'])', rf'\g<1>{new_version}\g<2>', content
         )
     elif file_path.name == '__init__.py':
         new_content = re.sub(
-            r'(__version__\s*=\s*")[\d.]+(")', rf'\g<1>{new_version}\g<2>', content
+            r'(__version__\s*=\s*["\'])[\d.]+(["\'])', rf'\g<1>{new_version}\g<2>', content
         )
 
     file_path.write_text(new_content)
