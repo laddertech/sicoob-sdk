@@ -1,38 +1,41 @@
-.PHONY: build test publish bump-patch bump-minor bump-major
+.PHONY: help build test publish bump-patch bump-minor bump-major
 
-# Build do pacote
-build:
+help:
+	python help.py
+
+## @ Gerenciamento de Pacote Python
+
+build: ## Build do pacote
 	python -m build
 
-# Executar testes
-test:
+test: ## Executar testes
 	pytest tests/
 
-# Publicar no PyPI (requer TWINE_USERNAME e TWINE_PASSWORD)
-publish: build
+publish: ## Publicar no PyPI (requer TWINE_USERNAME e TWINE_PASSWORD)
+	build
 	twine upload dist/*
 
-# Incrementar versão (patch, minor, major)
-bump-patch:
-	python scripts/bump_version.py patch
-
-bump-minor:
-	python scripts/bump_version.py minor
-
-bump-major:
-	python scripts/bump_version.py major
-
-# Limpar builds anteriores
-clean:
+clean: ## Limpar builds anteriores
 	rm -rf dist/ build/ *.egg-info/
 
-# Verificação de estilo/lint
-lint:
+## @ Atualiza versão do pacote
+
+bump-patch: ## Incrementar versão (patch)
+	python scripts/bump_version.py patch
+
+bump-minor: ## Incrementar versão (minor)
+	python scripts/bump_version.py minor
+
+bump-major: ## Incrementar versão (major)
+	python scripts/bump_version.py major
+
+## @ Verifica e formata código
+
+lint: ## Verificar estilo de código
 	ruff check .
 
-# Formatação automática
-format:
+format: ## Formatar código
 	ruff format .
 
-# Verificar e corrigir automaticamente
-fix: lint format
+fix: ## Corrigir problemas de estilo de código
+	lint format
