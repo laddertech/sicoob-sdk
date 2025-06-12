@@ -22,7 +22,7 @@ class PixAPI(APIClientBase):
             headers = self._get_headers(scope='cob.write')
             response = self.session.put(url, json=dados_cobranca, headers=headers)
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response)
         except requests.exceptions.HTTPError as e:
             raise CobrancaPixError(
                 f'Falha na criação de cobrança PIX - Status: {e.response.status_code}',
@@ -43,7 +43,7 @@ class PixAPI(APIClientBase):
                 raise CobrancaPixNaoEncontradaError(txid)
 
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response)
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
                 raise  # Re-raise the CobrancaPixNaoEncontradaError
@@ -97,7 +97,7 @@ class PixAPI(APIClientBase):
                 raise CobrancaPixNaoEncontradaError(txid)
 
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response)
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
                 raise CobrancaPixNaoEncontradaError(txid) from e

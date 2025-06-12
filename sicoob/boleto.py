@@ -52,7 +52,7 @@ class BoletoAPI(APIClientBase):
             headers = self._get_headers(scope='boletos_inclusao')
             response = self.session.post(url, json=dados_boleto, headers=headers)
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response)
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoEmissaoError(
@@ -108,7 +108,7 @@ class BoletoAPI(APIClientBase):
 
             response = self.session.get(url, params=params, headers=headers)
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response)
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoConsultaPagadorError(
@@ -180,7 +180,7 @@ class BoletoAPI(APIClientBase):
 
             response = self.session.get(url, params=params, headers=headers)
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response)
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoEmissaoError(
@@ -237,7 +237,7 @@ class BoletoAPI(APIClientBase):
 
             # Trata erros específicos com códigos 400, 406, 500
             if response.status_code in (400, 406, 500):
-                error_data = response.json()
+                error_data = self._validate_response(response)
                 raise BoletoConsultaFaixaError(
                     f'Falha na consulta de faixas: {error_data.get("mensagens", [{}])[0].get("mensagem", "Erro desconhecido")}',
                     code=response.status_code,
@@ -246,7 +246,7 @@ class BoletoAPI(APIClientBase):
 
             response.raise_for_status()
 
-            data = response.json()
+            data = self._validate_response(response)
             # Ajusta para a estrutura esperada (array resultado)
             if 'resultado' in data and len(data['resultado']) > 0:
                 faixa = data['resultado'][0]
@@ -329,7 +329,7 @@ class BoletoAPI(APIClientBase):
 
             response = self.session.get(url, params=params, headers=headers)
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response)
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 if e.response.status_code == 404:
@@ -582,7 +582,7 @@ class BoletoAPI(APIClientBase):
 
             # Trata erros específicos com códigos 400, 406, 500
             if response.status_code in (400, 406, 500):
-                error_data = response.json()
+                error_data = self._validate_response(response)
                 error_msg = error_data.get('mensagens', [{}])[0].get(
                     'mensagem', 'Erro desconhecido'
                 )
@@ -593,7 +593,7 @@ class BoletoAPI(APIClientBase):
                 )
 
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response)
 
         except requests.exceptions.RequestException as e:
             if e.response is not None:
@@ -811,7 +811,7 @@ class BoletoAPI(APIClientBase):
                 )
 
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response)
 
         except requests.exceptions.RequestException as e:
             if e.response is not None:
@@ -862,7 +862,7 @@ class BoletoAPI(APIClientBase):
 
             # Trata erros específicos com códigos 400, 406, 500
             if response.status_code in (400, 406, 500):
-                error_data = response.json()
+                error_data = self._validate_response(response)
                 error_msg = error_data.get('mensagens', [{}])[0].get(
                     'mensagem', 'Erro desconhecido'
                 )
@@ -882,7 +882,7 @@ class BoletoAPI(APIClientBase):
                     dados_webhook=webhook,
                 )
 
-            return response.json()
+            return self._validate_response(response)
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 raise BoletoWebhookError(

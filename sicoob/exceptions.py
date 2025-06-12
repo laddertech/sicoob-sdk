@@ -1,3 +1,5 @@
+import requests
+
 class SicoobError(Exception):
     """Classe base para todas as exceções do pacote Sicoob"""
 
@@ -10,6 +12,15 @@ class SicoobError(Exception):
         if self.code:
             return f'[{self.code}] {self.message}'
         return self.message
+
+
+class RespostaInvalidaError(SicoobError):
+    """Erro quando a resposta da API não está no formato esperado"""
+
+    def __init__(self, message: str, response: requests.Response | None = None) -> None:
+        self.response = response
+        self.message = message  # Definindo explicitamente
+        super().__init__(message, response.status_code if response else None)
 
 
 class BoletoError(SicoobError):

@@ -63,7 +63,7 @@ class ContaCorrenteAPI(APIClientBase):
             url = f'{self._get_base_url()}{self.base_path}/extrato/{mes}/{ano}'
             response = self.session.get(url, params=params, headers=headers)
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response)
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
                 raise ExtratoError(
@@ -101,7 +101,7 @@ class ContaCorrenteAPI(APIClientBase):
                 url, params=params, headers=self._get_headers(scope='cco_consulta')
             )
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response)
         except requests.exceptions.HTTPError as e:
             raise SaldoError(
                 f'Falha na consulta de saldo - Status: {e.response.status_code}',
@@ -152,7 +152,7 @@ class ContaCorrenteAPI(APIClientBase):
                 url, json=payload, headers=self._get_headers(scope='cco_transferencias')
             )
             response.raise_for_status()
-            return response.json()
+            return self._validate_response(response)
         except requests.exceptions.HTTPError as e:
             raise TransferenciaError(
                 f'Falha na transferência - Status: {e.response.status_code}',
