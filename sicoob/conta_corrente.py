@@ -6,7 +6,29 @@ from sicoob.exceptions import ExtratoError, SaldoError, TransferenciaError
 
 
 class ContaCorrenteAPI(APIClientBase):
-    """Classe para operações de conta corrente no Sicoob."""
+    """Implementação da API de Conta Corrente do Sicoob"""
+
+    def _handle_error_response(self, response: requests.Response, error_class: type, **kwargs) -> None:
+        """Trata respostas de erro da API de forma centralizada
+
+        Args:
+            response: Objeto Response da requisição
+            error_class: Classe de exceção a ser lançada
+            **kwargs: Argumentos adicionais para a exceção
+
+        Raises:
+            Exceção do tipo error_class com mensagens formatadas
+        """
+        if response.status_code in (400, 406, 500):
+            error_data = response.json()
+            mensagens = error_data.get("mensagens", [{"mensagem": "Erro desconhecido", "codigo": str(response.status_code)}])
+            raise error_class(
+                message=mensagens[0]["mensagem"],
+                code=response.status_code,
+                mensagens=mensagens,
+                **kwargs
+            )
+        response.raise_for_status()
 
     def __init__(
         self,
@@ -62,22 +84,49 @@ class ContaCorrenteAPI(APIClientBase):
 
             url = f'{self._get_base_url()}{self.base_path}/extrato/{mes}/{ano}'
             response = self.session.get(url, params=params, headers=headers)
-            response.raise_for_status()
+
+            if response.status_code == 404:
+                raise ExtratoError(
+                    f'Extrato não encontrado - Status: {response.status_code}',
+                    code=response.status_code,
+                    periodo=f'{dia_inicial}/{mes}/{ano}',
+                )
+
+            try:
+                self._handle_error_response(
+                    response,
+                    ExtratoError,
+                    periodo=f'{dia_inicial}/{mes}/{ano}'
+                )
+            except ExtratoError:
+                raise  # Re-raise se já foi tratado como erro 400/406/500
+
             return self._validate_response(response)
         except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
+            if e.response is not None:
+                if e.response.status_code == 404:
+                    raise ExtratoError(
+                        f'Extrato não encontrado - Status: {e.response.status_code}',
+                        code=e.response.status_code,
+                        periodo=f'{dia_inicial}/{mes}/{ano}',
+                    ) from e
+                try:
+                    self._handle_error_response(
+                        e.response,
+                        ExtratoError,
+                        periodo=f'{dia_inicial}/{mes}/{ano}'
+                    )
+                except ExtratoError:
+                    raise  # Re-raise se já foi tratado como erro 400/406/500
                 raise ExtratoError(
-                    f'Extrato não encontrado - Status: {e.response.status_code}',
+                    f'Falha ao consultar extrato - Status: {e.response.status_code}',
                     code=e.response.status_code,
                     periodo=f'{dia_inicial}/{mes}/{ano}',
                 ) from e
             raise ExtratoError(
-                f'Falha ao consultar extrato - Status: {e.response.status_code}',
-                code=e.response.status_code,
+                f'Erro ao consultar extrato: {e!s}',
                 periodo=f'{dia_inicial}/{mes}/{ano}',
             ) from e
-        except Exception as e:
-            raise ExtratoError(f'Erro ao consultar extrato: {e!s}') from e
 
     def saldo(self, numero_conta: str | None = None) -> dict:
         """Obtém o saldo atual da conta corrente.
@@ -100,17 +149,35 @@ class ContaCorrenteAPI(APIClientBase):
             response = self.session.get(
                 url, params=params, headers=self._get_headers(scope='cco_consulta')
             )
-            response.raise_for_status()
+
+            try:
+                self._handle_error_response(
+                    response,
+                    SaldoError,
+                    conta=numero_conta
+                )
+            except SaldoError:
+                raise  # Re-raise se já foi tratado como erro 400/406/500
+
             return self._validate_response(response)
         except requests.exceptions.HTTPError as e:
+            if e.response is not None:
+                try:
+                    self._handle_error_response(
+                        e.response,
+                        SaldoError,
+                        conta=numero_conta
+                    )
+                except SaldoError:
+                    raise  # Re-raise se já foi tratado como erro 400/406/500
+                raise SaldoError(
+                    f'Falha na consulta de saldo - Status: {e.response.status_code}',
+                    code=e.response.status_code,
+                    conta=numero_conta,
+                ) from e
             raise SaldoError(
-                f'Falha na consulta de saldo - Status: {e.response.status_code}',
-                code=e.response.status_code,
+                f'Erro ao consultar saldo: {e!s}',
                 conta=numero_conta,
-            ) from e
-        except Exception as e:
-            raise SaldoError(
-                f'Erro ao consultar saldo: {e!s}', conta=numero_conta
             ) from e
 
     def transferencia(
@@ -151,15 +218,33 @@ class ContaCorrenteAPI(APIClientBase):
             response = self.session.post(
                 url, json=payload, headers=self._get_headers(scope='cco_transferencias')
             )
-            response.raise_for_status()
+
+            try:
+                self._handle_error_response(
+                    response,
+                    TransferenciaError,
+                    dados=payload
+                )
+            except TransferenciaError:
+                raise  # Re-raise se já foi tratado como erro 400/406/500
+
             return self._validate_response(response)
         except requests.exceptions.HTTPError as e:
+            if e.response is not None:
+                try:
+                    self._handle_error_response(
+                        e.response,
+                        TransferenciaError,
+                        dados=payload
+                    )
+                except TransferenciaError:
+                    raise  # Re-raise se já foi tratado como erro 400/406/500
+                raise TransferenciaError(
+                    f'Falha na transferência - Status: {e.response.status_code}',
+                    code=e.response.status_code,
+                    dados=payload,
+                ) from e
             raise TransferenciaError(
-                f'Falha na transferência - Status: {e.response.status_code}',
-                code=e.response.status_code,
+                f'Erro na transferência: {e!s}',
                 dados=payload,
-            ) from e
-        except Exception as e:
-            raise TransferenciaError(
-                f'Erro na transferência: {e!s}', dados=payload
             ) from e

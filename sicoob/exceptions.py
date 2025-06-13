@@ -3,15 +3,27 @@ import requests
 class SicoobError(Exception):
     """Classe base para todas as exceções do pacote Sicoob"""
 
-    def __init__(self, message: str, code: int | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        code: int | None = None,
+        mensagens: list[dict] | None = None
+    ) -> None:
         self.message = message
         self.code = code
+        self.mensagens = mensagens or [{"mensagem": message, "codigo": str(code) if code else "0"}]
         super().__init__(message)
 
     def __str__(self) -> str:
         if self.code:
             return f'[{self.code}] {self.message}'
         return self.message
+
+    def to_dict(self) -> dict:
+        """Retorna o erro no formato padrão da API Sicoob"""
+        return {
+            "mensagens": self.mensagens
+        }
 
 
 class RespostaInvalidaError(SicoobError):
@@ -33,10 +45,14 @@ class BoletoEmissaoError(BoletoError):
     """Erro durante a emissão de boleto"""
 
     def __init__(
-        self, message: str, code: int | None = None, dados_boleto: dict | None = None
+        self,
+        message: str,
+        code: int | None = None,
+        dados_boleto: dict | None = None,
+        mensagens: list[dict] | None = None
     ) -> None:
         self.dados_boleto = dados_boleto
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class BoletoConsultaError(BoletoError):
@@ -53,20 +69,28 @@ class BoletoConsultaPagadorError(BoletoError):
     """Erro durante a consulta de boletos por pagador"""
 
     def __init__(
-        self, message: str, code: int | None = None, numero_cpf_cnpj: str | None = None
+        self,
+        message: str,
+        code: int | None = None,
+        numero_cpf_cnpj: str | None = None,
+        mensagens: list[dict] | None = None
     ) -> None:
         self.numero_cpf_cnpj = numero_cpf_cnpj
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class BoletoConsultaFaixaError(BoletoError):
     """Erro durante a consulta de faixas de nosso número"""
 
     def __init__(
-        self, message: str, code: int | None = None, numero_cliente: int | None = None
+        self,
+        message: str,
+        code: int | None = None,
+        numero_cliente: int | None = None,
+        mensagens: list[dict] | None = None,
     ) -> None:
         self.numero_cliente = numero_cliente
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class BoletoNaoEncontradoError(BoletoConsultaError):
@@ -89,10 +113,11 @@ class BoletoBaixaError(BoletoError):
         code: int | None = None,
         nosso_numero: int | None = None,
         dados_boleto: dict | None = None,
+        mensagens: list[dict] | None = None,
     ) -> None:
         self.nosso_numero = nosso_numero
         self.dados_boleto = dados_boleto
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class BoletoAlteracaoError(BoletoError):
@@ -104,10 +129,11 @@ class BoletoAlteracaoError(BoletoError):
         code: int | None = None,
         nosso_numero: str | None = None,
         dados_alteracao: dict | None = None,
+        mensagens: list[dict] | None = None,
     ) -> None:
         self.nosso_numero = nosso_numero
         self.dados_alteracao = dados_alteracao
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class BoletoAlteracaoPagadorError(BoletoError):
@@ -119,10 +145,11 @@ class BoletoAlteracaoPagadorError(BoletoError):
         code: int | None = None,
         numero_cpf_cnpj: str | None = None,
         dados_pagador: dict | None = None,
+        mensagens: list[dict] | None = None,
     ) -> None:
         self.numero_cpf_cnpj = numero_cpf_cnpj
         self.dados_pagador = dados_pagador
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class BoletoWebhookError(BoletoError):
@@ -135,11 +162,12 @@ class BoletoWebhookError(BoletoError):
         url: str | None = None,
         dados_webhook: dict | None = None,
         id_webhook: int | None = None,
+        mensagens: list[dict] | None = None,
     ) -> None:
         self.url = url
         self.dados_webhook = dados_webhook
         self.id_webhook = id_webhook
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class ContaCorrenteError(SicoobError):
@@ -164,40 +192,56 @@ class ExtratoError(ContaCorrenteError):
     """Erro durante consulta de extrato"""
 
     def __init__(
-        self, message: str, code: int | None = None, periodo: str | None = None
+        self,
+        message: str,
+        code: int | None = None,
+        periodo: str | None = None,
+        mensagens: list[dict] | None = None
     ) -> None:
         self.periodo = periodo
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class SaldoError(ContaCorrenteError):
     """Erro durante consulta de saldo"""
 
     def __init__(
-        self, message: str, code: int | None = None, conta: str | None = None
+        self,
+        message: str,
+        code: int | None = None,
+        conta: str | None = None,
+        mensagens: list[dict] | None = None
     ) -> None:
         self.conta = conta
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class TransferenciaError(ContaCorrenteError):
     """Erro durante transferência"""
 
     def __init__(
-        self, message: str, code: int | None = None, dados: dict | None = None
+        self,
+        message: str,
+        code: int | None = None,
+        dados: dict | None = None,
+        mensagens: list[dict] | None = None
     ) -> None:
         self.dados = dados
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class CobrancaPixError(PixError):
     """Erro durante operações de cobrança PIX"""
 
     def __init__(
-        self, message: str, code: int | None = None, txid: str | None = None
+        self,
+        message: str,
+        code: int | None = None,
+        txid: str | None = None,
+        mensagens: list[dict] | None = None
     ) -> None:
         self.txid = txid
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class CobrancaPixNaoEncontradaError(CobrancaPixError):
@@ -213,20 +257,28 @@ class CobrancaPixVencimentoError(PixError):
     """Erro durante operações de cobrança PIX com vencimento"""
 
     def __init__(
-        self, message: str, code: int | None = None, txid: str | None = None
+        self,
+        message: str,
+        code: int | None = None,
+        txid: str | None = None,
+        mensagens: list[dict] | None = None
     ) -> None:
         self.txid = txid
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class WebhookPixError(PixError):
     """Erro durante operações de webhook PIX"""
 
     def __init__(
-        self, message: str, code: int | None = None, chave: str | None = None
+        self,
+        message: str,
+        code: int | None = None,
+        chave: str | None = None,
+        mensagens: list[dict] | None = None
     ) -> None:
         self.chave = chave
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class WebhookPixNaoEncontradoError(WebhookPixError):
@@ -242,10 +294,14 @@ class LoteCobrancaPixError(PixError):
     """Erro durante operações com lote de cobranças PIX"""
 
     def __init__(
-        self, message: str, code: int | None = None, id_lote: str | None = None
+        self,
+        message: str,
+        code: int | None = None,
+        id_lote: str | None = None,
+        mensagens: list[dict] | None = None
     ) -> None:
         self.id_lote = id_lote
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class QrCodePixError(PixError):
