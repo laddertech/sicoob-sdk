@@ -26,19 +26,19 @@ SICOOB_CHAVE_PRIVADA=caminho/para/chave_privada.key
 from sicoob import Sicoob
 
 # Inicializa o cliente (usando certificado PEM)
-# É obrigatório fornecer ou certificado+chave ou PFX+senha
+# É obrigatório fornecer ou certificado+chave ou PFX+senha em ambiente de produção, mas opcional em ambiente de testes
 cliente = Sicoob(
     client_id="seu_client_id",  # Obrigatório
-    certificado="caminho/para/certificado.pem",  # Obrigatório se não usar PFX
-    chave_privada="caminho/para/chave_privada.key",  # Obrigatório se não usar PFX
+    certificado="caminho/para/certificado.pem",  # Obrigatório se não usar PFX [E em produção]
+    chave_privada="caminho/para/chave_privada.key",  # Obrigatório se não usar PFX [E em produção]
     sandbox_mode=False  # Opcional, default False
 )
 
 # Alternativa usando certificado PFX
 cliente_pfx = Sicoob(
     client_id="seu_client_id",  # Obrigatório
-    certificado_pfx="caminho/para/certificado.pfx",  # Obrigatório (pode ser path, bytes ou arquivo aberto)
-    senha_pfx="senha_do_pfx",  # Obrigatório se usar PFX
+    certificado_pfx="caminho/para/certificado.pfx",  # Obrigatório (pode ser path, bytes ou arquivo aberto) [E em produção]
+    senha_pfx="senha_do_pfx",  # Obrigatório se usar PFX [E em produção]
     sandbox_mode=True  # Opcional para ambiente de testes
 )
 
@@ -76,13 +76,80 @@ boleto_api = cliente.cobranca.boleto()
 try:
     # Emissão
     boleto = boleto_api.emitir_boleto({
-        "numeroContrato": 123456,  # Obrigatório
-        "modalidade": 1,  # Obrigatório (1-Simples, 3-Caucionada, etc)
-        "valor": 100.50,  # Obrigatório
-        "beneficiario": {  # Obrigatório
-            "nome": "Nome Beneficiário",
-            "documento": "12345678901"
-        }
+        "numeroCliente": 123456,
+        "codigoModalidade": 1,
+        "numeroContaCorrente": 0,
+        "codigoEspecieDocumento": "DM",
+        "dataEmissao": "2018-09-20",
+        "nossoNumero": 123456789,
+        "seuNumero": "1235512",
+        "identificacaoBoletoEmpresa": "4562",
+        "identificacaoEmissaoBoleto": 1,
+        "identificacaoDistribuicaoBoleto": 1,
+        "valor": 156.23,
+        "dataVencimento": "2018-09-20",
+        "dataLimitePagamento": "2018-09-20",
+        "valorAbatimento": 1,
+        "tipoDesconto": 1,
+        "dataPrimeiroDesconto": "2018-09-20",
+        "valorPrimeiroDesconto": 1,
+        "dataSegundoDesconto": "2018-09-20",
+        "valorSegundoDesconto": 0,
+        "dataTerceiroDesconto": "2018-09-20",
+        "valorTerceiroDesconto": 0,
+        "tipoMulta": 1,
+        "dataMulta": "2018-09-20",
+        "valorMulta": 5,
+        "tipoJurosMora": 1,
+        "dataJurosMora": "2018-09-20",
+        "valorJurosMora": 4,
+        "numeroParcela": 1,
+        "aceite": true,
+        "codigoNegativacao": 2,
+        "numeroDiasNegativacao": 60,
+        "codigoProtesto": 1,
+        "numeroDiasProtesto": 30,
+        "pagador": {
+            "numeroCpfCnpj": "98765432185",
+            "nome": "Marcelo dos Santos",
+            "endereco": "Rua 87 Quadra 1 Lote 1 casa 1",
+            "bairro": "Santa Rosa",
+            "cidade": "Luziânia",
+            "cep": "72320000",
+            "uf": "DF",
+            "email": "pagador@dominio.com.br"
+        },
+        "beneficiarioFinal": {
+            "numeroCpfCnpj": "98784978699",
+            "nome": "Lucas de Lima"
+        },
+        "mensagensInstrucao": [
+            "Descrição da Instrução 1",
+            "Descrição da Instrução 2",
+            "Descrição da Instrução 3",
+            "Descrição da Instrução 4",
+            "Descrição da Instrução 5"
+        ],
+        "gerarPdf": false,
+        "rateioCreditos": [
+            {
+                "numeroBanco": 756,
+                "numeroAgencia": 4027,
+                "numeroContaCorrente": 0,
+                "contaPrincipal": true,
+                "codigoTipoValorRateio": 1,
+                "valorRateio": 100,
+                "codigoTipoCalculoRateio": 1,
+                "numeroCpfCnpjTitular": "98765432185",
+                "nomeTitular": "Marcelo dos Santos",
+                "codigoFinalidadeTed": 10,
+                "codigoTipoContaDestinoTed": "CC",
+                "quantidadeDiasFloat": 1,
+                "dataFloatCredito": "2020-12-30"
+            }
+        ],
+        "codigoCadastrarPIX": 1,
+        "numeroContratoCobranca": 1
     })
 
     # Consultas
@@ -132,7 +199,11 @@ except BoletoError as e:
 A classe `PixAPI` implementa todas as operações PIX disponíveis:
 
 ```python
-from sicoob.exceptions import CobrancaPixError, CobrancaPixNaoEncontradaError
+from sicoob.exceptions import (
+    CobrancaPixError, CobrancaPixNaoEncontradaError,
+    CobrancaPixVencimentoError, WebhookPixError,
+    LoteCobrancaPixError, QrCodePixError
+)
 
 # Operações PIX
 pix_api = cliente.cobranca.pix()
@@ -177,9 +248,35 @@ try:
     webhook = pix_api.consultar_webhook_pix(
         chave="123e4567-e89b-12d3-a456-426614174000"
     )
+    
+    # Exclusão webhook
+    pix_api.excluir_webhook_pix(
+        chave="123e4567-e89b-12d3-a456-426614174000"
+    )
+
+    # Lotes de cobrança
+    lote = pix_api.criar_lote_cobranca_pix_com_vencimento(
+        id_lote="lote001",
+        cobrancas=[{
+            "txid": "tx789",
+            "valor": {"original": "300.00"},
+            "calendario": {"dataDeVencimento": "2025-12-31"},
+            "chave": "123e4567-e89b-12d3-a456-426614174000"
+        }]
+    )
+    
+    lote_consultado = pix_api.consultar_lote_cobranca_pix_com_vencimento("lote001")
 
 except CobrancaPixNaoEncontradaError:
     print("Cobrança PIX não encontrada")
+except CobrancaPixVencimentoError:
+    print("Erro em cobrança PIX com vencimento")
+except WebhookPixError:
+    print("Erro em operação de webhook PIX")
+except LoteCobrancaPixError:
+    print("Erro em operação com lote de cobranças PIX")
+except QrCodePixError:
+    print("Erro em operação com QR Code PIX")
 except CobrancaPixError as e:
     print(f"Erro na API PIX: {e}")
 ```
@@ -192,6 +289,8 @@ O SDK possui exceções específicas para cada tipo de operação:
 from sicoob.exceptions import (
     BoletoError, BoletoNaoEncontradoError,
     PixError, CobrancaPixNaoEncontradaError,
+    CobrancaPixVencimentoError, WebhookPixError,
+    LoteCobrancaPixError, QrCodePixError,
     ContaCorrenteError, TransferenciaError
 )
 

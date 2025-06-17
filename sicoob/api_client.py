@@ -39,20 +39,18 @@ class APIClientBase:
 
             token = os.getenv('SICOOB_SANDBOX_TOKEN', 'sandbox-token')
             client_id = os.getenv('SICOOB_SANDBOX_CLIENT_ID', 'sandbox-client-id')
+        else:
+            token = self.oauth_client.get_access_token(scope)
+            client_id = self.oauth_client.client_id
 
-            return {
-                'Authorization': f'Bearer {token}',
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'client_id': client_id,
-            }
-
-        token = self.oauth_client.get_access_token(scope)
         return {
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'client_id': self.oauth_client.client_id,
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'User-Agent': 'SicoobAPIClient/1.0',
+            'client_id': client_id,
         }
 
     def _validate_response(self, response: requests.Response) -> dict:

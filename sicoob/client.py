@@ -52,15 +52,17 @@ class Sicoob:
         if not self.client_id:
             raise ValueError('client_id é obrigatório')
 
-        # Verifica se pelo menos um conjunto de credenciais foi fornecido explicitamente
-        has_pem = bool(certificado and chave_privada)
-        has_pfx = bool(certificado_pfx and senha_pfx)
+        # Em modo sandbox, não é obrigatório ter certificado
+        if not self.sandbox_mode:
+            # Verifica se pelo menos um conjunto de credenciais foi fornecido explicitamente
+            has_pem = bool(certificado and chave_privada)
+            has_pfx = bool(certificado_pfx and senha_pfx)
 
-        if not (has_pem or has_pfx):
-            raise ValueError(
-                'É necessário fornecer certificado e chave privada (PEM) '
-                'ou certificado PFX e senha explicitamente'
-            )
+            if not (has_pem or has_pfx):
+                raise ValueError(
+                    'É necessário fornecer certificado e chave privada (PEM) '
+                    'ou certificado PFX e senha explicitamente'
+                )
 
         self.oauth_client = OAuth2Client(
             client_id=self.client_id,
@@ -68,6 +70,7 @@ class Sicoob:
             chave_privada=self.chave_privada,
             certificado_pfx=self.certificado_pfx,
             senha_pfx=self.senha_pfx,
+            sandbox_mode=self.sandbox_mode
         )
 
         # Armazena a sessão do OAuth2Client
