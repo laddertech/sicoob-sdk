@@ -44,7 +44,7 @@ class APIClientBase:
                 'Authorization': f'Bearer {token}',
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'x-sandbox-client-id': client_id,
+                'client_id': client_id,
             }
 
         token = self.oauth_client.get_access_token(scope)
@@ -52,6 +52,7 @@ class APIClientBase:
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json',
             'Accept': 'application/json',
+            'client_id': self.oauth_client.client_id,
         }
 
     def _validate_response(self, response: requests.Response) -> dict:
