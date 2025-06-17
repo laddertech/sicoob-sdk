@@ -26,21 +26,31 @@ SICOOB_CHAVE_PRIVADA=caminho/para/chave_privada.key
 from sicoob import Sicoob
 
 # Inicializa o cliente (usando certificado PEM)
+# É obrigatório fornecer ou certificado+chave ou PFX+senha
 cliente = Sicoob(
-    client_id="seu_client_id",
-    certificado="caminho/para/certificado.pem", 
-    chave_privada="caminho/para/chave_privada.key"
+    client_id="seu_client_id",  # Obrigatório
+    certificado="caminho/para/certificado.pem",  # Obrigatório se não usar PFX
+    chave_privada="caminho/para/chave_privada.key",  # Obrigatório se não usar PFX
+    sandbox_mode=False  # Opcional, default False
 )
 
 # Alternativa usando certificado PFX
 cliente_pfx = Sicoob(
-    client_id="seu_client_id",
-    certificado_pfx="caminho/para/certificado.pfx",  # ou bytes ou arquivo aberto
-    senha_pfx="senha_do_pfx"
+    client_id="seu_client_id",  # Obrigatório
+    certificado_pfx="caminho/para/certificado.pfx",  # Obrigatório (pode ser path, bytes ou arquivo aberto)
+    senha_pfx="senha_do_pfx",  # Obrigatório se usar PFX
+    sandbox_mode=True  # Opcional para ambiente de testes
 )
 
 # Exemplo: consulta de extratos
-extrato = cliente.conta_corrente.consulta_extrato(conta="12345", data_inicio="2023-01-01", data_fim="2023-01-31")
+extrato = cliente.conta_corrente.extrato(
+    mes=1,  # Obrigatório (1-12)
+    ano=2023,  # Obrigatório
+    dia_inicial=1,  # Obrigatório (1-31)
+    dia_final=31,  # Obrigatório (1-31)
+    numero_conta_corrente="12345",  # Obrigatório
+    agrupar_cnab=False  # Opcional
+)
 ```
 
 ## API de Cobrança
@@ -51,6 +61,7 @@ A classe `BoletoAPI` oferece operações completas para gerenciamento de boletos
 
 ```python
 from sicoob import Sicoob
+from sicoob.exceptions import BoletoError, BoletoNaoEncontradoError
 
 # Inicializa o cliente
 cliente = Sicoob(
@@ -62,22 +73,58 @@ cliente = Sicoob(
 # Operações com boletos
 boleto_api = cliente.cobranca.boleto()
 
-# Emissão
-boleto = boleto_api.emitir_boleto({
-    "numeroContrato": 123456,
-    "modalidade": 1,
-    "valor": 100.50,
-    "beneficiario": {"nome": "Nome Beneficiário", "documento": "12345678901"}
-})
+try:
+    # Emissão
+    boleto = boleto_api.emitir_boleto({
+        "numeroContrato": 123456,  # Obrigatório
+        "modalidade": 1,  # Obrigatório (1-Simples, 3-Caucionada, etc)
+        "valor": 100.50,  # Obrigatório
+        "beneficiario": {  # Obrigatório
+            "nome": "Nome Beneficiário",
+            "documento": "12345678901"
+        }
+    })
 
-# Consultas
-boleto_consultado = boleto_api.consultar_boleto(nosso_numero="123456789")
-boletos_pagador = boleto_api.consultar_boletos_por_pagador(cpf_cnpj="12345678901")
-faixas = boleto_api.consultar_faixas_nosso_numero()
+    # Consultas
+    boleto_consultado = boleto_api.consultar_boleto(
+        numero_cliente=123456,  # Obrigatório
+        codigo_modalidade=1,  # Obrigatório
+        nosso_numero="123456789"  # Obrigatório (ou linha_digitavel ou codigo_barras)
+    )
+    
+    boletos_pagador = boleto_api.consultar_boletos_por_pagador(
+        numero_cpf_cnpj="12345678901",  # Obrigatório
+        numero_cliente=123456,  # Obrigatório
+        client_id="seu_client_id"  # Obrigatório
+    )
+    
+    faixas = boleto_api.consultar_faixas_nosso_numero(
+        numero_cliente=123456,  # Obrigatório
+        codigo_modalidade=1,  # Obrigatório
+        quantidade=10,  # Obrigatório
+        client_id="seu_client_id"  # Obrigatório
+    )
 
-# Webhooks
-boleto_api.cadastrar_webhook(url="https://meusite.com/webhook")
-webhook = boleto_api.consultar_webhook()
+    # Webhooks
+    boleto_api.cadastrar_webhook(
+        webhook={
+            "url": "https://meusite.com/webhook",  # Obrigatório
+            "codigoTipoMovimento": 7,  # Obrigatório (7-Pagamento)
+            "codigoPeriodoMovimento": 1  # Obrigatório
+        },
+        client_id="seu_client_id"  # Obrigatório
+    )
+    
+    webhook = boleto_api.consultar_webhook(
+        id_webhook=1,  # Obrigatório
+        codigo_tipo_movimento=7,  # Obrigatório
+        client_id="seu_client_id"  # Obrigatório
+    )
+
+except BoletoNaoEncontradoError:
+    print("Boleto não encontrado")
+except BoletoError as e:
+    print(f"Erro na API de boletos: {e}")
 ```
 
 ### PIX
@@ -85,23 +132,56 @@ webhook = boleto_api.consultar_webhook()
 A classe `PixAPI` implementa todas as operações PIX disponíveis:
 
 ```python
+from sicoob.exceptions import CobrancaPixError, CobrancaPixNaoEncontradaError
+
 # Operações PIX
 pix_api = cliente.cobranca.pix()
 
-# Cobranças imediatas
-cobranca = pix_api.criar_cobranca_pix(
-    txid="tx123",
-    dados_cobranca={"valor": {"original": "100.50"}}
-)
+try:
+    # Cobranças imediatas
+    cobranca = pix_api.criar_cobranca_pix(
+        txid="tx123",  # Obrigatório (máx 35 caracteres)
+        dados_cobranca={  # Obrigatório
+            "valor": {"original": "100.50"},  # Obrigatório
+            "chave": "123e4567-e89b-12d3-a456-426614174000",  # Obrigatório
+            "solicitacaoPagador": "Pagamento do pedido 123"  # Opcional
+        }
+    )
 
-# Cobranças com vencimento
-cobranca_venc = pix_api.criar_cobranca_pix_com_vencimento(
-    txid="tx456",
-    dados_cobranca={"valor": {"original": "200.00"}, "calendario": {"dataDeVencimento": "2025-12-31"}}
-)
+    # Cobranças com vencimento
+    cobranca_venc = pix_api.criar_cobranca_pix_com_vencimento(
+        txid="tx456",  # Obrigatório
+        dados_cobranca={  # Obrigatório
+            "valor": {"original": "200.00"},  # Obrigatório
+            "calendario": {"dataDeVencimento": "2025-12-31"},  # Obrigatório
+            "chave": "123e4567-e89b-12d3-a456-426614174000"  # Obrigatório
+        }
+    )
 
-# Webhooks PIX
-pix_api.configurar_webhook_pix(chave="123e4567-e89b-12d3-a456-426614174000", webhook_url="https://meusite.com/pix-webhook")
+    # Consulta cobrança
+    cobranca_consultada = pix_api.consultar_cobranca_pix(txid="tx123")
+    
+    # Cancelamento
+    pix_api.cancelar_cobranca_pix(txid="tx123")
+    
+    # QR Code
+    qrcode = pix_api.obter_qrcode_pix(txid="tx123")
+
+    # Webhooks PIX
+    pix_api.configurar_webhook_pix(
+        chave="123e4567-e89b-12d3-a456-426614174000",  # Obrigatório
+        webhook_url="https://meusite.com/pix-webhook"  # Obrigatório
+    )
+    
+    # Consulta webhook
+    webhook = pix_api.consultar_webhook_pix(
+        chave="123e4567-e89b-12d3-a456-426614174000"
+    )
+
+except CobrancaPixNaoEncontradaError:
+    print("Cobrança PIX não encontrada")
+except CobrancaPixError as e:
+    print(f"Erro na API PIX: {e}")
 ```
 
 ### Tratamento de Erros
@@ -147,12 +227,13 @@ extrato = conta_api.extrato(
 saldo = conta_api.saldo("123456")
 
 # Transferências
-transferencia = conta_api.transferencia({
-    "contaOrigem": "123456",
-    "contaDestino": "654321",
-    "valor": 1000.00,
-    "descricao": "Transferência entre contas"
-})
+transferencia = conta_api.transferencia(
+    valor=1000.00,  # Obrigatório
+    conta_destino="654321",  # Obrigatório
+    tipo_transferencia="TED",  # Opcional (TED/DOC/PIX)
+    descricao="Transferência entre contas",  # Opcional
+    numero_conta="123456"  # Opcional se já configurado no cliente
+)
 ```
 
 ## Versionamento e Deploy
