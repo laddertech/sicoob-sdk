@@ -59,10 +59,14 @@ class BoletoConsultaError(BoletoError):
     """Erro durante a consulta de boleto"""
 
     def __init__(
-        self, message: str, code: int | None = None, nosso_numero: str | None = None
+        self,
+        message: str,
+        code: int | None = None,
+        nosso_numero: str | None = None,
+        mensagens: list[dict] | None = None
     ) -> None:
         self.nosso_numero = nosso_numero
-        super().__init__(message, code)
+        super().__init__(message, code, mensagens)
 
 
 class BoletoConsultaPagadorError(BoletoError):
@@ -163,10 +167,12 @@ class BoletoWebhookError(BoletoError):
         dados_webhook: dict | None = None,
         id_webhook: int | None = None,
         mensagens: list[dict] | None = None,
+        operation: str | None = None,
     ) -> None:
         self.url = url
         self.dados_webhook = dados_webhook
         self.id_webhook = id_webhook
+        self.operation = operation
         super().__init__(message, code, mensagens)
 
 

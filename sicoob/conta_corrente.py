@@ -19,16 +19,58 @@ class ContaCorrenteAPI(APIClientBase):
         Raises:
             Exceção do tipo error_class com mensagens formatadas
         """
-        if response.status_code in (400, 406, 500):
-            error_data = response.json()
-            mensagens = error_data.get("mensagens", [{"mensagem": "Erro desconhecido", "codigo": str(response.status_code)}])
+        try:
+            # Primeiro verifica se é uma exceção HTTP
+            if isinstance(response, Exception):
+                raise response
+
+            # Verifica os códigos de erro específicos
+            if hasattr(response, 'status_code') and response.status_code in (400, 406, 500):
+                # Tenta extrair mensagem de erro
+                mensagem = 'Erro desconhecido'
+                try:
+                    if hasattr(response, 'json') and callable(response.json):
+                        error_data = response.json()
+                        mensagens = error_data.get("mensagens", [{"mensagem": mensagem, "codigo": str(response.status_code)}])
+                        mensagem = mensagens[0]["mensagem"]
+                    else:
+                        mensagem = getattr(response, 'text', mensagem)
+                except Exception:
+                    pass
+
+                # Determina o prefixo da mensagem baseado no tipo de erro
+                prefixo = {
+                    ExtratoError: "Falha na consulta do extrato",
+                    SaldoError: "Falha na consulta do saldo",
+                    TransferenciaError: "Falha na transferência"
+                }.get(error_class, "Falha na operação")
+
+                raise error_class(
+                    message=f"[{response.status_code}] {prefixo}: {mensagem}",
+                    code=response.status_code,
+                    mensagens=[{"mensagem": mensagem, "codigo": str(response.status_code)}],
+                    **kwargs
+                )
+
+            # Se não for um dos códigos tratados, verifica raise_for_status
+            if hasattr(response, 'raise_for_status'):
+                try:
+                    response.raise_for_status()
+                except Exception as e:
+                    raise error_class(
+                        message=f"Erro na requisição: {str(e)}",
+                        code=getattr(response, 'status_code', 500),
+                        **kwargs
+                    )
+
+        except error_class:
+            raise  # Re-lança exceções já do tipo esperado
+        except Exception as e:
             raise error_class(
-                message=mensagens[0]["mensagem"],
-                code=response.status_code,
-                mensagens=mensagens,
+                message=f"Erro inesperado: {str(e)}",
+                code=500,
                 **kwargs
             )
-        response.raise_for_status()
 
     def __init__(
         self,

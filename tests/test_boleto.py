@@ -27,9 +27,12 @@ def test_emitir_boleto_sucesso(boleto_client: BoletoAPI) -> None:
     """Testa a emissão de boleto com sucesso"""
     # Configura o mock
     mock_response = Mock()
+    mock_response.status_code = 200
     mock_response.json.return_value = {
-        'nossoNumero': '123456789',
-        'codigoBarras': '00190000090123456789012345678901234567890000',
+        'resultado': {
+            'nossoNumero': '123456789',
+            'codigoBarras': '00190000090123456789012345678901234567890000',
+        }
     }
     boleto_client.session.post.return_value = mock_response
 
@@ -45,9 +48,11 @@ def test_emitir_boleto_sucesso(boleto_client: BoletoAPI) -> None:
     result = boleto_client.emitir_boleto(dados)
 
     # Verificações
-    if 'nossoNumero' not in result:
+    if 'resultado' not in result:
+        raise ValueError("Resultado deve conter 'resultado'")
+    if 'nossoNumero' not in result['resultado']:
         raise ValueError("Resultado deve conter 'nossoNumero'")
-    if 'codigoBarras' not in result:
+    if 'codigoBarras' not in result['resultado']:
         raise ValueError("Resultado deve conter 'codigoBarras'")
     boleto_client.session.post.assert_called_once()
     args, kwargs = boleto_client.session.post.call_args
@@ -59,17 +64,22 @@ def test_emitir_boleto_erro_http(boleto_client: BoletoAPI) -> None:
     """Testa a emissão de boleto com erro HTTP"""
     # Configura o mock para erro HTTP
     mock_response = Mock()
-    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
-        '400 Bad Request'
-    )
     mock_response.status_code = 400
+    mock_response.json.return_value = {
+        'mensagens': [{'mensagem': 'Dados inválidos', 'codigo': 'ERR001'}]
+    }
     boleto_client.session.post.return_value = mock_response
 
     dados = {'numeroContrato': 123456, 'valor': 100.50}
 
     # Verifica se exceção é levantada
-    with pytest.raises(Exception, match='400 Bad Request'):
+    with pytest.raises(BoletoEmissaoError) as exc_info:
         boleto_client.emitir_boleto(dados)
+
+    # Verificações
+    assert '[400] Falha na emissão do boleto: Dados inválidos' in str(exc_info.value)
+    assert exc_info.value.code == 400
+    assert exc_info.value.dados_boleto == dados
 
 
 def test_emitir_boleto_erro_generico(boleto_client: BoletoAPI) -> None:
@@ -82,8 +92,12 @@ def test_emitir_boleto_erro_generico(boleto_client: BoletoAPI) -> None:
     dados = {'numeroContrato': 123456, 'valor': 100.50}
 
     # Verifica se exceção é levantada
-    with pytest.raises(Exception, match='Erro de conexão'):
+    with pytest.raises(BoletoEmissaoError) as exc_info:
         boleto_client.emitir_boleto(dados)
+
+    # Verificações
+    assert 'Falha na comunicação com API de boletos: Erro de conexão' in str(exc_info.value)
+    assert exc_info.value.dados_boleto == dados
 
 
 def test_consultar_boleto_sucesso(boleto_client: BoletoAPI) -> None:
@@ -123,6 +137,10 @@ def test_consultar_boleto_nao_encontrado(boleto_client: BoletoAPI) -> None:
     )
     assert result is None
     boleto_client.session.get.assert_called_once()
+    args, kwargs = boleto_client.session.get.call_args
+    assert kwargs['params']['nossoNumero'] == '000000000'
+    assert kwargs['params']['numeroCliente'] == 123456
+    assert kwargs['params']['codigoModalidade'] == 1
 
 
 def test_consultar_boleto_erro_http(boleto_client: BoletoAPI) -> None:
@@ -150,10 +168,14 @@ def test_consultar_boleto_erro_generico(boleto_client: BoletoAPI) -> None:
     )
 
     # Verifica se exceção é levantada
-    with pytest.raises(Exception, match='Erro de conexão'):
+    with pytest.raises(BoletoConsultaError) as exc_info:
         boleto_client.consultar_boleto(
             numero_cliente=123456, codigo_modalidade=1, nosso_numero='123456789'
         )
+
+    # Verificações
+    assert 'Falha na comunicação com API de boletos: Erro de conexão' in str(exc_info.value)
+    assert exc_info.value.nosso_numero == '123456789'
 
 
 def test_consultar_boletos_por_pagador_sucesso(boleto_client: BoletoAPI) -> None:
@@ -522,10 +544,15 @@ def test_emitir_segunda_via_erro_generico(boleto_client: BoletoAPI) -> None:
     )
 
     # Verifica se exceção é levantada
-    with pytest.raises(Exception, match='Erro de conexão'):
+    with pytest.raises(BoletoEmissaoError) as exc_info:
         boleto_client.emitir_segunda_via(
             numero_cliente=123456, codigo_modalidade=1, nosso_numero=987654321
         )
+
+    # Verificações
+    assert 'Falha na comunicação com API de boletos: Erro de conexão' in str(exc_info.value)
+    params = {'numeroCliente': 123456, 'codigoModalidade': 1, 'nossoNumero': 987654321, 'gerarPdf': 'false'}
+    assert exc_info.value.dados_boleto == params
 
 
 def test_consultar_faixas_nosso_numero_sucesso(boleto_client: BoletoAPI) -> None:
