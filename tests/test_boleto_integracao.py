@@ -77,7 +77,7 @@ def test_emitir_boleto_integracao_real(sicoob_client):
             "Descrição da Instrução 4",
             "Descrição da Instrução 5"
         ],
-        "gerarPdf": False,
+        "gerarPdf": True,
         "rateioCreditos": [
             {
                 "numeroBanco": 756,
