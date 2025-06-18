@@ -33,7 +33,9 @@ def update_version(file_path: str, new_version: str) -> None:
         )
     elif file_path.name == '__init__.py':
         new_content = re.sub(
-            r'(__version__\s*=\s*["\'])[\d.]+(["\'])', rf'\g<1>{new_version}\g<2>', content
+            r'(__version__\s*=\s*["\'])[\d.]+(["\'])',
+            rf'\g<1>{new_version}\g<2>',
+            content,
         )
 
     file_path.write_text(new_content)

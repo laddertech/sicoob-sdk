@@ -16,16 +16,17 @@ def test_client_init(sicoob_client: Sicoob) -> None:
 
 def test_client_init_pfx() -> None:
     """Testa a inicialização do cliente com certificado PFX"""
-    with patch('sicoob.auth.oauth.requests_pkcs12.Pkcs12Adapter') as mock_adapter, \
-         patch('sicoob.auth.oauth.requests.Session') as mock_session:
-
+    with (
+        patch('sicoob.auth.oauth.requests_pkcs12.Pkcs12Adapter') as mock_adapter,
+        patch('sicoob.auth.oauth.requests.Session') as mock_session,
+    ):
         mock_adapter_instance = Mock()
         mock_adapter.return_value = mock_adapter_instance
 
         client = Sicoob(
             client_id='test_id',
             certificado_pfx='test_cert.pfx',
-            senha_pfx='test_password'
+            senha_pfx='test_password',
         )
 
         if client.client_id != 'test_id':
@@ -38,9 +39,11 @@ def test_client_init_pfx() -> None:
         mock_adapter.assert_called_once_with(
             pkcs12_data=None,
             pkcs12_filename='test_cert.pfx',
-            pkcs12_password='test_password'
+            pkcs12_password='test_password',
         )
-        mock_session.return_value.mount.assert_called_once_with('https://', mock_adapter_instance)
+        mock_session.return_value.mount.assert_called_once_with(
+            'https://', mock_adapter_instance
+        )
 
 
 def test_client_init_invalid() -> None:

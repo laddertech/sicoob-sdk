@@ -8,7 +8,9 @@ from sicoob.exceptions import ExtratoError, SaldoError, TransferenciaError
 class ContaCorrenteAPI(APIClientBase):
     """Implementação da API de Conta Corrente do Sicoob"""
 
-    def _handle_error_response(self, response: requests.Response, error_class: type, **kwargs) -> None:
+    def _handle_error_response(
+        self, response: requests.Response, error_class: type, **kwargs
+    ) -> None:
         """Trata respostas de erro da API de forma centralizada
 
         Args:
@@ -25,14 +27,26 @@ class ContaCorrenteAPI(APIClientBase):
                 raise response
 
             # Verifica os códigos de erro específicos
-            if hasattr(response, 'status_code') and response.status_code in (400, 406, 500):
+            if hasattr(response, 'status_code') and response.status_code in (
+                400,
+                406,
+                500,
+            ):
                 # Tenta extrair mensagem de erro
                 mensagem = 'Erro desconhecido'
                 try:
                     if hasattr(response, 'json') and callable(response.json):
                         error_data = response.json()
-                        mensagens = error_data.get("mensagens", [{"mensagem": mensagem, "codigo": str(response.status_code)}])
-                        mensagem = mensagens[0]["mensagem"]
+                        mensagens = error_data.get(
+                            'mensagens',
+                            [
+                                {
+                                    'mensagem': mensagem,
+                                    'codigo': str(response.status_code),
+                                }
+                            ],
+                        )
+                        mensagem = mensagens[0]['mensagem']
                     else:
                         mensagem = getattr(response, 'text', mensagem)
                 except Exception:
@@ -40,16 +54,18 @@ class ContaCorrenteAPI(APIClientBase):
 
                 # Determina o prefixo da mensagem baseado no tipo de erro
                 prefixo = {
-                    ExtratoError: "Falha na consulta do extrato",
-                    SaldoError: "Falha na consulta do saldo",
-                    TransferenciaError: "Falha na transferência"
-                }.get(error_class, "Falha na operação")
+                    ExtratoError: 'Falha na consulta do extrato',
+                    SaldoError: 'Falha na consulta do saldo',
+                    TransferenciaError: 'Falha na transferência',
+                }.get(error_class, 'Falha na operação')
 
                 raise error_class(
-                    message=f"[{response.status_code}] {prefixo}: {mensagem}",
+                    message=f'[{response.status_code}] {prefixo}: {mensagem}',
                     code=response.status_code,
-                    mensagens=[{"mensagem": mensagem, "codigo": str(response.status_code)}],
-                    **kwargs
+                    mensagens=[
+                        {'mensagem': mensagem, 'codigo': str(response.status_code)}
+                    ],
+                    **kwargs,
                 )
 
             # Se não for um dos códigos tratados, verifica raise_for_status
@@ -58,19 +74,15 @@ class ContaCorrenteAPI(APIClientBase):
                     response.raise_for_status()
                 except Exception as e:
                     raise error_class(
-                        message=f"Erro na requisição: {str(e)}",
+                        message=f'Erro na requisição: {str(e)}',
                         code=getattr(response, 'status_code', 500),
-                        **kwargs
+                        **kwargs,
                     )
 
         except error_class:
             raise  # Re-lança exceções já do tipo esperado
         except Exception as e:
-            raise error_class(
-                message=f"Erro inesperado: {str(e)}",
-                code=500,
-                **kwargs
-            )
+            raise error_class(message=f'Erro inesperado: {str(e)}', code=500, **kwargs)
 
     def __init__(
         self,
@@ -136,9 +148,7 @@ class ContaCorrenteAPI(APIClientBase):
 
             try:
                 self._handle_error_response(
-                    response,
-                    ExtratoError,
-                    periodo=f'{dia_inicial}/{mes}/{ano}'
+                    response, ExtratoError, periodo=f'{dia_inicial}/{mes}/{ano}'
                 )
             except ExtratoError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -154,9 +164,7 @@ class ContaCorrenteAPI(APIClientBase):
                     ) from e
                 try:
                     self._handle_error_response(
-                        e.response,
-                        ExtratoError,
-                        periodo=f'{dia_inicial}/{mes}/{ano}'
+                        e.response, ExtratoError, periodo=f'{dia_inicial}/{mes}/{ano}'
                     )
                 except ExtratoError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -193,11 +201,7 @@ class ContaCorrenteAPI(APIClientBase):
             )
 
             try:
-                self._handle_error_response(
-                    response,
-                    SaldoError,
-                    conta=numero_conta
-                )
+                self._handle_error_response(response, SaldoError, conta=numero_conta)
             except SaldoError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
 
@@ -206,9 +210,7 @@ class ContaCorrenteAPI(APIClientBase):
             if e.response is not None:
                 try:
                     self._handle_error_response(
-                        e.response,
-                        SaldoError,
-                        conta=numero_conta
+                        e.response, SaldoError, conta=numero_conta
                     )
                 except SaldoError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -262,11 +264,7 @@ class ContaCorrenteAPI(APIClientBase):
             )
 
             try:
-                self._handle_error_response(
-                    response,
-                    TransferenciaError,
-                    dados=payload
-                )
+                self._handle_error_response(response, TransferenciaError, dados=payload)
             except TransferenciaError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
 
@@ -275,9 +273,7 @@ class ContaCorrenteAPI(APIClientBase):
             if e.response is not None:
                 try:
                     self._handle_error_response(
-                        e.response,
-                        TransferenciaError,
-                        dados=payload
+                        e.response, TransferenciaError, dados=payload
                     )
                 except TransferenciaError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500

@@ -15,7 +15,9 @@ from sicoob.exceptions import (
 class PixAPI(APIClientBase):
     """Implementação da API de Cobrança PIX do Sicoob"""
 
-    def _handle_error_response(self, response: requests.Response, error_class: type, **kwargs) -> None:
+    def _handle_error_response(
+        self, response: requests.Response, error_class: type, **kwargs
+    ) -> None:
         """Trata respostas de erro da API de forma centralizada
 
         Args:
@@ -28,12 +30,20 @@ class PixAPI(APIClientBase):
         """
         if response.status_code in (400, 406, 500):
             error_data = response.json()
-            mensagens = error_data.get("mensagens", [{"mensagem": "Erro desconhecido", "codigo": str(response.status_code)}])
+            mensagens = error_data.get(
+                'mensagens',
+                [
+                    {
+                        'mensagem': 'Erro desconhecido',
+                        'codigo': str(response.status_code),
+                    }
+                ],
+            )
             raise error_class(
-                message=mensagens[0]["mensagem"],
+                message=mensagens[0]['mensagem'],
                 code=response.status_code,
                 mensagens=mensagens,
-                **kwargs
+                **kwargs,
             )
         response.raise_for_status()
 
@@ -41,15 +51,11 @@ class PixAPI(APIClientBase):
         """Cria uma cobrança imediata via PIX"""
         try:
             url = f'{self._get_base_url()}/pix/api/v2/cob/{txid}'
-            headers = self._get_headers(scope='cob.write')
+            headers = self._get_headers(scope='cob.write pix.write')
             response = self.session.put(url, json=dados_cobranca, headers=headers)
 
             try:
-                self._handle_error_response(
-                    response,
-                    CobrancaPixError,
-                    txid=txid
-                )
+                self._handle_error_response(response, CobrancaPixError, txid=txid)
             except CobrancaPixError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
 
@@ -57,11 +63,7 @@ class PixAPI(APIClientBase):
         except requests.exceptions.HTTPError as e:
             if e.response is not None:
                 try:
-                    self._handle_error_response(
-                        e.response,
-                        CobrancaPixError,
-                        txid=txid
-                    )
+                    self._handle_error_response(e.response, CobrancaPixError, txid=txid)
                 except CobrancaPixError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
                 raise CobrancaPixError(
@@ -69,9 +71,7 @@ class PixAPI(APIClientBase):
                     code=e.response.status_code,
                     txid=txid,
                 ) from e
-            raise CobrancaPixError(
-                f'Erro ao criar cobrança PIX: {e}', txid=txid
-            ) from e
+            raise CobrancaPixError(f'Erro ao criar cobrança PIX: {e}', txid=txid) from e
         except Exception as e:
             raise CobrancaPixError(f'Erro ao criar cobrança PIX: {e}', txid=txid) from e
 
@@ -86,11 +86,7 @@ class PixAPI(APIClientBase):
                 raise CobrancaPixNaoEncontradaError(txid)
 
             try:
-                self._handle_error_response(
-                    response,
-                    CobrancaPixError,
-                    txid=txid
-                )
+                self._handle_error_response(response, CobrancaPixError, txid=txid)
             except CobrancaPixError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
 
@@ -100,11 +96,7 @@ class PixAPI(APIClientBase):
                 if e.response.status_code == 404:
                     raise CobrancaPixNaoEncontradaError(txid) from e
                 try:
-                    self._handle_error_response(
-                        e.response,
-                        CobrancaPixError,
-                        txid=txid
-                    )
+                    self._handle_error_response(e.response, CobrancaPixError, txid=txid)
                 except CobrancaPixError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
                 raise CobrancaPixError(
@@ -133,11 +125,7 @@ class PixAPI(APIClientBase):
                 raise CobrancaPixNaoEncontradaError(txid)
 
             try:
-                self._handle_error_response(
-                    response,
-                    CobrancaPixError,
-                    txid=txid
-                )
+                self._handle_error_response(response, CobrancaPixError, txid=txid)
             except CobrancaPixError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
 
@@ -147,11 +135,7 @@ class PixAPI(APIClientBase):
                 if e.response.status_code == 404:
                     raise CobrancaPixNaoEncontradaError(txid) from e
                 try:
-                    self._handle_error_response(
-                        e.response,
-                        CobrancaPixError,
-                        txid=txid
-                    )
+                    self._handle_error_response(e.response, CobrancaPixError, txid=txid)
                 except CobrancaPixError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
                 raise CobrancaPixError(
@@ -214,9 +198,7 @@ class PixAPI(APIClientBase):
 
             try:
                 self._handle_error_response(
-                    response,
-                    CobrancaPixVencimentoError,
-                    txid=txid
+                    response, CobrancaPixVencimentoError, txid=txid
                 )
             except CobrancaPixVencimentoError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -226,9 +208,7 @@ class PixAPI(APIClientBase):
             if e.response is not None:
                 try:
                     self._handle_error_response(
-                        e.response,
-                        CobrancaPixVencimentoError,
-                        txid=txid
+                        e.response, CobrancaPixVencimentoError, txid=txid
                     )
                 except CobrancaPixVencimentoError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -344,11 +324,7 @@ class PixAPI(APIClientBase):
             response = self.session.put(url, json=payload, headers=headers)
 
             try:
-                self._handle_error_response(
-                    response,
-                    WebhookPixError,
-                    chave=chave
-                )
+                self._handle_error_response(response, WebhookPixError, chave=chave)
             except WebhookPixError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
 
@@ -357,9 +333,7 @@ class PixAPI(APIClientBase):
             if e.response is not None:
                 try:
                     self._handle_error_response(
-                        e.response,
-                        WebhookPixError,
-                        chave=chave
+                        e.response, WebhookPixError, chave=chave
                     )
                 except WebhookPixError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -399,11 +373,7 @@ class PixAPI(APIClientBase):
                 raise WebhookPixNaoEncontradoError(chave)
 
             try:
-                self._handle_error_response(
-                    response,
-                    WebhookPixError,
-                    chave=chave
-                )
+                self._handle_error_response(response, WebhookPixError, chave=chave)
             except WebhookPixError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
 
@@ -414,9 +384,7 @@ class PixAPI(APIClientBase):
                     raise WebhookPixNaoEncontradoError(chave) from e
                 try:
                     self._handle_error_response(
-                        e.response,
-                        WebhookPixError,
-                        chave=chave
+                        e.response, WebhookPixError, chave=chave
                     )
                 except WebhookPixError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -458,11 +426,7 @@ class PixAPI(APIClientBase):
                 raise WebhookPixNaoEncontradoError(chave)
 
             try:
-                self._handle_error_response(
-                    response,
-                    WebhookPixError,
-                    chave=chave
-                )
+                self._handle_error_response(response, WebhookPixError, chave=chave)
             except WebhookPixError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
 
@@ -473,9 +437,7 @@ class PixAPI(APIClientBase):
                     raise WebhookPixNaoEncontradoError(chave) from e
                 try:
                     self._handle_error_response(
-                        e.response,
-                        WebhookPixError,
-                        chave=chave
+                        e.response, WebhookPixError, chave=chave
                     )
                 except WebhookPixError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500

@@ -70,7 +70,7 @@ class Sicoob:
             chave_privada=self.chave_privada,
             certificado_pfx=self.certificado_pfx,
             senha_pfx=self.senha_pfx,
-            sandbox_mode=self.sandbox_mode
+            sandbox_mode=self.sandbox_mode,
         )
 
         # Armazena a sessão do OAuth2Client

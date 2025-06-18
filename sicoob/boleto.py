@@ -27,7 +27,9 @@ class BoletoAPI(APIClientBase):
         super().__init__(oauth_client, session, sandbox_mode)
         self.base_path = '/cobranca-bancaria/v3'
 
-    def _handle_error_response(self, response: requests.Response, error_class: type, **kwargs) -> None:
+    def _handle_error_response(
+        self, response: requests.Response, error_class: type, **kwargs
+    ) -> None:
         """Trata respostas de erro da API de forma centralizada
 
         Args:
@@ -44,11 +46,15 @@ class BoletoAPI(APIClientBase):
                 raise response
 
             # Verifica se é um mock (usado em testes)
-            if hasattr(response, '_mock_return_value') or hasattr(response, 'mock_calls'):
+            if hasattr(response, '_mock_return_value') or hasattr(
+                response, 'mock_calls'
+            ):
                 if isinstance(response, Exception):
                     raise response
                 # Para mocks, assumimos sucesso a menos que configurado como erro
-                if hasattr(response, 'status_code') and isinstance(response.status_code, int):
+                if hasattr(response, 'status_code') and isinstance(
+                    response.status_code, int
+                ):
                     status_code = response.status_code
                 else:
                     # Mock sem status_code definido é tratado como sucesso
@@ -64,31 +70,35 @@ class BoletoAPI(APIClientBase):
                     if hasattr(response, 'json') and callable(response.json):
                         error_data = response.json()
                         if isinstance(error_data, dict):
-                            mensagens = error_data.get("mensagens", [{"mensagem": mensagem, "codigo": str(status_code)}])
+                            mensagens = error_data.get(
+                                'mensagens',
+                                [{'mensagem': mensagem, 'codigo': str(status_code)}],
+                            )
                             if isinstance(mensagens, list) and len(mensagens) > 0:
-                                mensagem = mensagens[0].get("mensagem", mensagem)
+                                mensagem = mensagens[0].get('mensagem', mensagem)
                 except Exception:
                     pass
 
                 # Determina o prefixo da mensagem baseado no tipo de erro
                 prefixo = {
-                    BoletoConsultaError: "Falha na consulta do boleto",
-                    BoletoConsultaPagadorError: "Falha na consulta de boletos por pagador",
-                    BoletoConsultaFaixaError: "Falha na consulta de faixas",
-                    BoletoEmissaoError: "Falha na emissão do boleto" if "segunda-via" not in str(response.url)
-                                      else "Falha na emissão da segunda via",
-                    BoletoAlteracaoError: "Falha na alteração do boleto",
-                    BoletoBaixaError: "Falha na baixa do boleto",
-                    BoletoAlteracaoPagadorError: "Falha na alteração do pagador",
+                    BoletoConsultaError: 'Falha na consulta do boleto',
+                    BoletoConsultaPagadorError: 'Falha na consulta de boletos por pagador',
+                    BoletoConsultaFaixaError: 'Falha na consulta de faixas',
+                    BoletoEmissaoError: 'Falha na emissão do boleto'
+                    if 'segunda-via' not in str(response.url)
+                    else 'Falha na emissão da segunda via',
+                    BoletoAlteracaoError: 'Falha na alteração do boleto',
+                    BoletoBaixaError: 'Falha na baixa do boleto',
+                    BoletoAlteracaoPagadorError: 'Falha na alteração do pagador',
                     BoletoWebhookError: {
-                        'cadastrar': "Falha no cadastro do webhook",
-                        'consultar': "Falha na consulta do webhook",
-                        'atualizar': "Falha na atualização do webhook",
-                        'excluir': "Falha na exclusão do webhook",
-                        'solicitacoes': "Falha na consulta das solicitações do webhook",
-                        'default': "Falha na operação do webhook"
-                    }
-                }.get(error_class, "Falha na operação")
+                        'cadastrar': 'Falha no cadastro do webhook',
+                        'consultar': 'Falha na consulta do webhook',
+                        'atualizar': 'Falha na atualização do webhook',
+                        'excluir': 'Falha na exclusão do webhook',
+                        'solicitacoes': 'Falha na consulta das solicitações do webhook',
+                        'default': 'Falha na operação do webhook',
+                    },
+                }.get(error_class, 'Falha na operação')
 
                 # Tratamento especial para BoletoWebhookError
                 if error_class == BoletoWebhookError:
@@ -102,53 +112,66 @@ class BoletoAPI(APIClientBase):
                 # Format error message based on status code and error class
                 if status_code >= 400:
                     if error_class == BoletoConsultaError:
-                        message = f"[{status_code}] {prefixo} - Status: {status_code}"
+                        message = f'[{status_code}] {prefixo} - Status: {status_code}'
                     elif error_class == BoletoConsultaPagadorError:
-                        message = f"[{status_code}] {prefixo} - Status: {status_code}"
+                        message = f'[{status_code}] {prefixo} - Status: {status_code}'
                     elif error_class == BoletoEmissaoError:
                         # Special handling for segunda-via operations
                         is_segunda_via = (
-                            ("segunda-via" in str(response.url) if hasattr(response, 'url') else False) or
-                            kwargs.get('dados_boleto', {}).get('gerarPdf', False) or
-                            kwargs.get('dados_boleto', {}).get('nossoNumero') is not None
+                            (
+                                'segunda-via' in str(response.url)
+                                if hasattr(response, 'url')
+                                else False
+                            )
+                            or kwargs.get('dados_boleto', {}).get('gerarPdf', False)
+                            or kwargs.get('dados_boleto', {}).get('nossoNumero')
+                            is not None
                         )
 
                         if is_segunda_via:
-                            message = f"[{status_code}] Falha na emissão da segunda via - Status: {status_code}"
+                            message = f'[{status_code}] Falha na emissão da segunda via - Status: {status_code}'
                         elif hasattr(response, '_mock_return_value'):
                             # For mock responses, use the standard format
-                            message = f"[{status_code}] {prefixo}: {mensagem}"
+                            message = f'[{status_code}] {prefixo}: {mensagem}'
                         else:
-                            message = f"[{status_code}] {prefixo}: {mensagem}"
+                            message = f'[{status_code}] {prefixo}: {mensagem}'
                     elif error_class == BoletoConsultaFaixaError:
                         if status_code == 400 and 'Parâmetros inválidos' in mensagem:
-                            message = f"[{status_code}] {mensagem}"
+                            message = f'[{status_code}] {mensagem}'
                         elif status_code == 406 and 'Dados inconsistentes' in mensagem:
-                            message = f"[{status_code}] {mensagem}"
+                            message = f'[{status_code}] {mensagem}'
                         else:
-                            message = f"[{status_code}] Falha na consulta de faixas - Status: {status_code}"
+                            message = f'[{status_code}] Falha na consulta de faixas - Status: {status_code}'
                     else:
-                        message = f"[{status_code}] {prefixo}: {mensagem}"
+                        message = f'[{status_code}] {prefixo}: {mensagem}'
                 else:
-                    message = f"[{status_code}] {prefixo}: {mensagem}"
+                    message = f'[{status_code}] {prefixo}: {mensagem}'
 
-                raise error_class(
-                    message=message,
-                    code=status_code,
-                    **kwargs
-                )
+                raise error_class(message=message, code=status_code, **kwargs)
 
             # Verifica os códigos de erro específicos
-            if hasattr(response, 'status_code') and response.status_code in (400, 406, 500):
+            if hasattr(response, 'status_code') and response.status_code in (
+                400,
+                406,
+                500,
+            ):
                 # Tenta extrair mensagem de erro
                 mensagem = 'Erro desconhecido'
                 try:
                     if hasattr(response, 'json') and callable(response.json):
                         error_data = response.json()
                         if isinstance(error_data, dict):
-                            mensagens = error_data.get("mensagens", [{"mensagem": mensagem, "codigo": str(response.status_code)}])
+                            mensagens = error_data.get(
+                                'mensagens',
+                                [
+                                    {
+                                        'mensagem': mensagem,
+                                        'codigo': str(response.status_code),
+                                    }
+                                ],
+                            )
                             if isinstance(mensagens, list) and len(mensagens) > 0:
-                                mensagem = mensagens[0].get("mensagem", mensagem)
+                                mensagem = mensagens[0].get('mensagem', mensagem)
                         elif hasattr(response, 'text'):
                             mensagem = response.text
                     elif hasattr(response, 'text'):
@@ -158,22 +181,22 @@ class BoletoAPI(APIClientBase):
 
                 # Determina o prefixo da mensagem baseado no tipo de erro
                 prefixo = {
-                    BoletoConsultaError: "Falha na consulta do boleto",
-                    BoletoConsultaPagadorError: "Falha na consulta de boletos por pagador",
-                    BoletoConsultaFaixaError: "Falha na consulta de faixas de nosso número",
-                    BoletoEmissaoError: "Falha na emissão do boleto",
-                    BoletoAlteracaoError: "Falha na alteração do boleto",
-                    BoletoBaixaError: "Falha na baixa do boleto",
-                    BoletoAlteracaoPagadorError: "Falha na alteração do pagador",
+                    BoletoConsultaError: 'Falha na consulta do boleto',
+                    BoletoConsultaPagadorError: 'Falha na consulta de boletos por pagador',
+                    BoletoConsultaFaixaError: 'Falha na consulta de faixas de nosso número',
+                    BoletoEmissaoError: 'Falha na emissão do boleto',
+                    BoletoAlteracaoError: 'Falha na alteração do boleto',
+                    BoletoBaixaError: 'Falha na baixa do boleto',
+                    BoletoAlteracaoPagadorError: 'Falha na alteração do pagador',
                     BoletoWebhookError: {
-                        'cadastrar': "Falha no cadastro do webhook",
-                        'consultar': "Falha na consulta do webhook",
-                        'atualizar': "Falha na atualização do webhook",
-                        'excluir': "Falha na exclusão do webhook",
-                        'solicitacoes': "Falha na consulta das solicitações do webhook",
-                        'default': "Falha na operação do webhook"
-                    }
-                }.get(error_class, "Falha na operação")
+                        'cadastrar': 'Falha no cadastro do webhook',
+                        'consultar': 'Falha na consulta do webhook',
+                        'atualizar': 'Falha na atualização do webhook',
+                        'excluir': 'Falha na exclusão do webhook',
+                        'solicitacoes': 'Falha na consulta das solicitações do webhook',
+                        'default': 'Falha na operação do webhook',
+                    },
+                }.get(error_class, 'Falha na operação')
 
                 # Tratamento especial para BoletoWebhookError
                 if error_class == BoletoWebhookError:
@@ -186,11 +209,11 @@ class BoletoAPI(APIClientBase):
                     if hasattr(response, 'json') and callable(response.json):
                         error_data = response.json()
                         if isinstance(error_data, dict):
-                            mensagens = error_data.get("mensagens", [])
+                            mensagens = error_data.get('mensagens', [])
                             if mensagens and isinstance(mensagens, list):
-                                mensagem = mensagens[0].get("mensagem", mensagem)
+                                mensagem = mensagens[0].get('mensagem', mensagem)
                             else:
-                                mensagem = error_data.get("message", str(response))
+                                mensagem = error_data.get('message', str(response))
                         else:
                             mensagem = str(response)
                     elif hasattr(response, 'text'):
@@ -203,12 +226,12 @@ class BoletoAPI(APIClientBase):
                 # For webhook errors, use the specific operation prefix
                 if error_class == BoletoWebhookError:
                     operation_map = {
-                        'cadastrar': "Falha no cadastro do webhook",
-                        'consultar': "Falha na consulta do webhook",
-                        'atualizar': "Falha na atualização do webhook",
-                        'excluir': "Falha na exclusão do webhook",
-                        'solicitacoes': "Falha na consulta das solicitações do webhook",
-                        'default': "Falha na operação do webhook"
+                        'cadastrar': 'Falha no cadastro do webhook',
+                        'consultar': 'Falha na consulta do webhook',
+                        'atualizar': 'Falha na atualização do webhook',
+                        'excluir': 'Falha na exclusão do webhook',
+                        'solicitacoes': 'Falha na consulta das solicitações do webhook',
+                        'default': 'Falha na operação do webhook',
                     }
                     operation = kwargs.get('operation', 'default')
                     prefixo = operation_map.get(operation, operation_map['default'])
@@ -217,10 +240,12 @@ class BoletoAPI(APIClientBase):
                         kwargs['operation'] = operation
 
                 raise error_class(
-                    message=f"{prefixo}: {mensagem}",
+                    message=f'{prefixo}: {mensagem}',
                     code=response.status_code,
-                    mensagens=[{"mensagem": mensagem, "codigo": str(response.status_code)}],
-                    **kwargs
+                    mensagens=[
+                        {'mensagem': mensagem, 'codigo': str(response.status_code)}
+                    ],
+                    **kwargs,
                 )
 
             # Se não for um dos códigos tratados, verifica raise_for_status
@@ -229,19 +254,15 @@ class BoletoAPI(APIClientBase):
                     response.raise_for_status()
                 except Exception as e:
                     raise error_class(
-                        message=f"Erro na requisição: {str(e)}",
+                        message=f'Erro na requisição: {str(e)}',
                         code=getattr(response, 'status_code', 500),
-                        **kwargs
+                        **kwargs,
                     )
 
         except error_class:
             raise  # Re-lança exceções já do tipo esperado
         except Exception as e:
-            raise error_class(
-                message=f"Erro inesperado: {str(e)}",
-                code=500,
-                **kwargs
-            )
+            raise error_class(message=f'Erro inesperado: {str(e)}', code=500, **kwargs)
 
     def emitir_boleto(self, dados_boleto: dict) -> dict:
         """Emite um novo boleto bancário
@@ -261,18 +282,14 @@ class BoletoAPI(APIClientBase):
             response = self.session.post(url, json=dados_boleto, headers=headers)
 
             self._handle_error_response(
-                response,
-                BoletoEmissaoError,
-                dados_boleto=dados_boleto
+                response, BoletoEmissaoError, dados_boleto=dados_boleto
             )
             return self._validate_response(response)
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 try:
                     self._handle_error_response(
-                        e.response,
-                        BoletoEmissaoError,
-                        dados_boleto=dados_boleto
+                        e.response, BoletoEmissaoError, dados_boleto=dados_boleto
                     )
                 except BoletoEmissaoError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -330,9 +347,7 @@ class BoletoAPI(APIClientBase):
             response = self.session.get(url, params=params, headers=headers)
 
             self._handle_error_response(
-                response,
-                BoletoConsultaPagadorError,
-                numero_cpf_cnpj=numero_cpf_cnpj
+                response, BoletoConsultaPagadorError, numero_cpf_cnpj=numero_cpf_cnpj
             )
             return self._validate_response(response)
         except requests.exceptions.RequestException as e:
@@ -341,7 +356,7 @@ class BoletoAPI(APIClientBase):
                     self._handle_error_response(
                         e.response,
                         BoletoConsultaPagadorError,
-                        numero_cpf_cnpj=numero_cpf_cnpj
+                        numero_cpf_cnpj=numero_cpf_cnpj,
                     )
                 except BoletoConsultaPagadorError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -415,18 +430,14 @@ class BoletoAPI(APIClientBase):
             response = self.session.get(url, params=params, headers=headers)
 
             self._handle_error_response(
-                response,
-                BoletoEmissaoError,
-                dados_boleto=params
+                response, BoletoEmissaoError, dados_boleto=params
             )
             return self._validate_response(response)
         except requests.exceptions.RequestException as e:
             if e.response is not None:
                 try:
                     self._handle_error_response(
-                        e.response,
-                        BoletoEmissaoError,
-                        dados_boleto=params
+                        e.response, BoletoEmissaoError, dados_boleto=params
                     )
                 except BoletoEmissaoError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -483,9 +494,7 @@ class BoletoAPI(APIClientBase):
             response = self.session.get(url, params=params, headers=headers)
 
             self._handle_error_response(
-                response,
-                BoletoConsultaFaixaError,
-                numero_cliente=numero_cliente
+                response, BoletoConsultaFaixaError, numero_cliente=numero_cliente
             )
 
             data = self._validate_response(response)
@@ -510,7 +519,7 @@ class BoletoAPI(APIClientBase):
                     self._handle_error_response(
                         e.response,
                         BoletoConsultaFaixaError,
-                        numero_cliente=numero_cliente
+                        numero_cliente=numero_cliente,
                     )
                 except BoletoConsultaFaixaError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -587,7 +596,7 @@ class BoletoAPI(APIClientBase):
             self._handle_error_response(
                 response,
                 BoletoConsultaError,
-                nosso_numero=str(params.get('nossoNumero', ''))
+                nosso_numero=str(params.get('nossoNumero', '')),
             )
             return self._validate_response(response)
         except requests.exceptions.RequestException as e:
@@ -598,18 +607,18 @@ class BoletoAPI(APIClientBase):
                     self._handle_error_response(
                         e.response,
                         BoletoConsultaError,
-                        nosso_numero=str(params.get('nossoNumero', ''))
+                        nosso_numero=str(params.get('nossoNumero', '')),
                     )
                 except BoletoConsultaError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
                 raise BoletoConsultaError(
                     f'Falha na consulta do boleto - Status: {e.response.status_code}',
                     code=e.response.status_code,
-                    nosso_numero=str(params.get('nossoNumero', ''))
+                    nosso_numero=str(params.get('nossoNumero', '')),
                 ) from e
             raise BoletoConsultaError(
                 f'Falha na comunicação com API de boletos: {e!s}',
-                nosso_numero=str(params.get('nossoNumero', ''))
+                nosso_numero=str(params.get('nossoNumero', '')),
             ) from e
 
     def baixar_boleto(
@@ -645,7 +654,7 @@ class BoletoAPI(APIClientBase):
                     response,
                     BoletoBaixaError,
                     nosso_numero=nosso_numero,
-                    dados_boleto=dados_boleto
+                    dados_boleto=dados_boleto,
                 )
             except BoletoBaixaError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -666,7 +675,7 @@ class BoletoAPI(APIClientBase):
                         e.response,
                         BoletoBaixaError,
                         nosso_numero=nosso_numero,
-                        dados_boleto=dados_boleto
+                        dados_boleto=dados_boleto,
                     )
                 except BoletoBaixaError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -713,7 +722,7 @@ class BoletoAPI(APIClientBase):
                     response,
                     BoletoAlteracaoError,
                     nosso_numero=str(nosso_numero),
-                    dados_alteracao=dados_alteracao
+                    dados_alteracao=dados_alteracao,
                 )
             except BoletoAlteracaoError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -734,7 +743,7 @@ class BoletoAPI(APIClientBase):
                         e.response,
                         BoletoAlteracaoError,
                         nosso_numero=str(nosso_numero),
-                        dados_alteracao=dados_alteracao
+                        dados_alteracao=dados_alteracao,
                     )
                 except BoletoAlteracaoError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -788,7 +797,7 @@ class BoletoAPI(APIClientBase):
                     response,
                     BoletoAlteracaoPagadorError,
                     numero_cpf_cnpj=pagador.get('numeroCpfCnpj'),
-                    dados_pagador=pagador
+                    dados_pagador=pagador,
                 )
             except BoletoAlteracaoPagadorError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -809,7 +818,7 @@ class BoletoAPI(APIClientBase):
                         e.response,
                         BoletoAlteracaoPagadorError,
                         numero_cpf_cnpj=pagador.get('numeroCpfCnpj'),
-                        dados_pagador=pagador
+                        dados_pagador=pagador,
                     )
                 except BoletoAlteracaoPagadorError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -879,7 +888,7 @@ class BoletoAPI(APIClientBase):
                 response,
                 BoletoWebhookError,
                 id_webhook=id_webhook,
-                operation='consultar'
+                operation='consultar',
             )
             return self._validate_response(response)
 
@@ -887,9 +896,7 @@ class BoletoAPI(APIClientBase):
             if e.response is not None:
                 try:
                     self._handle_error_response(
-                        e.response,
-                        BoletoWebhookError,
-                        id_webhook=id_webhook
+                        e.response, BoletoWebhookError, id_webhook=id_webhook
                     )
                 except BoletoWebhookError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -937,7 +944,7 @@ class BoletoAPI(APIClientBase):
                     BoletoWebhookError,
                     id_webhook=id_webhook,
                     dados_webhook=webhook,
-                    operation='atualizar'
+                    operation='atualizar',
                 )
             except BoletoWebhookError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -958,7 +965,7 @@ class BoletoAPI(APIClientBase):
                         e.response,
                         BoletoWebhookError,
                         id_webhook=id_webhook,
-                        dados_webhook=webhook
+                        dados_webhook=webhook,
                     )
                 except BoletoWebhookError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -1003,7 +1010,7 @@ class BoletoAPI(APIClientBase):
                     response,
                     BoletoWebhookError,
                     id_webhook=id_webhook,
-                    operation='excluir'
+                    operation='excluir',
                 )
             except BoletoWebhookError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -1020,9 +1027,7 @@ class BoletoAPI(APIClientBase):
             if e.response is not None:
                 try:
                     self._handle_error_response(
-                        e.response,
-                        BoletoWebhookError,
-                        id_webhook=id_webhook
+                        e.response, BoletoWebhookError, id_webhook=id_webhook
                     )
                 except BoletoWebhookError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -1111,7 +1116,7 @@ class BoletoAPI(APIClientBase):
                 response,
                 BoletoWebhookError,
                 id_webhook=id_webhook,
-                operation='solicitacoes'
+                operation='solicitacoes',
             )
             return self._validate_response(response)
 
@@ -1119,9 +1124,7 @@ class BoletoAPI(APIClientBase):
             if e.response is not None:
                 try:
                     self._handle_error_response(
-                        e.response,
-                        BoletoWebhookError,
-                        id_webhook=id_webhook
+                        e.response, BoletoWebhookError, id_webhook=id_webhook
                     )
                 except BoletoWebhookError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -1176,7 +1179,7 @@ class BoletoAPI(APIClientBase):
                     BoletoWebhookError,
                     url=webhook.get('url'),
                     dados_webhook=webhook,
-                    operation='cadastrar'
+                    operation='cadastrar',
                 )
             except BoletoWebhookError:
                 raise  # Re-raise se já foi tratado como erro 400/406/500
@@ -1198,7 +1201,7 @@ class BoletoAPI(APIClientBase):
                         e.response,
                         BoletoWebhookError,
                         url=webhook.get('url'),
-                        dados_webhook=webhook
+                        dados_webhook=webhook,
                     )
                 except BoletoWebhookError:
                     raise  # Re-raise se já foi tratado como erro 400/406/500

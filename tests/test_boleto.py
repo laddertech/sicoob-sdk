@@ -96,7 +96,9 @@ def test_emitir_boleto_erro_generico(boleto_client: BoletoAPI) -> None:
         boleto_client.emitir_boleto(dados)
 
     # Verificações
-    assert 'Falha na comunicação com API de boletos: Erro de conexão' in str(exc_info.value)
+    assert 'Falha na comunicação com API de boletos: Erro de conexão' in str(
+        exc_info.value
+    )
     assert exc_info.value.dados_boleto == dados
 
 
@@ -174,7 +176,9 @@ def test_consultar_boleto_erro_generico(boleto_client: BoletoAPI) -> None:
         )
 
     # Verificações
-    assert 'Falha na comunicação com API de boletos: Erro de conexão' in str(exc_info.value)
+    assert 'Falha na comunicação com API de boletos: Erro de conexão' in str(
+        exc_info.value
+    )
     assert exc_info.value.nosso_numero == '123456789'
 
 
@@ -550,8 +554,15 @@ def test_emitir_segunda_via_erro_generico(boleto_client: BoletoAPI) -> None:
         )
 
     # Verificações
-    assert 'Falha na comunicação com API de boletos: Erro de conexão' in str(exc_info.value)
-    params = {'numeroCliente': 123456, 'codigoModalidade': 1, 'nossoNumero': 987654321, 'gerarPdf': 'false'}
+    assert 'Falha na comunicação com API de boletos: Erro de conexão' in str(
+        exc_info.value
+    )
+    params = {
+        'numeroCliente': 123456,
+        'codigoModalidade': 1,
+        'nossoNumero': 987654321,
+        'gerarPdf': 'false',
+    }
     assert exc_info.value.dados_boleto == params
 
 

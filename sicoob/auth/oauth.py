@@ -47,9 +47,13 @@ class OAuth2Client:
             if self.certificado_pfx and self.senha_pfx:
                 # Configura autenticação com PFX
                 pkcs12_adapter = requests_pkcs12.Pkcs12Adapter(
-                    pkcs12_data=self.certificado_pfx if isinstance(self.certificado_pfx, bytes) else None,
-                    pkcs12_filename=self.certificado_pfx if isinstance(self.certificado_pfx, str) else None,
-                    pkcs12_password=self.senha_pfx
+                    pkcs12_data=self.certificado_pfx
+                    if isinstance(self.certificado_pfx, bytes)
+                    else None,
+                    pkcs12_filename=self.certificado_pfx
+                    if isinstance(self.certificado_pfx, str)
+                    else None,
+                    pkcs12_password=self.senha_pfx,
                 )
                 self.session.mount('https://', pkcs12_adapter)
             elif self.certificado and self.chave_privada:
@@ -57,8 +61,8 @@ class OAuth2Client:
                 self.session.cert = (self.certificado, self.chave_privada)
             else:
                 raise ValueError(
-                    "É necessário fornecer certificado e chave privada (PEM) "
-                    "ou certificado PFX e senha"
+                    'É necessário fornecer certificado e chave privada (PEM) '
+                    'ou certificado PFX e senha'
                 )
 
     def get_access_token(self, scope: str | None = None) -> str:

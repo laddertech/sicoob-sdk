@@ -35,6 +35,7 @@ class APIClientBase:
         if self.sandbox_mode:
             import os
             from dotenv import load_dotenv
+
             load_dotenv()
 
             token = os.getenv('SICOOB_SANDBOX_TOKEN', 'sandbox-token')
@@ -73,13 +74,11 @@ class APIClientBase:
             content_type = response.headers.get('Content-Type', '')
             if 'application/json' not in content_type:
                 raise RespostaInvalidaError(
-                    f'Resposta não é JSON (Content-Type: {content_type})',
-                    response
+                    f'Resposta não é JSON (Content-Type: {content_type})', response
                 )
 
             return response.json()
         except json.JSONDecodeError as e:
             raise RespostaInvalidaError(
-                f'Resposta não é JSON válido: {str(e)}',
-                response
+                f'Resposta não é JSON válido: {str(e)}', response
             ) from e
