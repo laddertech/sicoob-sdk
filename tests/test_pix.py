@@ -232,8 +232,8 @@ def test_consultar_cobranca_pix_com_vencimento(pix_client: SicoobPixAPI) -> None
 #     pix_client.session.get.assert_called_once()
 
 
-def test_excluir_webhook_pix(pix_client: SicoobPixAPI) -> None:
-    """Testa a exclusão de webhook PIX"""
+def test_excluir_webhook_pix_sucesso(pix_client: SicoobPixAPI) -> None:
+    """Testa a exclusão de webhook PIX com sucesso"""
     mock_response = Mock()
     mock_response.status_code = 204
     mock_response.json.return_value = None
@@ -243,11 +243,13 @@ def test_excluir_webhook_pix(pix_client: SicoobPixAPI) -> None:
     chave = '12345678901'
     result = pix_client.excluir_webhook(chave)
 
-    if result is not True:
-        raise ValueError('Exclusão de webhook PIX não retornou True')
+    assert result is True, f"Esperado True, mas recebeu: {result}"
     pix_client.session.delete.assert_called_once()
 
-    # Testa caso de não encontrado (404)
+
+def test_excluir_webhook_pix_nao_encontrado(pix_client: SicoobPixAPI) -> None:
+    """Testa a exclusão de webhook PIX quando não encontrado"""
+    chave = '12345678901'
     mock_response_404 = Mock()
     mock_response_404.raise_for_status.side_effect = Exception('404')
     mock_response_404.status_code = 404
