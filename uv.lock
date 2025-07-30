@@ -434,7 +434,7 @@ wheels = [
 
 [[package]]
 name = "pypix-api"
-version = "0.3.1"
+version = "0.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "python-dotenv" },
@@ -442,9 +442,9 @@ dependencies = [
     { name = "requests-pkcs12" },
     { name = "ruff" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/46/c3/8abbb5368af68025705c9316d683b5f86ce33468942ab8b28e23fd97fccd/pypix_api-0.3.1.tar.gz", hash = "sha256:bd6afc4b65aa277ab4e34b9e3abdcba441913aaf0b42498e50c521ba0e08e173", size = 16615 }
+sdist = { url = "https://files.pythonhosted.org/packages/77/06/bb995a19b151dc58253ef63fa7119f42aeb047e8ce60f5970e5729bd1430/pypix_api-0.3.2.tar.gz", hash = "sha256:79fc8ffbe3e80d7ba96a93a1d057e93d6a5a9df49cd65a875ae5a23feab348a3", size = 16652 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fe/da/d8e9a8c4a7341101845746aebd27b5c5d1bbd7e08e549873bc35fdffd943/pypix_api-0.3.1-py3-none-any.whl", hash = "sha256:7f571ffbde5ea0e97e3760fbc839619896a90a46420270fbcd6030efa32e2589", size = 22624 },
+    { url = "https://files.pythonhosted.org/packages/d6/9c/1fb98dd379b005add07d876779a03874b4eda8cc40e108945d45103d514f/pypix_api-0.3.2-py3-none-any.whl", hash = "sha256:73073342c628ca866173b4367c6bd9e0f24474155f96a7d34bc89a622810cc9a", size = 22788 },
 ]
 
 [[package]]
@@ -621,7 +621,7 @@ wheels = [
 
 [[package]]
 name = "sicoob-sdk"
-version = "0.1.15"
+version = "0.1.16"
 source = { virtual = "." }
 dependencies = [
     { name = "pypix-api" },
@@ -641,7 +641,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pypix-api", specifier = "==0.3.1" },
+    { name = "pypix-api", specifier = "==0.3.2" },
     { name = "pytest", specifier = ">=7.0.0" },
     { name = "pytest-mock", specifier = ">=3.6.1" },
     { name = "python-dotenv", specifier = ">=0.15.0" },
