@@ -11,7 +11,7 @@ dependencies = [
     "pytest>=7.0.0",
     "pytest-mock>=3.6.1",
     "requests-pkcs12>=1.25",
-    "pypix-api==0.3.2",
+    "pypix-api==0.3.3",
 ]
 
 [dependency-groups]
