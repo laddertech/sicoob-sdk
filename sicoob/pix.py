@@ -1,3 +1,16 @@
+"""Módulo PIX do SDK Sicoob
+
+Este módulo atua como uma ponte (thin wrapper) entre o SDK Sicoob e a
+biblioteca pypix-api, que implementa o padrão PIX do BACEN.
+
+Arquitetura:
+    - pypix-api: Implementação genérica do PIX (padrão BACEN)
+    - sicoob-sdk: Funcionalidades específicas do Sicoob
+
+A separação permite que a pypix-api seja reutilizada por outros bancos,
+enquanto o sicoob-sdk foca nas particularidades do Banco Sicoob.
+"""
+
 from typing import Any
 
 import requests
@@ -12,241 +25,198 @@ from sicoob.exceptions import (
 
 
 class PixAPI(APIClientBase):
-    """API de PIX do Sicoob integrada ao SDK
+    """Interface PIX para o SDK Sicoob
 
-    Esta classe encapsula a pypix-api e oferece uma interface consistente
-    com o resto do SDK Sicoob, incluindo tratamento de erros padronizado.
+    Esta classe atua como um wrapper fino sobre a pypix-api,
+    delegando todas as operações PIX para a implementação genérica
+    enquanto mantém consistência com a interface do SDK Sicoob.
+
+    Responsabilidades:
+        - Proxy para métodos da pypix-api
+        - Tratamento de erros consistente com o SDK
+        - Logging e métricas (se necessário)
+        - Validações específicas do Sicoob (se necessário)
     """
 
     def __init__(self, oauth_client, session, sandbox_mode=False):
-        """Inicializa a API de PIX.
+        """Inicializa a API PIX
 
         Args:
             oauth_client: Cliente OAuth2 para autenticação
-            session: Sessão de requests configurada
-            sandbox_mode: Modo sandbox (default: False)
+            session: Sessão HTTP (mantida por compatibilidade)
+            sandbox_mode: Habilita modo sandbox
         """
         super().__init__(oauth_client, session, sandbox_mode)
 
-        # Inicializa a API PIX subjacente
+        # Inicializa a implementação PIX customizada do Sicoob
         self._pix_api = SicoobPixAPICustom(
             oauth=oauth_client, sandbox_mode=sandbox_mode
         )
 
-        # Define o caminho base da API
-        self.base_path = '/pix/api/v2'
+    def __getattr__(self, name: str) -> Any:
+        """Proxy transparente para pypix-api
 
-    def criar_cobranca_imediata(self, txid: str, dados_cobranca: dict) -> dict:
-        """Cria uma cobrança PIX imediata
+        Delega automaticamente qualquer método não definido
+        explicitamente para a instância da pypix-api.
 
         Args:
-            txid: Identificador único da transação (27-36 caracteres)
-            dados_cobranca: Dados da cobrança conforme especificação do BACEN
+            name: Nome do método/atributo
 
         Returns:
-            dict: Resposta da API com os dados da cobrança criada
-
-        Raises:
-            PixError: Erro genérico na operação
-            CobrancaPixNaoEncontradaError: Cobrança não encontrada
+            Método ou atributo da pypix-api
         """
-        try:
-            return self._pix_api.criar_cob(txid, dados_cobranca)
-        except Exception as e:
-            self._handle_pix_error(e)
+        # Delega para a implementação da pypix-api
+        attr = getattr(self._pix_api, name)
+
+        # Se for um método, encapsula com tratamento de erro
+        if callable(attr):
+
+            def wrapped_method(*args, **kwargs):
+                try:
+                    return attr(*args, **kwargs)
+                except (CobrancaPixNaoEncontradaError, WebhookPixNaoEncontradoError):
+                    # Re-lança exceções do domínio
+                    raise
+                except Exception as e:
+                    # Converte outras exceções em PixError
+                    raise PixError(f'Erro na operação PIX: {str(e)}') from e
+
+            return wrapped_method
+
+        return attr
+
+    # Métodos explícitos para melhor documentação e IDE support
+
+    def criar_cobranca_imediata(self, txid: str, dados: dict) -> dict:
+        """Cria cobrança PIX imediata (COB)
+
+        Args:
+            txid: Identificador da transação
+            dados: Dados da cobrança
+
+        Returns:
+            Dados da cobrança criada
+        """
+        return self.criar_cob(txid, dados)
 
     def consultar_cobranca_imediata(self, txid: str) -> dict:
-        """Consulta uma cobrança PIX imediata
+        """Consulta cobrança PIX imediata
 
         Args:
-            txid: Identificador único da transação
+            txid: Identificador da transação
 
         Returns:
-            dict: Dados da cobrança
-
-        Raises:
-            CobrancaPixNaoEncontradaError: Cobrança não encontrada
-            PixError: Erro genérico na operação
+            Dados da cobrança
         """
-        try:
-            return self._pix_api.consultar_cob(txid)
-        except Exception as e:
-            self._handle_pix_error(e)
+        return self.consultar_cob(txid)
 
-    def criar_cobranca_com_vencimento(self, txid: str, dados_cobranca: dict) -> dict:
-        """Cria uma cobrança PIX com vencimento (COBV)
+    def criar_cobranca_com_vencimento(self, txid: str, dados: dict) -> dict:
+        """Cria cobrança PIX com vencimento (COBV)
 
         Args:
-            txid: Identificador único da transação
-            dados_cobranca: Dados da cobrança incluindo vencimento
+            txid: Identificador da transação
+            dados: Dados da cobrança com vencimento
 
         Returns:
-            dict: Resposta da API com os dados da cobrança criada
-
-        Raises:
-            PixError: Erro genérico na operação
+            Dados da cobrança criada
         """
-        try:
-            return self._pix_api.criar_cobv(txid, dados_cobranca)
-        except Exception as e:
-            self._handle_pix_error(e)
+        return self.criar_cobv(txid, dados)
 
     def consultar_cobranca_com_vencimento(self, txid: str) -> dict:
-        """Consulta uma cobrança PIX com vencimento
+        """Consulta cobrança PIX com vencimento
 
         Args:
-            txid: Identificador único da transação
+            txid: Identificador da transação
 
         Returns:
-            dict: Dados da cobrança
-
-        Raises:
-            CobrancaPixNaoEncontradaError: Cobrança não encontrada
-            PixError: Erro genérico na operação
+            Dados da cobrança
         """
-        try:
-            return self._pix_api.consultar_cobv(txid, 0)  # revisao=0 por padrão
-        except Exception as e:
-            self._handle_pix_error(e)
+        return self.consultar_cobv(txid, 0)
+
+    def cadastrar_webhook(self, chave: str, url: str) -> dict:
+        """Cadastra webhook para notificações PIX
+
+        Args:
+            chave: Chave PIX
+            url: URL do webhook
+
+        Returns:
+            Dados do webhook cadastrado
+        """
+        return self.configurar_webhook(chave, url)
+
+    def consultar_webhook(self, chave: str) -> dict:
+        """Consulta webhook cadastrado
+
+        Args:
+            chave: Chave PIX
+
+        Returns:
+            Dados do webhook
+        """
+        return self._pix_api.consultar_webhook(chave)
+
+    def excluir_webhook(self, chave: str) -> None:
+        """Exclui webhook cadastrado
+
+        Args:
+            chave: Chave PIX
+        """
+        return self._pix_api.excluir_webhook(chave)
 
     def listar_cobrancas(self, inicio: str, fim: str, **filtros) -> dict:
-        """Lista cobranças PIX em um período
+        """Lista cobranças em um período
 
         Args:
-            inicio: Data/hora de início (ISO 8601)
-            fim: Data/hora de fim (ISO 8601)
-            **filtros: Filtros adicionais (cpf, cnpj, status, etc)
+            inicio: Data/hora inicial (ISO 8601)
+            fim: Data/hora final (ISO 8601)
+            **filtros: Filtros adicionais
 
         Returns:
-            dict: Lista de cobranças
-
-        Raises:
-            PixError: Erro genérico na operação
+            Lista de cobranças
         """
-        try:
-            return self._pix_api.listar_cob(inicio, fim, **filtros)
-        except Exception as e:
-            self._handle_pix_error(e)
+        return self.listar_cob(inicio, fim, **filtros)
 
-    def criar_lote_cobranca(self, id_lote: int, dados_lote: dict) -> dict:
-        """Cria um lote de cobranças PIX
+    def criar_lote_cobranca(self, id_lote: int, dados: dict) -> dict:
+        """Cria lote de cobranças com vencimento
 
         Args:
-            id_lote: Identificador do lote
-            dados_lote: Dados do lote de cobranças
+            id_lote: ID do lote
+            dados: Dados do lote
 
         Returns:
-            dict: Resposta da API com os dados do lote criado
-
-        Raises:
-            PixError: Erro genérico na operação
+            Dados do lote criado
         """
-        try:
-            return self._pix_api.criar_lotecobv(id_lote, dados_lote)
-        except Exception as e:
-            self._handle_pix_error(e)
+        return self.criar_lotecobv(id_lote, dados)
 
     def consultar_lote_cobranca(self, id_lote: int) -> dict:
-        """Consulta um lote de cobranças PIX
+        """Consulta lote de cobranças
 
         Args:
-            id_lote: Identificador do lote
+            id_lote: ID do lote
 
         Returns:
-            dict: Dados do lote
-
-        Raises:
-            PixError: Erro genérico na operação
+            Dados do lote
         """
-        try:
-            return self._pix_api.consultar_lotecobv(id_lote)
-        except Exception as e:
-            self._handle_pix_error(e)
-
-    def cadastrar_webhook(self, chave_pix: str, url_webhook: str) -> dict:
-        """Cadastra um webhook PIX
-
-        Args:
-            chave_pix: Chave PIX para receber notificações
-            url_webhook: URL para receber as notificações
-
-        Returns:
-            dict: Dados do webhook cadastrado
-
-        Raises:
-            PixError: Erro genérico na operação
-        """
-        try:
-            return self._pix_api.configurar_webhook(chave_pix, url_webhook)
-        except Exception as e:
-            self._handle_pix_error(e)
-
-    def consultar_webhook(self, chave_pix: str) -> dict:
-        """Consulta um webhook PIX
-
-        Args:
-            chave_pix: Chave PIX do webhook
-
-        Returns:
-            dict: Dados do webhook
-
-        Raises:
-            WebhookPixNaoEncontradoError: Webhook não encontrado
-            PixError: Erro genérico na operação
-        """
-        try:
-            return self._pix_api.consultar_webhook(chave_pix)
-        except Exception as e:
-            self._handle_pix_error(e)
-
-    def excluir_webhook(self, chave_pix: str) -> None:
-        """Exclui um webhook PIX
-
-        Args:
-            chave_pix: Chave PIX do webhook
-
-        Raises:
-            WebhookPixNaoEncontradoError: Webhook não encontrado
-            PixError: Erro genérico na operação
-        """
-        try:
-            self._pix_api.excluir_webhook(chave_pix)
-        except Exception as e:
-            self._handle_pix_error(e)
-
-    def _handle_pix_error(self, error: Exception) -> None:
-        """Trata erros da API PIX de forma padronizada
-
-        Args:
-            error: Exceção capturada
-
-        Raises:
-            CobrancaPixNaoEncontradaError: Cobrança não encontrada
-            WebhookPixNaoEncontradoError: Webhook não encontrado
-            PixError: Erro genérico
-        """
-        # Repassa exceções específicas do domínio
-        if isinstance(
-            error, (CobrancaPixNaoEncontradaError, WebhookPixNaoEncontradoError)
-        ):
-            raise error
-
-        # Converte outras exceções em PixError genérico
-        raise PixError(f'Erro na operação PIX: {error!s}') from error
+        return self.consultar_lotecobv(id_lote)
 
 
 class SicoobPixAPICustom(SicoobPixAPI):
-    """Customização da API PIX do Sicoob para tratamento de erros"""
+    """Customização da pypix-api para Sicoob
+
+    Adiciona tratamento de erros específicos do domínio Sicoob.
+    """
 
     def _handle_error_response(
         self, response: requests.Response, **kwargs: Any
     ) -> None:
-        """Trata respostas de erro da API de forma centralizada
+        """Trata erros com exceções específicas do domínio
 
-        Sobrescreve o método original para lidar corretamente com status de sucesso
-        e lançar exceções específicas do domínio.
+        Args:
+            response: Resposta HTTP
+            **kwargs: Argumentos adicionais (não utilizado)
         """
-        # Se for uma resposta de sucesso, não faz nada
+        # Respostas de sucesso não são erros
         status_code = getattr(response, 'status_code', None)
         if status_code and 200 <= status_code < 300:
             return
@@ -256,18 +226,18 @@ class SicoobPixAPICustom(SicoobPixAPI):
         except (ValueError, AttributeError):
             error_data = {}
 
-        type_ = error_data.get('type', '')
+        detail = error_data.get('detail', '')
         title = error_data.get('title', '')
         status = error_data.get('status', status_code)
-        detail = error_data.get('detail', '')
+        type_ = error_data.get('type', '')
 
-        # Verifica se é uma exceção de domínio específica
+        # Mapeia para exceções específicas do domínio
         if status == 404:
-            if 'Cobrança' in title or 'cobranca' in detail.lower():
+            if 'cobrança' in (detail + title).lower():
                 raise CobrancaPixNaoEncontradaError(detail or title)
-            elif 'Webhook' in title or 'webhook' in detail.lower():
+            elif 'webhook' in (detail + title).lower():
                 raise WebhookPixNaoEncontradoError(detail or title)
 
-        # Para outros erros, lança PixError genérico com detalhes
+        # Erro genérico
         error_msg = detail or title or f'Erro {status}: {type_}'
         raise PixError(error_msg)
