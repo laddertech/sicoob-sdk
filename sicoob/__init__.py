@@ -26,6 +26,45 @@ from .exceptions import (
 )
 from .pix import PixAPI
 
+# Funcionalidades assíncronas (importadas opcionalmente)
+try:
+    from .async_client import (
+        AsyncSicoob,
+        AsyncAPIClient,
+        AsyncContaCorrenteAPI,
+        AsyncCobrancaAPI,
+        gather_with_concurrency,
+        async_batch_processor,
+    )
+    from .async_cache import (
+        AsyncCacheManager,
+        get_default_async_cache,
+        async_cached,
+    )
+    from .async_boleto import AsyncBoletoAPI
+    from .async_pix import AsyncPixAPI
+    
+    _async_available = True
+    
+    __all_async__ = [
+        'AsyncSicoob',
+        'AsyncAPIClient', 
+        'AsyncContaCorrenteAPI',
+        'AsyncCobrancaAPI',
+        'AsyncBoletoAPI',
+        'AsyncPixAPI',
+        'AsyncCacheManager',
+        'gather_with_concurrency',
+        'async_batch_processor',
+        'get_default_async_cache',
+        'async_cached',
+    ]
+    
+except ImportError:
+    # Dependências assíncronas não instaladas
+    _async_available = False
+    __all_async__ = []
+
 __version__ = '0.1.21'
 __all__ = [
     'AutenticacaoError',
@@ -51,4 +90,18 @@ __all__ = [
     'TransferenciaError',
     'WebhookPixError',
     'WebhookPixNaoEncontradoError',
-]
+] + __all_async__
+
+
+def is_async_available() -> bool:
+    """Verifica se funcionalidades assíncronas estão disponíveis."""
+    return _async_available
+
+
+def get_async_info() -> dict:
+    """Retorna informações sobre disponibilidade async."""
+    return {
+        'available': _async_available,
+        'classes': __all_async__ if _async_available else [],
+        'required_packages': ['aiohttp>=3.8.0', 'aiofiles>=24.0.0'] if not _async_available else []
+    }
