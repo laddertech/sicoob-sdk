@@ -23,6 +23,8 @@ def sicoob_client():
     )
 
 
+@pytest.mark.integration
+@pytest.mark.slow
 def test_criar_cobranca_pix_integracao_real(sicoob_client):
     """Teste de integração real com API de cobrança PIX (sandbox)"""
     # Gera um txid válido (27-36 caracteres)

@@ -22,6 +22,8 @@ def sicoob_client():
     )
 
 
+@pytest.mark.integration
+@pytest.mark.slow
 def test_emitir_boleto_integracao_real(sicoob_client):
     """Teste de integração real com API de boletos do Sicoob (sandbox)"""
     # Dados do boleto (mesmos do teste anterior)

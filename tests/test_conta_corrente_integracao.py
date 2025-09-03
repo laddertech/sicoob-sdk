@@ -22,6 +22,8 @@ def sicoob_client():
     )
 
 
+@pytest.mark.integration
+@pytest.mark.slow
 def test_extrato_conta_corrente_integracao_real(sicoob_client):
     """Teste de integração real com API de extrato da conta corrente (sandbox)"""
     # Parâmetros da consulta

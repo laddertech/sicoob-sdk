@@ -8,8 +8,17 @@ help:
 build: ## Build do pacote
 	python -m build
 
-test: ## Executar testes
-	pytest tests/
+test: ## Executar todos os testes
+	uv run pytest tests/
+
+test-unit: ## Executar apenas testes unitários
+	uv run pytest -m "unit or not integration" tests/
+
+test-integration: ## Executar apenas testes de integração
+	uv run pytest -m "integration" tests/
+
+test-fast: ## Executar testes excluindo os lentos
+	uv run pytest -m "not slow" tests/
 
 publish: build ## Publicar no PyPI (requer TWINE_USERNAME e TWINE_PASSWORD)
 	twine upload dist/*
@@ -37,4 +46,24 @@ format: ## Formatar código
 	ruff format .
 
 fix: ## Corrigir problemas de estilo de código
-	lint format
+	make lint format
+
+## @ Coverage e Relatórios de Teste
+
+coverage: ## Executar testes com coverage completo
+	uv run python scripts/test_coverage.py --html --xml --json
+
+coverage-unit: ## Coverage apenas para testes unitários
+	uv run python scripts/test_coverage.py --unit --html
+
+coverage-fast: ## Coverage excluindo testes lentos
+	uv run python scripts/test_coverage.py --fast --html
+
+coverage-report: ## Mostrar relatório de coverage no terminal
+	uv run coverage report --show-missing
+
+coverage-html: ## Gerar e abrir relatório HTML
+	uv run python scripts/test_coverage.py --html --open-html
+
+coverage-ci: ## Pipeline de CI completo
+	./scripts/ci_coverage.sh
