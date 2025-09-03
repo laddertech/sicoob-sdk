@@ -254,7 +254,7 @@ class BoletoAPI(APIClientBase):
                     response.raise_for_status()
                 except Exception as e:
                     raise error_class(
-                        message=f'Erro na requisição: {str(e)}',
+                        message=f'Erro na requisição: {e!s}',
                         code=getattr(response, 'status_code', 500),
                         **kwargs,
                     )
@@ -262,7 +262,7 @@ class BoletoAPI(APIClientBase):
         except error_class:
             raise  # Re-lança exceções já do tipo esperado
         except Exception as e:
-            raise error_class(message=f'Erro inesperado: {str(e)}', code=500, **kwargs)
+            raise error_class(message=f'Erro inesperado: {e!s}', code=500, **kwargs)
 
     def emitir_boleto(self, dados_boleto: dict) -> dict:
         """Emite um novo boleto bancário

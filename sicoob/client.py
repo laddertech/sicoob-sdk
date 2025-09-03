@@ -1,74 +1,11 @@
 import os
-from typing import Any, BinaryIO, Union
+from typing import BinaryIO
 
-import requests
 from dotenv import load_dotenv
-from pypix_api.banks.sicoob import SicoobPixAPI
-from pypix_api.banks.exceptions import (
-    PixAcessoNegadoException,
-    PixErroDesconhecidoException,
-    PixErroServicoIndisponivelException,
-    PixErroValidacaoException,
-    PixRecursoNaoEncontradoException,
-)
 
 from sicoob.auth import OAuth2Client
-from sicoob.cobranca import BoletoAPI
+from sicoob.cobranca import CobrancaAPI
 from sicoob.conta_corrente import ContaCorrenteAPI
-
-
-class SicoobPixAPICustom(SicoobPixAPI):
-    def _handle_error_response(
-        self, response: requests.Response, **kwargs: Any
-    ) -> None:
-        """Trata respostas de erro da API de forma centralizada
-
-        Sobrescreve o método original para lidar corretamente com status de sucesso
-        e lançar exceções específicas do domínio.
-        """
-        # Se for uma resposta de sucesso, não faz nada
-        status_code = getattr(response, 'status_code', None)
-        if status_code and 200 <= status_code < 300:
-            return
-
-        try:
-            error_data = response.json()
-        except (ValueError, AttributeError):
-            error_data = {}
-
-        type_ = error_data.get('type', '')
-        title = error_data.get('title', '')
-        status = error_data.get('status', status_code)
-        detail = error_data.get('detail', '')
-
-        # Verifica se é uma exceção de domínio específica
-        if status == 404:
-            if 'Cobrança' in title:
-                from sicoob.exceptions import CobrancaPixNaoEncontradaError
-
-                raise CobrancaPixNaoEncontradaError(detail)
-            elif 'Webhook' in title:
-                from sicoob.exceptions import WebhookPixNaoEncontradoError
-
-                raise WebhookPixNaoEncontradoError(detail)
-
-        # Mapeamento para exceções genéricas
-        if status == 403 or 'AcessoNegado' in type_:
-            raise PixAcessoNegadoException(type_, title, status, detail)
-        elif status == 400 or 'ErroValidacao' in type_:
-            raise PixErroValidacaoException(type_, title, status, detail)
-        elif status == 503:
-            raise PixErroServicoIndisponivelException(type_, title, status, detail)
-        else:
-            raise PixErroDesconhecidoException(type_, title, status, detail)
-
-
-class CobrancaServices:
-    def __init__(
-        self, oauth_client: OAuth2Client, session: requests.Session, sandbox_mode: bool
-    ) -> None:
-        self.boleto = BoletoAPI(oauth_client, session, sandbox_mode=sandbox_mode)
-        self.pix = SicoobPixAPICustom(oauth=oauth_client, sandbox_mode=sandbox_mode)
 
 
 class Sicoob:
@@ -79,7 +16,7 @@ class Sicoob:
         client_id: str | None = None,
         certificado: str | None = None,
         chave_privada: str | None = None,
-        certificado_pfx: Union[str, bytes, BinaryIO] | None = None,
+        certificado_pfx: str | bytes | BinaryIO | None = None,
         senha_pfx: str | None = None,
         sandbox_mode: bool = False,
     ) -> None:
@@ -140,7 +77,7 @@ class Sicoob:
             raise Exception(f'Falha ao obter token de acesso: {e!s}') from e
 
     @property
-    def cobranca(self) -> CobrancaServices:
+    def cobranca(self) -> CobrancaAPI:
         """Acesso às APIs de Cobrança (Boleto e PIX)
 
         Retorna um objeto com duas propriedades:
@@ -153,7 +90,7 @@ class Sicoob:
             >>> pix = sicoob.cobranca.pix.criar_cobranca_pix(txid, dados)
         """
 
-        return CobrancaServices(self.oauth_client, self.session, self.sandbox_mode)
+        return CobrancaAPI(self.oauth_client, self.session, self.sandbox_mode)
 
     @property
     def conta_corrente(self) -> ContaCorrenteAPI:

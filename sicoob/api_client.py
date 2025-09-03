@@ -1,4 +1,5 @@
 import json
+
 import requests
 
 from sicoob.auth import OAuth2Client
@@ -34,6 +35,7 @@ class APIClientBase:
         """Retorna headers padrão com token de acesso"""
         if self.sandbox_mode:
             import os
+
             from dotenv import load_dotenv
 
             load_dotenv()
@@ -80,5 +82,5 @@ class APIClientBase:
             return response.json()
         except json.JSONDecodeError as e:
             raise RespostaInvalidaError(
-                f'Resposta não é JSON válido: {str(e)}', response
+                f'Resposta não é JSON válido: {e!s}', response
             ) from e

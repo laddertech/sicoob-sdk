@@ -1,9 +1,8 @@
 """Módulo principal do SDK Sicoob"""
 
-from pypix_api.banks.sicoob import SicoobPixAPI
-
 from .boleto import BoletoAPI
 from .client import Sicoob
+from .cobranca import CobrancaAPI
 from .conta_corrente import ContaCorrenteAPI
 from .exceptions import (
     AutenticacaoError,
@@ -25,6 +24,7 @@ from .exceptions import (
     WebhookPixError,
     WebhookPixNaoEncontradoError,
 )
+from .pix import PixAPI
 
 __version__ = '0.1.21'
 __all__ = [
@@ -34,6 +34,7 @@ __all__ = [
     'BoletoEmissaoError',
     'BoletoError',
     'BoletoNaoEncontradoError',
+    'CobrancaAPI',
     'CobrancaPixError',
     'CobrancaPixNaoEncontradaError',
     'CobrancaPixVencimentoError',
@@ -41,12 +42,12 @@ __all__ = [
     'ContaCorrenteError',
     'ExtratoError',
     'LoteCobrancaPixError',
+    'PixAPI',
     'PixError',
     'QrCodePixError',
     'SaldoError',
     'Sicoob',
     'SicoobError',
-    'SicoobPixAPI',
     'TransferenciaError',
     'WebhookPixError',
     'WebhookPixNaoEncontradoError',

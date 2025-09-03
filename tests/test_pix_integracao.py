@@ -1,5 +1,6 @@
 import os
 import uuid
+
 import pytest
 from dotenv import load_dotenv
 
@@ -42,7 +43,7 @@ def test_criar_cobranca_pix_integracao_real(sicoob_client):
 
     try:
         # Chama a API real (sem mocks)
-        resultado = sicoob_client.cobranca.pix.criar_cob(txid, payload)
+        resultado = sicoob_client.cobranca.pix.criar_cobranca_imediata(txid, payload)
 
         # Verifica campos obrigatórios no JSON de resposta
         required_fields = [

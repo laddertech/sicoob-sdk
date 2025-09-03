@@ -1,10 +1,12 @@
 import os
 import time
+from typing import BinaryIO
+
 import requests
 import requests_pkcs12
-from typing import Union, BinaryIO
-from sicoob.constants import AUTH_URL
 from dotenv import load_dotenv
+
+from sicoob.constants import AUTH_URL
 
 
 class OAuth2Client:
@@ -15,7 +17,7 @@ class OAuth2Client:
         client_id: str | None = None,
         certificado: str | None = None,
         chave_privada: str | None = None,
-        certificado_pfx: Union[str, bytes, BinaryIO] | None = None,
+        certificado_pfx: str | bytes | BinaryIO | None = None,
         senha_pfx: str | None = None,
         sandbox_mode: bool = False,
     ) -> None:
