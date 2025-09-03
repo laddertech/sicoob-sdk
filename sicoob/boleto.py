@@ -11,6 +11,11 @@ from sicoob.exceptions import (
     BoletoEmissaoError,
     BoletoWebhookError,
 )
+from sicoob.validation import (
+    MultipleValidationError,
+    ValidationError,
+    get_boleto_schema,
+)
 
 
 class BoletoAPI(APIClientBase):
@@ -274,8 +279,17 @@ class BoletoAPI(APIClientBase):
             Resposta da API com dados do boleto emitido
 
         Raises:
+            ValidationError: Em caso de dados inválidos
+            MultipleValidationError: Em caso de múltiplos erros de validação
             BoletoEmissaoError: Em caso de falha na requisição com status 400, 406 ou 500
         """
+        # Valida dados de entrada
+        try:
+            schema = get_boleto_schema()
+            dados_boleto = schema.validate(dados_boleto, strict=False)
+        except (ValidationError, MultipleValidationError) as e:
+            raise e
+
         try:
             url = f'{self._get_base_url()}/cobranca-bancaria/v3/boletos'
             headers = self._get_headers(scope='boletos_inclusao')
@@ -1157,16 +1171,57 @@ class BoletoAPI(APIClientBase):
             Resposta da API com confirmação do cadastro (status 201)
 
         Raises:
+            ValidationError: Em caso de dados inválidos
+            MultipleValidationError: Em caso de múltiplos erros de validação
             BoletoWebhookError: Em caso de falha na requisição com status 400, 406 ou 500
         """
+        # Valida dados de entrada
         try:
-            # Valida parâmetros obrigatórios
-            if not all(
-                key in webhook
-                for key in ['url', 'codigoTipoMovimento', 'codigoPeriodoMovimento']
-            ):
-                raise ValueError('Parâmetros obrigatórios do webhook não informados')
+            from sicoob.validation import (
+                DataValidator,
+                FieldValidator,
+                validate_email,
+                validate_url,
+            )
 
+            webhook_schema = DataValidator(
+                'webhook_boleto',
+                [
+                    FieldValidator(
+                        'url',
+                        required=True,
+                        data_type=str,
+                        custom_validator=validate_url,
+                    ),
+                    FieldValidator(
+                        'codigoTipoMovimento', required=True, data_type=int, min_value=1
+                    ),
+                    FieldValidator(
+                        'codigoPeriodoMovimento',
+                        required=True,
+                        data_type=int,
+                        min_value=1,
+                    ),
+                    FieldValidator(
+                        'email',
+                        required=False,
+                        data_type=str,
+                        custom_validator=validate_email,
+                    ),
+                ],
+            )
+
+            webhook = webhook_schema.validate(webhook, strict=False)
+        except (ValidationError, MultipleValidationError) as e:
+            raise e
+
+        # Valida client_id
+        if not client_id or not isinstance(client_id, str):
+            raise ValidationError(
+                'client_id é obrigatório e deve ser uma string', 'client_id', client_id
+            )
+
+        try:
             url = f'{self._get_base_url()}/cobranca-bancaria/v3/webhooks'
             headers = self._get_headers(scope='boletos_webhook')
             headers['client_id'] = client_id

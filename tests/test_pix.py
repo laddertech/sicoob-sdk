@@ -23,7 +23,7 @@ def test_criar_cobranca_pix(pix_client: PixAPI) -> None:
         mock_criar.return_value = {'status': 'ATIVA'}
 
         # Dados de teste
-        txid = '123e4567-e89b-12d3-a456-426614174000'
+        txid = 'abcd1234567890123456789012345'  # 29 caracteres
         dados = {
             'calendario': {'expiracao': 3600},
             'valor': {'original': '100.50'},
@@ -45,7 +45,7 @@ def test_consultar_cobranca_pix(pix_client: PixAPI) -> None:
         mock_consultar.return_value = {'status': 'ATIVA', 'txid': '123'}
 
         # Chama o método
-        txid = '123e4567-e89b-12d3-a456-426614174000'
+        txid = 'abcd1234567890123456789012345'  # 29 caracteres
         result = pix_client.consultar_cobranca_imediata(txid)
 
         # Verificações
@@ -60,7 +60,7 @@ def test_consultar_cobranca_pix_nao_encontrada(pix_client: PixAPI) -> None:
             'Cobrança com txid 123 não encontrada'
         )
 
-        txid = '123e4567-e89b-12d3-a456-426614174000'
+        txid = 'abcd1234567890123456789012345'  # 29 caracteres
         with pytest.raises(CobrancaPixNaoEncontradaError) as exc_info:
             pix_client.consultar_cobranca_imediata(txid)
 

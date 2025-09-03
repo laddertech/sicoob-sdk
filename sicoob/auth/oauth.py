@@ -7,7 +7,6 @@ import requests_pkcs12
 from dotenv import load_dotenv
 
 from sicoob.config import SicoobConfig
-from sicoob.constants import AUTH_URL  # Para compatibilidade
 from sicoob.logging_config import get_logger
 
 

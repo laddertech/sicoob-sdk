@@ -22,6 +22,13 @@ from sicoob.exceptions import (
     PixError,
     WebhookPixNaoEncontradoError,
 )
+from sicoob.validation import (
+    MultipleValidationError,
+    ValidationError,
+    get_pix_cobranca_schema,
+    validate_txid,
+    validate_url,
+)
 
 
 class PixAPI(APIClientBase):
@@ -79,7 +86,7 @@ class PixAPI(APIClientBase):
                     raise
                 except Exception as e:
                     # Converte outras exceções em PixError
-                    raise PixError(f'Erro na operação PIX: {str(e)}') from e
+                    raise PixError(f'Erro na operação PIX: {e!s}') from e
 
             return wrapped_method
 
@@ -91,23 +98,49 @@ class PixAPI(APIClientBase):
         """Cria cobrança PIX imediata (COB)
 
         Args:
-            txid: Identificador da transação
+            txid: Identificador da transação (26-35 caracteres alfanuméricos)
             dados: Dados da cobrança
 
         Returns:
             Dados da cobrança criada
+
+        Raises:
+            ValidationError: Em caso de dados inválidos
+            MultipleValidationError: Em caso de múltiplos erros de validação
         """
+        # Valida TXID
+        try:
+            txid = validate_txid(txid)
+        except ValueError as e:
+            raise ValidationError(str(e), 'txid', txid)
+
+        # Valida dados da cobrança
+        try:
+            schema = get_pix_cobranca_schema()
+            dados = schema.validate(dados, strict=False)
+        except (ValidationError, MultipleValidationError) as e:
+            raise e
+
         return self.criar_cob(txid, dados)
 
     def consultar_cobranca_imediata(self, txid: str) -> dict:
         """Consulta cobrança PIX imediata
 
         Args:
-            txid: Identificador da transação
+            txid: Identificador da transação (26-35 caracteres alfanuméricos)
 
         Returns:
             Dados da cobrança
+
+        Raises:
+            ValidationError: Em caso de TXID inválido
         """
+        # Valida TXID
+        try:
+            txid = validate_txid(txid)
+        except ValueError as e:
+            raise ValidationError(str(e), 'txid', txid)
+
         return self.consultar_cob(txid)
 
     def criar_cobranca_com_vencimento(self, txid: str, dados: dict) -> dict:
@@ -137,12 +170,28 @@ class PixAPI(APIClientBase):
         """Cadastra webhook para notificações PIX
 
         Args:
-            chave: Chave PIX
-            url: URL do webhook
+            chave: Chave PIX (não pode ser vazia)
+            url: URL do webhook (deve ser uma URL válida)
 
         Returns:
             Dados do webhook cadastrado
+
+        Raises:
+            ValidationError: Em caso de dados inválidos
         """
+        # Valida chave PIX
+        if not chave or not isinstance(chave, str) or not chave.strip():
+            raise ValidationError(
+                'Chave PIX é obrigatória e não pode estar vazia', 'chave', chave
+            )
+        chave = chave.strip()
+
+        # Valida URL
+        try:
+            url = validate_url(url)
+        except ValueError as e:
+            raise ValidationError(str(e), 'url', url)
+
         return self.configurar_webhook(chave, url)
 
     def consultar_webhook(self, chave: str) -> dict:

@@ -3,6 +3,10 @@ import requests
 from sicoob.api_client import APIClientBase
 from sicoob.auth import OAuth2Client
 from sicoob.exceptions import ExtratoError, SaldoError, TransferenciaError
+from sicoob.validation import (
+    ValidationError,
+    validate_date_range,
+)
 
 
 class ContaCorrenteAPI(APIClientBase):
@@ -123,8 +127,29 @@ class ContaCorrenteAPI(APIClientBase):
             Lista de dicts com as transações do período
 
         Raises:
+            ValidationError: Em caso de parâmetros inválidos
             ExtratoError: Em caso de falha na requisição de extrato
         """
+        # Valida parâmetros de data
+        try:
+            mes, ano, dia_inicial, dia_final = validate_date_range(
+                mes, ano, dia_inicial, dia_final
+            )
+        except ValueError as e:
+            raise ValidationError(str(e))
+
+        # Valida número da conta corrente
+        if (
+            not numero_conta_corrente
+            or not isinstance(numero_conta_corrente, int)
+            or numero_conta_corrente <= 0
+        ):
+            raise ValidationError(
+                'Número da conta corrente deve ser um inteiro positivo',
+                'numero_conta_corrente',
+                numero_conta_corrente,
+            )
+
         try:
             headers = self._get_headers(scope='cco_consulta')
             headers['client_id'] = str(self.oauth_client.client_id)

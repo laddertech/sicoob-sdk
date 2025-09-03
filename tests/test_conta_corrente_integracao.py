@@ -30,7 +30,7 @@ def test_extrato_conta_corrente_integracao_real(sicoob_client):
         'ano': 2025,
         'dia_inicial': 1,
         'dia_final': 5,
-        'numero_conta_corrente': '12345678',  # Número de conta sandbox
+        'numero_conta_corrente': 12345678,  # Número de conta sandbox
         'agrupar_cnab': True,
     }
 

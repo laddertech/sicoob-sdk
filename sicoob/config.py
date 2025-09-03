@@ -3,7 +3,8 @@
 import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Optional
+from typing import Optional
+
 from dotenv import load_dotenv
 
 
@@ -49,7 +50,7 @@ class EnvironmentConfig:
     verify_ssl: bool = True
 
     # Headers customizados por ambiente
-    custom_headers: Dict[str, str] = field(default_factory=dict)
+    custom_headers: dict[str, str] = field(default_factory=dict)
 
 
 class SicoobConfig:
@@ -301,7 +302,7 @@ class SicoobConfig:
         return cls.get_current_config().verify_ssl
 
     @classmethod
-    def get_custom_headers(cls) -> Dict[str, str]:
+    def get_custom_headers(cls) -> dict[str, str]:
         """Retorna headers customizados"""
         return cls.get_current_config().custom_headers.copy()
 

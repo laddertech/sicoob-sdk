@@ -6,9 +6,8 @@ import requests
 
 from sicoob.auth import OAuth2Client
 from sicoob.config import SicoobConfig
-from sicoob.constants import BASE_URL, SANDBOX_URL  # Para compatibilidade
 from sicoob.exceptions import RespostaInvalidaError
-from sicoob.logging_config import get_logger, SicoobLogger
+from sicoob.logging_config import SicoobLogger, get_logger
 
 
 class APIClientBase:
@@ -42,6 +41,7 @@ class APIClientBase:
 
         if SicoobConfig.is_sandbox():
             import os
+
             from dotenv import load_dotenv
 
             load_dotenv()

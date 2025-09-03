@@ -40,8 +40,11 @@ def test_emitir_boleto_sucesso(boleto_client: BoletoAPI) -> None:
     dados = {
         'numeroContrato': 123456,
         'modalidade': 1,
-        'valor': 100.50,
-        'beneficiario': {'nome': 'Teste Beneficiário', 'documento': '12345678901'},
+        'numeroContaCorrente': 12345,
+        'especieDocumento': 'DM',
+        'dataVencimento': '2024-12-31',
+        'valorNominal': '100.50',
+        'pagador': {'nome': 'João Silva', 'cpfCnpj': '11144477735'},
     }
 
     # Chama o método
@@ -70,7 +73,15 @@ def test_emitir_boleto_erro_http(boleto_client: BoletoAPI) -> None:
     }
     boleto_client.session.post.return_value = mock_response
 
-    dados = {'numeroContrato': 123456, 'valor': 100.50}
+    dados = {
+        'numeroContrato': 123456,
+        'modalidade': 1,
+        'numeroContaCorrente': 12345,
+        'especieDocumento': 'DM',
+        'dataVencimento': '2024-12-31',
+        'valorNominal': '100.50',
+        'pagador': {'nome': 'João Silva', 'cpfCnpj': '11144477735'},
+    }
 
     # Verifica se exceção é levantada
     with pytest.raises(BoletoEmissaoError) as exc_info:
@@ -89,7 +100,15 @@ def test_emitir_boleto_erro_generico(boleto_client: BoletoAPI) -> None:
         'Erro de conexão'
     )
 
-    dados = {'numeroContrato': 123456, 'valor': 100.50}
+    dados = {
+        'numeroContrato': 123456,
+        'modalidade': 1,
+        'numeroContaCorrente': 12345,
+        'especieDocumento': 'DM',
+        'dataVencimento': '2024-12-31',
+        'valorNominal': '100.50',
+        'pagador': {'nome': 'João Silva', 'cpfCnpj': '11144477735'},
+    }
 
     # Verifica se exceção é levantada
     with pytest.raises(BoletoEmissaoError) as exc_info:
@@ -1295,7 +1314,7 @@ def test_cadastrar_webhook_erro_negocio(boleto_client: BoletoAPI) -> None:
 
     # Dados de teste
     webhook = {
-        'url': 'url-invalida',
+        'url': 'https://webhook-invalido.com',
         'codigoTipoMovimento': 7,
         'codigoPeriodoMovimento': 1,
     }
@@ -1310,7 +1329,7 @@ def test_cadastrar_webhook_erro_negocio(boleto_client: BoletoAPI) -> None:
         exc_info.value
     )
     assert exc_info.value.code == 400
-    assert exc_info.value.url == 'url-invalida'
+    assert exc_info.value.url == 'https://webhook-invalido.com'
     assert exc_info.value.dados_webhook == webhook
 
 

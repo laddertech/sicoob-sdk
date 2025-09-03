@@ -17,7 +17,6 @@ import logging.handlers
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
 
 
 class SensitiveDataFilter(logging.Filter):
@@ -130,7 +129,7 @@ class SicoobLogger:
     """Classe principal para configuração de logging do SDK"""
 
     _configured = False
-    _loggers: Dict[str, logging.Logger] = {}
+    _loggers: dict[str, logging.Logger] = {}
 
     @classmethod
     def get_logger(cls, name: str) -> logging.Logger:
@@ -155,11 +154,11 @@ class SicoobLogger:
     @classmethod
     def configure(
         cls,
-        level: Optional[str] = None,
-        format_type: Optional[str] = None,
-        log_file: Optional[str] = None,
-        log_requests: Optional[bool] = None,
-        log_responses: Optional[bool] = None,
+        level: str | None = None,
+        format_type: str | None = None,
+        log_file: str | None = None,
+        log_requests: bool | None = None,
+        log_responses: bool | None = None,
         force_reconfigure: bool = False,
     ) -> None:
         """Configura o sistema de logging
@@ -289,9 +288,9 @@ class SicoobLogger:
         cls,
         method: str,
         url: str,
-        headers: Optional[Dict] = None,
-        body: Optional[str] = None,
-        request_id: Optional[str] = None,
+        headers: dict | None = None,
+        body: str | None = None,
+        request_id: str | None = None,
     ) -> None:
         """Loga uma requisição HTTP
 
@@ -335,8 +334,8 @@ class SicoobLogger:
         status_code: int,
         url: str,
         duration_ms: float,
-        response_body: Optional[str] = None,
-        request_id: Optional[str] = None,
+        response_body: str | None = None,
+        request_id: str | None = None,
     ) -> None:
         """Loga uma resposta HTTP
 

@@ -1,13 +1,13 @@
 import os
-from typing import BinaryIO, Optional
+from typing import BinaryIO
 
 from dotenv import load_dotenv
 
 from sicoob.auth import OAuth2Client
 from sicoob.cobranca import CobrancaAPI
-from sicoob.config import SicoobConfig, Environment
+from sicoob.config import Environment, SicoobConfig
 from sicoob.conta_corrente import ContaCorrenteAPI
-from sicoob.logging_config import get_logger, SicoobLogger
+from sicoob.logging_config import SicoobLogger, get_logger
 
 
 class Sicoob:
