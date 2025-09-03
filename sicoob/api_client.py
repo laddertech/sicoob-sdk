@@ -9,6 +9,7 @@ from sicoob.auth import OAuth2Client
 from sicoob.config import SicoobConfig
 from sicoob.exceptions import RespostaInvalidaError
 from sicoob.logging_config import SicoobLogger, get_logger
+from sicoob.resilience import create_resilient_session, RetryConfig
 
 
 class APIClientBase:
@@ -19,6 +20,8 @@ class APIClientBase:
         oauth_client: OAuth2Client,
         session: requests.Session,
         sandbox_mode: bool = False,
+        enable_resilience: bool = True,
+        retry_config: RetryConfig | None = None,
     ) -> None:
         """Inicializa com cliente OAuth e sessão HTTP existente
 
@@ -26,15 +29,71 @@ class APIClientBase:
             oauth_client: Cliente OAuth2 para autenticação
             session: Sessão HTTP existente
             sandbox_mode: Se True, usa URL de sandbox (default: False)
+            enable_resilience: Se True, habilita retry e circuit breaker (default: True)
+            retry_config: Configuração personalizada de retry
         """
         self.sandbox_mode = sandbox_mode
         self.oauth_client = oauth_client
-        self.session = session
+        self.enable_resilience = enable_resilience
         self.logger = get_logger(__name__)
+        
+        # Configura sessão com ou sem resiliência
+        if enable_resilience and not hasattr(session, '_sicoob_resilient'):
+            # Aplica resiliência à sessão existente se não foi aplicada ainda
+            config = retry_config or RetryConfig(
+                max_retries=3,
+                base_delay=1.0,
+                max_delay=30.0,
+                backoff_factor=2.0,
+                jitter=True
+            )
+            
+            # Cria nova sessão resiliente mantendo configurações da original
+            resilient_session = create_resilient_session(
+                retry_config=config,
+                timeout=getattr(session, 'timeout', (10, 30))
+            )
+            
+            # Copia configurações importantes da sessão original
+            if hasattr(session, 'headers'):
+                resilient_session.headers.update(session.headers)
+            if hasattr(session, 'proxies'):
+                resilient_session.proxies = session.proxies
+            if hasattr(session, 'verify'):
+                resilient_session.verify = session.verify
+            if hasattr(session, 'cert'):
+                resilient_session.cert = session.cert
+                
+            # Marca como configurada para evitar reconfiguração
+            resilient_session._sicoob_resilient = True
+            self.session = resilient_session
+        else:
+            self.session = session
 
     def _get_base_url(self) -> str:
         """Retorna a URL base conforme configuração do ambiente"""
         return SicoobConfig.get_base_url()
+    
+    def _get_timeout_for_operation(self, operation: str = "default") -> tuple[int, int]:
+        """Obtém timeout específico para tipo de operação
+        
+        Args:
+            operation: Tipo de operação (pix, boleto, extrato, default)
+            
+        Returns:
+            Tupla (connect_timeout, read_timeout) em segundos
+        """
+        config = SicoobConfig.get_current_config()
+        
+        # Timeouts específicos por operação
+        timeout_map = {
+            "pix": (config.connect_timeout, config.pix_timeout),
+            "boleto": (config.connect_timeout, config.boleto_timeout), 
+            "extrato": (config.connect_timeout, config.extrato_timeout),
+            "default": (config.connect_timeout, config.read_timeout),
+        }
+        
+        return timeout_map.get(operation, timeout_map["default"])
 
     def _get_headers(self, scope: str) -> dict[str, str]:
         """Retorna headers padrão com token de acesso"""
@@ -100,7 +159,7 @@ class APIClientBase:
             ) from e
 
     def _make_request(
-        self, method: str, url: str, scope: str, **kwargs
+        self, method: str, url: str, scope: str, operation: str = "default", **kwargs
     ) -> requests.Response:
         """Faz uma requisição HTTP com logging integrado
 
@@ -108,6 +167,7 @@ class APIClientBase:
             method: Método HTTP (GET, POST, PUT, DELETE, etc.)
             url: URL completa da requisição
             scope: Escopo OAuth2 necessário
+            operation: Tipo de operação para timeout específico (pix, boleto, extrato)
             **kwargs: Argumentos adicionais para requests
 
         Returns:
@@ -124,7 +184,7 @@ class APIClientBase:
         # Configurações de timeout e SSL baseadas no ambiente
         config = SicoobConfig.get_current_config()
         if 'timeout' not in kwargs:
-            kwargs['timeout'] = config.timeout
+            kwargs['timeout'] = self._get_timeout_for_operation(operation)
         if 'verify' not in kwargs:
             kwargs['verify'] = config.verify_ssl
 

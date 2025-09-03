@@ -316,3 +316,46 @@ class QrCodePixError(PixError):
     ) -> None:
         self.txid = txid
         super().__init__(message, code)
+
+
+# Exceções de Resiliência
+
+
+class ResilienceError(SicoobError):
+    """Classe base para erros de resiliência"""
+    
+    pass
+
+
+class MaxRetriesExceededError(ResilienceError):
+    """Erro quando o número máximo de tentativas é excedido"""
+    
+    def __init__(
+        self,
+        message: str,
+        attempts: int | None = None,
+        last_error: Exception | None = None
+    ) -> None:
+        self.attempts = attempts
+        self.last_error = last_error
+        super().__init__(message)
+
+
+class CircuitBreakerOpenError(ResilienceError):
+    """Erro quando circuit breaker está aberto"""
+    
+    def __init__(
+        self,
+        message: str,
+        failure_count: int | None = None,
+        recovery_timeout: float | None = None
+    ) -> None:
+        self.failure_count = failure_count
+        self.recovery_timeout = recovery_timeout
+        super().__init__(message)
+
+
+class TimeoutConfigurationError(ResilienceError):
+    """Erro na configuração de timeout"""
+    
+    pass

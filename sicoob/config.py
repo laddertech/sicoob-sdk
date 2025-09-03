@@ -32,9 +32,16 @@ class EnvironmentConfig:
     )
 
     # Configurações de rede
-    timeout: int = 30
+    timeout: int = 30  # Timeout padrão
+    connect_timeout: int = 10  # Timeout para conexão
+    read_timeout: int = 30  # Timeout para leitura
     max_retries: int = 3
     retry_backoff_factor: float = 1.0
+    
+    # Timeouts específicos por operação
+    pix_timeout: int = 45  # PIX pode ser mais lento
+    boleto_timeout: int = 60  # Emissão de boleto pode demorar
+    extrato_timeout: int = 120  # Consultas de extrato podem ser lentas
 
     # Configurações de logging por ambiente
     log_level: str = 'INFO'
