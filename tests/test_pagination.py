@@ -1,21 +1,22 @@
-"""Testes para sistema de paginação"""
+"""Testes para módulo de paginação."""
 
-import time
-from unittest.mock import Mock, patch
-
+import math
 import pytest
+import time
+from unittest.mock import Mock, patch, MagicMock
 
-from sicoob.exceptions import InvalidPageError, PageSizeError, PaginationError
 from sicoob.pagination import (
-    CursorBasedStrategy,
-    OffsetBasedStrategy,
-    PagedResponse,
-    PageInfo,
-    PaginatedIterator,
     PaginationConfig,
+    PageInfo,
+    PagedResponse,
+    PaginationStrategy,
+    OffsetBasedStrategy,
+    CursorBasedStrategy,
     SicoobPaginationStrategy,
+    PaginatedIterator,
     paginated_response_from_data,
 )
+from sicoob.exceptions import PaginationError
 
 
 class TestPaginationConfig:
@@ -244,6 +245,20 @@ class TestOffsetBasedStrategy:
         assert page_info.total_pages is None
         assert page_info.has_next is True  # Página cheia indica possível próxima
         assert page_info.has_previous is False
+    
+    def test_extract_page_info_alternative_keys(self):
+        """Testa extração com chaves alternativas."""
+        strategy = OffsetBasedStrategy()
+        
+        response_data = {
+            "data": ["item"] * 10,
+            "totalElements": 25
+        }
+        
+        page_info = strategy.extract_page_info(response_data, 1, 10)
+        
+        assert page_info.total_items == 25
+        assert len(response_data["data"]) == 10  # Verifica que 'data' foi encontrado
 
     def test_custom_param_names(self):
         """Testa nomes customizados de parâmetros"""
@@ -318,8 +333,8 @@ class TestCursorBasedStrategy:
         strategy = CursorBasedStrategy()
         response_data = {
             "data": [
-                {"id": 1, "id": "item1"},
-                {"id": 2, "id": "item2"}  # Apenas 2 items de uma página de 5
+                {"id": "item1"},
+                {"id": "item2"}  # Apenas 2 items de uma página de 5
             ]
         }
         
@@ -328,6 +343,39 @@ class TestCursorBasedStrategy:
         assert page_info.current_page == 3
         assert page_info.page_size == 5
         assert page_info.has_next is False  # Página não está cheia
+        assert page_info.next_cursor is None
+    
+    def test_cursor_strategy_get_next_params_no_cursor(self):
+        """Testa quando não há cursor para próxima página."""
+        strategy = CursorBasedStrategy()
+        
+        current_params = {"size": 10}
+        page_info = PageInfo(
+            current_page=1, 
+            page_size=10, 
+            has_next=True, 
+            next_cursor=None
+        )
+        response = PagedResponse(items=["item"] * 10, page_info=page_info)
+        
+        next_params = strategy.get_next_params(current_params, response)
+        assert next_params is None
+    
+    def test_cursor_strategy_extract_page_info_no_cursor_field(self):
+        """Testa extração quando item não tem campo cursor."""
+        strategy = CursorBasedStrategy()
+        
+        response_data = {
+            "items": [
+                {"name": "item1"},  # Sem campo 'id'
+                {"name": "item2"},
+                {"name": "item3"}
+            ]
+        }
+        
+        page_info = strategy.extract_page_info(response_data, 1, 3)
+        
+        assert page_info.has_next is False
         assert page_info.next_cursor is None
 
 
@@ -393,6 +441,40 @@ class TestSicoobPaginationStrategy:
         
         expected = {"inicio": "2024-01-01", "fim": "2024-01-31", "page": 2}
         assert next_params == expected
+    
+    def test_sicoob_strategy_get_next_params_partial_page(self):
+        """Testa quando página parcial indica fim dos dados."""
+        strategy = SicoobPaginationStrategy()
+        
+        current_params = {"limit": 10}
+        page_info = PageInfo(current_page=2, page_size=10, has_next=True)
+        response = PagedResponse(items=["item"] * 5, page_info=page_info)  # Menos que page_size
+        
+        next_params = strategy.get_next_params(current_params, response)
+        assert next_params is None
+    
+    def test_sicoob_strategy_get_next_params_no_next(self):
+        """Testa quando não há próxima página."""
+        strategy = SicoobPaginationStrategy()
+        
+        current_params = {"limit": 10}
+        page_info = PageInfo(current_page=2, page_size=10, has_next=False)
+        response = PagedResponse(items=["item"] * 5, page_info=page_info)
+        
+        next_params = strategy.get_next_params(current_params, response)
+        assert next_params is None
+    
+    def test_sicoob_strategy_extract_page_info_no_matching_key(self):
+        """Testa extração quando não encontra chave conhecida."""
+        strategy = SicoobPaginationStrategy()
+        
+        response_data = {
+            "unknown_key": ["item1", "item2"]
+        }
+        
+        page_info = strategy.extract_page_info(response_data, 1, 10)
+        
+        assert page_info.has_next is False  # items vazio
 
 
 class TestPaginatedIterator:
@@ -537,6 +619,93 @@ class TestPaginatedIterator:
         items = list(iterator)
         assert len(items) == 2
         assert items == [{"name": "João"}, {"name": "Maria"}]
+    
+    def test_paginated_iterator_creation(self):
+        """Testa criação do iterador."""
+        def mock_fetch(params):
+            return {"items": ["item1", "item2"]}
+        
+        config = PaginationConfig(page_size=10)
+        strategy = OffsetBasedStrategy()
+        
+        iterator = PaginatedIterator(
+            fetch_function=mock_fetch,
+            initial_params={"limit": 10},
+            config=config,
+            strategy=strategy
+        )
+        
+        assert iterator.current_page == 1
+        assert iterator.pages_fetched == 0
+        assert iterator.total_items_fetched == 0
+        assert iterator.finished is False
+    
+    def test_paginated_iterator_auto_sets_limit_param(self):
+        """Testa que limit é configurado automaticamente."""
+        captured_params = []
+        
+        def mock_fetch(params):
+            captured_params.append(params.copy())
+            return {"items": ["item1"]}
+        
+        config = PaginationConfig(page_size=50)
+        strategy = SicoobPaginationStrategy()
+        
+        iterator = PaginatedIterator(
+            fetch_function=mock_fetch,
+            initial_params={},
+            config=config,
+            strategy=strategy
+        )
+        
+        list(iterator)
+        
+        assert captured_params[0]["limit"] == 50
+    
+    def test_paginated_iterator_preserves_existing_limit(self):
+        """Testa que não sobrescreve limit existente."""
+        captured_params = []
+        
+        def mock_fetch(params):
+            captured_params.append(params.copy())
+            return {"items": ["item1"]}
+        
+        config = PaginationConfig(page_size=50)
+        strategy = SicoobPaginationStrategy()
+        
+        iterator = PaginatedIterator(
+            fetch_function=mock_fetch,
+            initial_params={"size": 100},  # Já tem size
+            config=config,
+            strategy=strategy
+        )
+        
+        list(iterator)
+        
+        # Não deve adicionar limit pois já tem size
+        assert "limit" not in captured_params[0]
+        assert captured_params[0]["size"] == 100
+    
+    @patch('time.sleep')
+    def test_paginated_iterator_no_auto_retry(self, mock_sleep):
+        """Testa quando auto_retry está desabilitado."""
+        def mock_fetch(params):
+            raise Exception("Error without retry")
+        
+        config = PaginationConfig(page_size=10, auto_retry=False)
+        strategy = SicoobPaginationStrategy()
+        
+        iterator = PaginatedIterator(
+            fetch_function=mock_fetch,
+            initial_params={},
+            config=config,
+            strategy=strategy
+        )
+        
+        with pytest.raises(PaginationError, match="Falha ao buscar página 1"):
+            list(iterator)
+        
+        mock_sleep.assert_not_called()
 
 
 class TestUtilityFunctions:

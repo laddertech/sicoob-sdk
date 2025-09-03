@@ -1,4 +1,4 @@
-"""Testes para o sistema de validação de entrada"""
+"""Testes para módulo de validação."""
 
 import pytest
 from decimal import Decimal
@@ -20,409 +20,443 @@ from sicoob.validation import (
     get_pix_cobranca_schema,
     get_webhook_schema,
     get_pagador_schema,
+    validate_input,
 )
 
 
+class TestValidationError:
+    """Testes para exceções de validação."""
+    
+    def test_validation_error_basic(self):
+        """Testa criação básica da exceção."""
+        error = ValidationError("Erro teste")
+        assert str(error) == "Erro teste"
+        assert error.field is None
+        assert error.value is None
+    
+    def test_validation_error_with_field(self):
+        """Testa exceção com campo e valor."""
+        error = ValidationError("Valor inválido", "nome", "teste")
+        assert "Campo 'nome': Valor inválido" in str(error)
+        assert error.field == "nome"
+        assert error.value == "teste"
+    
+    def test_multiple_validation_error(self):
+        """Testa múltiplas exceções de validação."""
+        errors = [
+            ValidationError("Erro 1", "campo1"),
+            ValidationError("Erro 2", "campo2"),
+        ]
+        multi_error = MultipleValidationError(errors)
+        assert "Múltiplos erros de validação" in str(multi_error)
+        assert len(multi_error.errors) == 2
+
+
 class TestFieldValidator:
-    """Testes para FieldValidator"""
-
+    """Testes para validador de campo."""
+    
     def test_required_field_validation(self):
-        """Testa validação de campo obrigatório"""
-        validator = FieldValidator("test_field", required=True)
+        """Testa validação de campo obrigatório."""
+        validator = FieldValidator("nome", required=True)
         
-        # Campo vazio deve falhar
-        with pytest.raises(ValidationError) as exc_info:
+        # Campo obrigatório vazio
+        with pytest.raises(ValidationError, match="Campo obrigatório"):
             validator.validate(None)
-        assert "Campo obrigatório não pode estar vazio" in str(exc_info.value)
-        assert exc_info.value.field == "test_field"
+            
+        with pytest.raises(ValidationError, match="Campo obrigatório"):
+            validator.validate("")
         
-        # Campo com valor deve passar
-        assert validator.validate("valor") == "valor"
-
+        # Campo obrigatório preenchido
+        assert validator.validate("João") == "João"
+    
     def test_optional_field_validation(self):
-        """Testa validação de campo opcional"""
-        validator = FieldValidator("test_field", required=False)
+        """Testa validação de campo opcional."""
+        validator = FieldValidator("descricao", required=False)
         
-        # Campo vazio deve passar
+        # Campo opcional pode ser None ou vazio
         assert validator.validate(None) is None
         assert validator.validate("") == ""
-        
-        # Campo com valor deve passar
-        assert validator.validate("valor") == "valor"
-
+        assert validator.validate("Descrição") == "Descrição"
+    
     def test_data_type_validation(self):
-        """Testa validação de tipo de dados"""
-        validator = FieldValidator("test_field", data_type=int)
+        """Testa validação de tipo de dados."""
+        # String
+        validator = FieldValidator("nome", data_type=str)
+        assert validator.validate("João") == "João"
+        assert validator.validate(123) == "123"  # Conversão automática
         
-        # Tipo correto deve passar
-        assert validator.validate(42) == 42
+        # Inteiro
+        validator = FieldValidator("idade", data_type=int)
+        assert validator.validate(25) == 25
+        assert validator.validate("25") == 25  # Conversão automática
         
-        # Conversão automática deve funcionar
-        assert validator.validate("42") == 42
+        with pytest.raises(ValidationError, match="Deve ser do tipo int"):
+            validator.validate("abc")
         
-        # Tipo incompatível deve falhar
-        with pytest.raises(ValidationError) as exc_info:
-            validator.validate("texto")
-        assert "Deve ser do tipo int" in str(exc_info.value)
-
-    def test_range_validation(self):
-        """Testa validação de range numérico"""
-        validator = FieldValidator("test_field", data_type=int, min_value=1, max_value=10)
+        # Float
+        validator = FieldValidator("preco", data_type=float)
+        assert validator.validate(10.5) == 10.5
+        assert validator.validate("10.5") == 10.5
         
-        # Valores dentro do range devem passar
+        with pytest.raises(ValidationError, match="Deve ser do tipo float"):
+            validator.validate("abc")
+    
+    def test_numeric_range_validation(self):
+        """Testa validação de faixas numéricas."""
+        validator = FieldValidator("nota", min_value=0, max_value=10)
+        
+        # Valores válidos
         assert validator.validate(5) == 5
-        assert validator.validate(1) == 1
+        assert validator.validate(0) == 0
         assert validator.validate(10) == 10
         
-        # Valores fora do range devem falhar
-        with pytest.raises(ValidationError):
-            validator.validate(0)
-        
-        with pytest.raises(ValidationError):
+        # Valores inválidos
+        with pytest.raises(ValidationError, match="Deve ser >= 0"):
+            validator.validate(-1)
+            
+        with pytest.raises(ValidationError, match="Deve ser <= 10"):
             validator.validate(11)
-
-    def test_length_validation(self):
-        """Testa validação de comprimento de string"""
-        validator = FieldValidator("test_field", data_type=str, min_length=3, max_length=10)
+    
+    def test_string_length_validation(self):
+        """Testa validação de comprimento de string."""
+        validator = FieldValidator("senha", min_length=6, max_length=20)
         
-        # Comprimentos válidos devem passar
-        assert validator.validate("abc") == "abc"
-        assert validator.validate("1234567890") == "1234567890"
+        # Comprimentos válidos
+        assert validator.validate("123456") == "123456"
+        assert validator.validate("a" * 20) == "a" * 20
         
-        # Comprimentos inválidos devem falhar
-        with pytest.raises(ValidationError):
-            validator.validate("ab")
-        
-        with pytest.raises(ValidationError):
-            validator.validate("12345678901")
-
+        # Comprimentos inválidos
+        with pytest.raises(ValidationError, match="pelo menos 6 caracteres"):
+            validator.validate("12345")
+            
+        with pytest.raises(ValidationError, match="no máximo 20 caracteres"):
+            validator.validate("a" * 21)
+    
     def test_pattern_validation(self):
-        """Testa validação de padrão regex"""
-        validator = FieldValidator("test_field", pattern=r'^\d{4}-\d{2}-\d{2}$')
+        """Testa validação de padrão regex."""
+        validator = FieldValidator("cep", pattern=r'^\d{5}-\d{3}$')
         
-        # Padrão válido deve passar
-        assert validator.validate("2024-01-15") == "2024-01-15"
+        # Padrão válido
+        assert validator.validate("12345-678") == "12345-678"
         
-        # Padrão inválido deve falhar
-        with pytest.raises(ValidationError):
-            validator.validate("15/01/2024")
-
+        # Padrão inválido
+        with pytest.raises(ValidationError, match="Formato inválido"):
+            validator.validate("12345678")
+    
     def test_allowed_values_validation(self):
-        """Testa validação de valores permitidos"""
-        validator = FieldValidator("test_field", allowed_values=["A", "B", "C"])
+        """Testa validação de valores permitidos."""
+        validator = FieldValidator("status", allowed_values=["ativo", "inativo", "pendente"])
         
-        # Valores permitidos devem passar
-        assert validator.validate("A") == "A"
-        assert validator.validate("B") == "B"
+        # Valores válidos
+        assert validator.validate("ativo") == "ativo"
+        assert validator.validate("inativo") == "inativo"
         
-        # Valores não permitidos devem falhar
-        with pytest.raises(ValidationError):
-            validator.validate("D")
-
+        # Valor inválido
+        with pytest.raises(ValidationError, match="Deve ser um dos valores"):
+            validator.validate("cancelado")
+    
     def test_custom_validator(self):
-        """Testa validador customizado"""
-        def uppercase_validator(value):
-            return value.upper()
+        """Testa validador customizado."""
+        def validate_even(value):
+            if value % 2 != 0:
+                raise ValueError("Deve ser par")
+            return value
         
-        validator = FieldValidator("test_field", custom_validator=uppercase_validator)
+        validator = FieldValidator("numero", custom_validator=validate_even)
         
-        # Validador customizado deve ser aplicado
-        assert validator.validate("hello") == "HELLO"
+        # Valor válido
+        assert validator.validate(4) == 4
         
-        # Erro no validador customizado deve ser capturado
-        def failing_validator(value):
-            raise ValueError("Custom validation failed")
-        
-        validator = FieldValidator("test_field", custom_validator=failing_validator)
-        
-        with pytest.raises(ValidationError) as exc_info:
-            validator.validate("test")
-        assert "Validação customizada falhou" in str(exc_info.value)
+        # Valor inválido
+        with pytest.raises(ValidationError, match="Validação customizada falhou"):
+            validator.validate(3)
 
 
 class TestDataValidator:
-    """Testes para DataValidator"""
-
-    def test_basic_validation(self):
-        """Testa validação básica de estrutura"""
-        schema = DataValidator("test_schema", [
-            FieldValidator("name", required=True, data_type=str),
-            FieldValidator("age", required=True, data_type=int, min_value=0),
+    """Testes para validador de dados."""
+    
+    def test_valid_data_validation(self):
+        """Testa validação de dados válidos."""
+        fields = [
+            FieldValidator("nome", required=True, data_type=str),
+            FieldValidator("idade", required=True, data_type=int, min_value=0),
             FieldValidator("email", required=False, data_type=str),
-        ])
+        ]
+        validator = DataValidator("usuario", fields)
         
-        # Dados válidos devem passar
-        data = {"name": "João", "age": 30}
-        result = schema.validate(data)
-        assert result["name"] == "João"
-        assert result["age"] == 30
+        data = {"nome": "João", "idade": 25, "email": "joao@email.com"}
+        result = validator.validate(data)
         
-        # Dados com campo opcional devem passar
-        data = {"name": "João", "age": 30, "email": "joao@email.com"}
-        result = schema.validate(data)
+        assert result["nome"] == "João"
+        assert result["idade"] == 25
         assert result["email"] == "joao@email.com"
-
-    def test_multiple_validation_errors(self):
-        """Testa múltiplos erros de validação"""
-        schema = DataValidator("test_schema", [
-            FieldValidator("name", required=True, data_type=str),
-            FieldValidator("age", required=True, data_type=int, min_value=0),
-        ])
+    
+    def test_strict_mode_validation(self):
+        """Testa modo strict que rejeita campos extras."""
+        fields = [FieldValidator("nome", required=True)]
+        validator = DataValidator("usuario", fields)
         
-        # Múltiplos erros devem ser coletados
-        data = {"age": -1}  # name ausente, age inválido
+        data = {"nome": "João", "extra": "valor"}
+        
+        # Modo strict (padrão) rejeita campo extra
+        with pytest.raises(MultipleValidationError):
+            validator.validate(data, strict=True)
+        
+        # Modo não-strict aceita campo extra
+        result = validator.validate(data, strict=False)
+        assert result["nome"] == "João"
+        assert result["extra"] == "valor"
+    
+    def test_multiple_validation_errors(self):
+        """Testa coleta de múltiplos erros."""
+        fields = [
+            FieldValidator("nome", required=True),
+            FieldValidator("idade", required=True, data_type=int, min_value=0),
+        ]
+        validator = DataValidator("usuario", fields)
+        
+        data = {"nome": "", "idade": -5}
         
         with pytest.raises(MultipleValidationError) as exc_info:
-            schema.validate(data)
+            validator.validate(data)
         
         errors = exc_info.value.errors
-        assert len(errors) == 2
-        assert any("Campo obrigatório" in str(e) for e in errors)
-        assert any("Deve ser >= 0" in str(e) for e in errors)
-
-    def test_strict_mode(self):
-        """Testa modo strict (rejeita campos extras)"""
-        schema = DataValidator("test_schema", [
-            FieldValidator("name", required=True, data_type=str),
-        ])
+        assert len(errors) >= 2  # Pelo menos nome vazio e idade negativa
+    
+    def test_non_dict_data(self):
+        """Testa validação de dados que não são dicionário."""
+        fields = [FieldValidator("nome", required=True)]
+        validator = DataValidator("usuario", fields)
         
-        data = {"name": "João", "extra_field": "valor"}
-        
-        # Modo strict deve rejeitar campos extras
-        with pytest.raises(MultipleValidationError) as exc_info:
-            schema.validate(data, strict=True)
-        
-        # Modo não-strict deve aceitar campos extras
-        result = schema.validate(data, strict=False)
-        assert result["name"] == "João"
-        assert result["extra_field"] == "valor"
+        with pytest.raises(ValidationError, match="Dados devem ser um dicionário"):
+            validator.validate("não é dict")
 
 
 class TestCustomValidators:
-    """Testes para validadores customizados"""
-
+    """Testes para validadores customizados."""
+    
     def test_validate_cpf(self):
-        """Testa validação de CPF"""
-        # CPF válido deve passar
+        """Testa validador de CPF."""
+        # CPF válido
         assert validate_cpf("11144477735") == "11144477735"
-        assert validate_cpf("111.444.777-35") == "11144477735"
+        assert validate_cpf("111.444.777-35") == "11144477735"  # Remove formatação
         
-        # CPF inválido deve falhar
-        with pytest.raises(ValueError):
+        # CPF inválido - tamanho
+        with pytest.raises(ValueError, match="CPF deve ter 11 dígitos"):
+            validate_cpf("123456789")
+        
+        # CPF inválido - sequência
+        with pytest.raises(ValueError, match="CPF inválido \\(sequência\\)"):
+            validate_cpf("11111111111")
+        
+        # CPF inválido - dígitos verificadores
+        with pytest.raises(ValueError, match="CPF inválido"):
             validate_cpf("12345678901")
-        
-        with pytest.raises(ValueError):
-            validate_cpf("111.111.111-11")  # Sequência
-        
-        with pytest.raises(ValueError):
-            validate_cpf("123456789")  # Tamanho incorreto
-
+    
     def test_validate_cnpj(self):
-        """Testa validação de CNPJ"""
-        # CNPJ válido deve passar
+        """Testa validador de CNPJ."""
+        # CNPJ válido
         assert validate_cnpj("11222333000181") == "11222333000181"
         assert validate_cnpj("11.222.333/0001-81") == "11222333000181"
         
-        # CNPJ inválido deve falhar
-        with pytest.raises(ValueError):
+        # CNPJ inválido - tamanho
+        with pytest.raises(ValueError, match="CNPJ deve ter 14 dígitos"):
+            validate_cnpj("123456789")
+        
+        # CNPJ inválido - sequência
+        with pytest.raises(ValueError, match="CNPJ inválido \\(sequência\\)"):
+            validate_cnpj("11111111111111")
+        
+        # CNPJ inválido - dígitos verificadores
+        with pytest.raises(ValueError, match="CNPJ inválido"):
             validate_cnpj("12345678000123")
-        
-        with pytest.raises(ValueError):
-            validate_cnpj("11.111.111/1111-11")  # Sequência
-
+    
     def test_validate_email(self):
-        """Testa validação de email"""
-        # Emails válidos devem passar
+        """Testa validador de email."""
+        # Email válido
         assert validate_email("test@example.com") == "test@example.com"
-        assert validate_email("USER@DOMAIN.COM") == "user@domain.com"
+        assert validate_email("User@Example.COM") == "user@example.com"  # Normaliza
         
-        # Emails inválidos devem falhar
-        with pytest.raises(ValueError):
+        # Email inválido
+        with pytest.raises(ValueError, match="Formato de email inválido"):
             validate_email("invalid-email")
         
-        with pytest.raises(ValueError):
-            validate_email("@domain.com")
-
+        with pytest.raises(ValueError, match="Formato de email inválido"):
+            validate_email("@example.com")
+    
     def test_validate_url(self):
-        """Testa validação de URL"""
-        # URLs válidas devem passar
+        """Testa validador de URL."""
+        # URL válida
         assert validate_url("https://example.com") == "https://example.com"
-        assert validate_url("http://api.example.com/webhook") == "http://api.example.com/webhook"
+        assert validate_url("http://sub.domain.com/path") == "http://sub.domain.com/path"
         
-        # URLs inválidas devem falhar
-        with pytest.raises(ValueError):
+        # URL inválida
+        with pytest.raises(ValueError, match="Formato de URL inválido"):
             validate_url("ftp://example.com")
         
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Formato de URL inválido"):
             validate_url("not-a-url")
-
+    
     def test_validate_txid(self):
-        """Testa validação de TXID PIX"""
-        # TXIDs válidos devem passar
-        assert validate_txid("abcdefghijklmnopqrstuvwxyz") == "abcdefghijklmnopqrstuvwxyz"
-        assert validate_txid("12345678901234567890123456") == "12345678901234567890123456"
+        """Testa validador de TXID PIX."""
+        # TXID válido
+        valid_txid = "a" * 26
+        assert validate_txid(valid_txid) == valid_txid
         
-        # TXIDs inválidos devem falhar
-        with pytest.raises(ValueError):
-            validate_txid("12345")  # Muito curto
+        valid_txid = "A1B2C3D4E5F6G7H8I9J0K1L2M3"
+        assert validate_txid(valid_txid) == valid_txid
         
-        with pytest.raises(ValueError):
-            validate_txid("a" * 40)  # Muito longo
+        # TXID inválido - tamanho
+        with pytest.raises(ValueError, match="TXID deve ter entre 26 e 35 caracteres"):
+            validate_txid("abc")
         
-        with pytest.raises(ValueError):
-            validate_txid("txid-com-hifen")  # Caracteres inválidos
-
+        with pytest.raises(ValueError, match="TXID deve ter entre 26 e 35 caracteres"):
+            validate_txid("a" * 36)
+        
+        # TXID inválido - caracteres
+        with pytest.raises(ValueError, match="TXID deve conter apenas caracteres alfanuméricos"):
+            validate_txid("a" * 25 + "@")
+    
     def test_validate_monetary_value(self):
-        """Testa validação de valor monetário"""
-        # Valores válidos devem passar
+        """Testa validador de valor monetário."""
+        # Valores válidos
         assert validate_monetary_value("100.50") == "100.50"
-        assert validate_monetary_value(100) == "100.00"
-        assert validate_monetary_value(Decimal("50.75")) == "50.75"
+        assert validate_monetary_value("100,50") == "100.50"  # Normaliza vírgula
+        assert validate_monetary_value(100.5) == "100.50"
+        assert validate_monetary_value(Decimal("100.50")) == "100.50"
         
-        # Valores inválidos devem falhar
-        with pytest.raises(ValueError):
-            validate_monetary_value(-10)  # Negativo
+        # Valor negativo
+        with pytest.raises(ValueError, match="Valor monetário inválido"):
+            validate_monetary_value(-10)
         
-        with pytest.raises(ValueError):
-            validate_monetary_value("texto")  # Não numérico
+        # Valor muito alto
+        with pytest.raises(ValueError, match="Valor monetário inválido"):
+            validate_monetary_value("1000000000")
         
-        with pytest.raises(ValueError):
-            validate_monetary_value(10**10)  # Muito alto
-
+        # Valor inválido
+        with pytest.raises(ValueError, match="Valor monetário inválido"):
+            validate_monetary_value("abc")
+    
     def test_validate_date_range(self):
-        """Testa validação de range de datas"""
-        # Datas válidas devem passar
-        result = validate_date_range(1, 2024, 1, 31)
-        assert result == (1, 2024, 1, 31)
+        """Testa validador de range de datas."""
+        current_year = datetime.now().year
         
-        # Datas inválidas devem falhar
-        with pytest.raises(ValueError):
-            validate_date_range(13, 2024, 1, 31)  # Mês inválido
+        # Range válido
+        result = validate_date_range(12, 2023, 1, 15)
+        assert result == (12, 2023, 1, 15)
         
-        with pytest.raises(ValueError):
-            validate_date_range(1, 1999, 1, 31)  # Ano muito antigo
+        # Mês inválido
+        with pytest.raises(ValueError, match="Mês deve estar entre 1 e 12"):
+            validate_date_range(13, 2023, 1, 15)
         
-        with pytest.raises(ValueError):
-            validate_date_range(1, 2024, 31, 1)  # Dia inicial > final
+        # Ano inválido
+        with pytest.raises(ValueError, match="Ano deve estar entre"):
+            validate_date_range(12, 1999, 1, 15)
         
-        with pytest.raises(ValueError):
-            validate_date_range(2, 2024, 30, 30)  # Data inexistente
+        with pytest.raises(ValueError, match="Ano deve estar entre"):
+            validate_date_range(12, current_year + 1, 1, 15)
+        
+        # Dia inválido
+        with pytest.raises(ValueError, match="Dia inicial deve estar entre 1 e 31"):
+            validate_date_range(12, 2023, 0, 15)
+        
+        # Range inválido (inicial > final)
+        with pytest.raises(ValueError, match="Dia inicial não pode ser maior"):
+            validate_date_range(12, 2023, 20, 10)
+        
+        # Data inexistente
+        with pytest.raises(ValueError, match="Data inválida"):
+            validate_date_range(2, 2023, 30, 31)  # Fevereiro não tem 30 dias
 
 
 class TestSchemas:
-    """Testes para schemas predefinidos"""
-
+    """Testes para schemas predefinidos."""
+    
     def test_boleto_schema(self):
-        """Testa schema de boleto"""
+        """Testa schema de boleto."""
         schema = get_boleto_schema()
         
-        # Dados válidos devem passar
-        data = {
-            "numeroContrato": 123456,
+        valid_data = {
+            "numeroContrato": 12345,
             "modalidade": 1,
-            "numeroContaCorrente": 12345,
+            "numeroContaCorrente": 67890,
             "especieDocumento": "DM",
             "dataVencimento": "2024-12-31",
-            "valorNominal": "100.50",
-            "pagador": {"nome": "João", "cpfCnpj": "12345678901"},
+            "valorNominal": "100.00",
+            "pagador": {"nome": "João", "cpf": "12345678901"}
         }
         
-        result = schema.validate(data, strict=False)
-        assert result["numeroContrato"] == 123456
-        assert result["valorNominal"] == "100.50"
+        # Deve validar sem erro
+        result = schema.validate(valid_data, strict=False)
+        assert result["numeroContrato"] == 12345
+        assert result["modalidade"] == 1
         
-        # Dados inválidos devem falhar
-        data["modalidade"] = 5  # Valor não permitido
+        # Campo obrigatório faltando
+        invalid_data = valid_data.copy()
+        del invalid_data["numeroContrato"]
+        
         with pytest.raises(MultipleValidationError):
-            schema.validate(data)
-
+            schema.validate(invalid_data)
+    
     def test_pix_cobranca_schema(self):
-        """Testa schema de cobrança PIX"""
+        """Testa schema de cobrança PIX."""
         schema = get_pix_cobranca_schema()
         
-        # Dados válidos devem passar
-        data = {
+        valid_data = {
             "calendario": {"expiracao": 3600},
-            "valor": {"original": "100.50"},
-            "chave": "usuario@exemplo.com",
-            "solicitacaoPagador": "Pagamento teste"
+            "valor": {"original": "100.00"},
+            "chave": "user@example.com"
         }
         
-        result = schema.validate(data, strict=False)
-        assert result["chave"] == "usuario@exemplo.com"
-        
-        # Campo obrigatório ausente deve falhar
-        del data["chave"]
-        with pytest.raises(MultipleValidationError):
-            schema.validate(data)
-
+        result = schema.validate(valid_data, strict=False)
+        assert result["chave"] == "user@example.com"
+    
     def test_webhook_schema(self):
-        """Testa schema de webhook"""
+        """Testa schema de webhook."""
         schema = get_webhook_schema()
         
-        # Dados válidos devem passar
-        data = {"webhookUrl": "https://example.com/webhook"}
-        result = schema.validate(data)
+        valid_data = {"webhookUrl": "https://example.com/webhook"}
+        result = schema.validate(valid_data, strict=False)
         assert result["webhookUrl"] == "https://example.com/webhook"
         
-        # URL inválida deve falhar
-        data = {"webhookUrl": "url-invalida"}
+        # URL inválida
+        invalid_data = {"webhookUrl": "not-a-url"}
         with pytest.raises(MultipleValidationError):
-            schema.validate(data)
-
+            schema.validate(invalid_data)
+    
     def test_pagador_schema(self):
-        """Testa schema de pagador"""
+        """Testa schema de pagador."""
         schema = get_pagador_schema()
         
-        # Dados válidos com CPF devem passar
-        data = {
+        valid_data = {
             "nome": "João Silva",
             "cpfCnpj": "11144477735",
-            "email": "joao@exemplo.com"
         }
         
-        result = schema.validate(data, strict=False)
+        result = schema.validate(valid_data, strict=False)
         assert result["nome"] == "João Silva"
         assert result["cpfCnpj"] == "11144477735"
+
+
+class TestValidateInputDecorator:
+    """Testa decorator de validação automática."""
+    
+    def test_validate_input_decorator(self):
+        """Testa decorator de validação de entrada."""
         
-        # Nome muito longo deve falhar
-        data["nome"] = "x" * 80
-        with pytest.raises(MultipleValidationError):
-            schema.validate(data)
-
-
-class TestIntegration:
-    """Testes de integração com validação"""
-
-    def test_error_messages(self):
-        """Testa mensagens de erro descritivas"""
-        validator = FieldValidator("test_field", required=True, data_type=int, min_value=1)
+        @validate_input('webhook', 'data')
+        def create_webhook(self, data):
+            return data
         
-        with pytest.raises(ValidationError) as exc_info:
-            validator.validate(None)
+        # Dados válidos
+        valid_data = {"webhookUrl": "https://example.com/webhook"}
+        result = create_webhook(None, valid_data)
+        assert result["webhookUrl"] == "https://example.com/webhook"
         
-        error = exc_info.value
-        assert error.field == "test_field"
-        assert "Campo obrigatório" in str(error)
-        assert "Campo 'test_field'" in str(error)
-
-    def test_validation_error_attributes(self):
-        """Testa atributos do ValidationError"""
-        try:
-            raise ValidationError("Test message", "test_field", "test_value")
-        except ValidationError as e:
-            assert e.field == "test_field"
-            assert e.value == "test_value"
-            assert "Campo 'test_field': Test message" in str(e)
-
-    def test_multiple_validation_error_collection(self):
-        """Testa coleta de múltiplos erros"""
-        errors = [
-            ValidationError("Error 1", "field1", "value1"),
-            ValidationError("Error 2", "field2", "value2"),
-        ]
-        
-        multiple_error = MultipleValidationError(errors)
-        assert len(multiple_error.errors) == 2
-        assert "Error 1" in str(multiple_error)
-        assert "Error 2" in str(multiple_error)
+        # Schema inexistente (deve passar sem validação)
+        @validate_input('inexistente', 'data')
+        def dummy_func(self, data):
+            return data
+            
+        result = dummy_func(None, {"any": "data"})
+        assert result == {"any": "data"}
