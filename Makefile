@@ -67,3 +67,16 @@ coverage-html: ## Gerar e abrir relatório HTML
 
 coverage-ci: ## Pipeline de CI completo
 	./scripts/ci_coverage.sh
+
+## @ Documentação
+
+docs: ## Construir documentação HTML
+	uv run sphinx-build -b html docs docs/_build/html
+
+docs-clean: ## Limpar build da documentação
+	rm -rf docs/_build
+
+docs-serve: ## Servir documentação localmente
+	cd docs/_build/html && python -m http.server 8000
+
+docs-rebuild: docs-clean docs ## Rebuild completo da documentação

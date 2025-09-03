@@ -1,4 +1,4 @@
-"""Módulo PIX do SDK Sicoob
+"""Módulo PIX do SDK Sicoob.
 
 Este módulo atua como uma ponte (thin wrapper) entre o SDK Sicoob e a
 biblioteca pypix-api, que implementa o padrão PIX do BACEN.
@@ -9,6 +9,23 @@ Arquitetura:
 
 A separação permite que a pypix-api seja reutilizada por outros bancos,
 enquanto o sicoob-sdk foca nas particularidades do Banco Sicoob.
+
+Classes:
+    PixAPI: Interface principal para operações PIX
+    SicoobPixAPICustom: Customização da pypix-api para Sicoob
+    
+Example:
+    >>> from sicoob import Sicoob
+    >>> cliente = Sicoob(client_id="123", sandbox_mode=True)
+    >>> cobranca = cliente.pix.criar_cobranca_imediata(
+    ...     txid="abcd1234567890123456789012345",
+    ...     dados={
+    ...         "calendario": {"expiracao": 3600},
+    ...         "valor": {"original": "100.50"},
+    ...         "chave": "usuario@exemplo.com"
+    ...     }
+    ... )
+    >>> print(cobranca["qrcode"])
 """
 
 from typing import Any
@@ -46,12 +63,16 @@ class PixAPI(APIClientBase):
     """
 
     def __init__(self, oauth_client, session, sandbox_mode=False):
-        """Inicializa a API PIX
+        """Inicializa a API PIX.
 
         Args:
             oauth_client: Cliente OAuth2 para autenticação
             session: Sessão HTTP (mantida por compatibilidade)
-            sandbox_mode: Habilita modo sandbox
+            sandbox_mode: Se True, habilita modo sandbox (default: False)
+            
+        Note:
+            Em modo sandbox, as operações não afetam dados reais e podem
+            usar dados fictícios para testes.
         """
         super().__init__(oauth_client, session, sandbox_mode)
 
@@ -61,16 +82,24 @@ class PixAPI(APIClientBase):
         )
 
     def __getattr__(self, name: str) -> Any:
-        """Proxy transparente para pypix-api
+        """Proxy transparente para pypix-api.
 
         Delega automaticamente qualquer método não definido
         explicitamente para a instância da pypix-api.
 
         Args:
-            name: Nome do método/atributo
-
+            name: Nome do método/atributo a ser acessado
+            
         Returns:
-            Método ou atributo da pypix-api
+            Método ou atributo da pypix-api, encapsulado com
+            tratamento de erro se for um método
+            
+        Raises:
+            AttributeError: Se o método/atributo não existe na pypix-api
+            
+        Note:
+            Métodos são automaticamente encapsulados com tratamento
+            de erro que converte exceções genéricas em PixError.
         """
         # Delega para a implementação da pypix-api
         attr = getattr(self._pix_api, name)

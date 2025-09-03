@@ -54,7 +54,7 @@ class TestAPIClientBase:
 
     def test_get_base_url_sandbox(self, api_client):
         """Testa obtenção da URL base em modo sandbox"""
-        with patch.object(SicoobConfig, 'get_sandbox_url', return_value='https://sandbox.sicoob.com'):
+        with patch.object(SicoobConfig, 'get_base_url', return_value='https://sandbox.sicoob.com'):
             url = api_client._get_base_url()
             assert url == 'https://sandbox.sicoob.com'
 
@@ -62,7 +62,7 @@ class TestAPIClientBase:
         """Testa obtenção da URL base em modo produção"""
         client = APIClientBase(mock_oauth_client, mock_session, sandbox_mode=False)
         
-        with patch.object(SicoobConfig, 'get_production_url', return_value='https://api.sicoob.com'):
+        with patch.object(SicoobConfig, 'get_base_url', return_value='https://api.sicoob.com'):
             url = client._get_base_url()
             assert url == 'https://api.sicoob.com'
 

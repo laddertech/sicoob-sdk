@@ -1,3 +1,5 @@
+from typing import Any
+
 import requests
 
 from sicoob.api_client import APIClientBase
@@ -21,7 +23,7 @@ from sicoob.validation import (
 class BoletoAPI(APIClientBase):
     """Implementação da API de Boletos do Sicoob"""
 
-    def __init__(self, oauth_client, session, sandbox_mode=False):
+    def __init__(self, oauth_client: Any, session: requests.Session, sandbox_mode: bool = False) -> None:
         """Inicializa a API de boletos.
 
         Args:

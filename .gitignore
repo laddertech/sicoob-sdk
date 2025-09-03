@@ -68,3 +68,7 @@ venv.bak/
 .devcontainer/
 .docker/
 Dockerfile.Dev
+
+# Documentation build
+docs/_build/
+docs/api/
