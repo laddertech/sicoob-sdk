@@ -36,29 +36,32 @@ class SicoobPixAPICustom(SicoobPixAPI):
         except (ValueError, AttributeError):
             error_data = {}
 
-        type_ = error_data.get("type", "")
-        title = error_data.get("title", "")
-        status = error_data.get("status", status_code)
-        detail = error_data.get("detail", "")
+        type_ = error_data.get('type', '')
+        title = error_data.get('title', '')
+        status = error_data.get('status', status_code)
+        detail = error_data.get('detail', '')
 
         # Verifica se é uma exceção de domínio específica
         if status == 404:
-            if "Cobrança" in title:
+            if 'Cobrança' in title:
                 from sicoob.exceptions import CobrancaPixNaoEncontradaError
+
                 raise CobrancaPixNaoEncontradaError(detail)
-            elif "Webhook" in title:
+            elif 'Webhook' in title:
                 from sicoob.exceptions import WebhookPixNaoEncontradoError
+
                 raise WebhookPixNaoEncontradoError(detail)
 
         # Mapeamento para exceções genéricas
-        if status == 403 or "AcessoNegado" in type_:
+        if status == 403 or 'AcessoNegado' in type_:
             raise PixAcessoNegadoException(type_, title, status, detail)
-        elif status == 400 or "ErroValidacao" in type_:
+        elif status == 400 or 'ErroValidacao' in type_:
             raise PixErroValidacaoException(type_, title, status, detail)
         elif status == 503:
             raise PixErroServicoIndisponivelException(type_, title, status, detail)
         else:
             raise PixErroDesconhecidoException(type_, title, status, detail)
+
 
 class CobrancaServices:
     def __init__(

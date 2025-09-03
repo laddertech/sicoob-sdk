@@ -1,4 +1,5 @@
 """Módulo principal do SDK Sicoob"""
+
 from pypix_api.banks.sicoob import SicoobPixAPI
 
 from .boleto import BoletoAPI

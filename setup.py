@@ -12,9 +12,19 @@ setup(
     install_requires=[
         'requests>=2.25.1',
         'python-dotenv>=0.15.0',
-        'requests-pkcs12>=1.0',
+        'requests-pkcs12>=1.25',
+        'pypix-api==0.7.0',
     ],
-    python_requires='>=3.7',
+    extras_require={
+        'dev': [
+            'pytest>=7.0.0',
+            'pytest-mock>=3.6.1',
+            'build>=1.2.2.post1',
+            'twine>=6.1.0',
+            'ruff>=0.4.2',
+        ],
+    },
+    python_requires='>=3.10',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',

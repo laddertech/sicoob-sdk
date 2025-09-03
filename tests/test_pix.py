@@ -13,6 +13,7 @@ from sicoob.exceptions import (
 def pix_client(mock_oauth_client: Mock) -> SicoobPixAPI:
     """Fixture que retorna um cliente PixAPI configurado para testes"""
     from sicoob.client import SicoobPixAPICustom
+
     return SicoobPixAPICustom(mock_oauth_client, True)
 
 
@@ -72,32 +73,30 @@ def test_consultar_cobranca_pix(pix_client: SicoobPixAPI) -> None:
         'type': 'RecursoNaoEncontrado',
         'title': 'Cobrança não encontrada',
         'status': 404,
-        'detail': f'Cobrança com txid {txid} não encontrada'
+        'detail': f'Cobrança com txid {txid} não encontrada',
     }
     pix_client.session.get.return_value = mock_response_404
     with pytest.raises(CobrancaPixNaoEncontradaError) as exc_info:
         pix_client.consultar_cob(txid)
     assert txid in str(exc_info.value)
 
+    # def test_obter_qrcode_pix(pix_client: SicoobPixAPI) -> None:
+    #     """Testa a obtenção do QR Code PIX"""
+    #     mock_response = Mock()
+    #     mock_response.json.return_value = {
+    #         'qrcode': 'base64encodedimage',
+    #         'imagemQrcode': 'base64encodedimage',
+    #     }
+    #     pix_client.session.get.return_value = mock_response
 
-# def test_obter_qrcode_pix(pix_client: SicoobPixAPI) -> None:
-#     """Testa a obtenção do QR Code PIX"""
-#     mock_response = Mock()
-#     mock_response.json.return_value = {
-#         'qrcode': 'base64encodedimage',
-#         'imagemQrcode': 'base64encodedimage',
-#     }
-#     pix_client.session.get.return_value = mock_response
+    #     txid = '123e4567-e89b-12d3-a456-426614174000'
+    #     result = pix_client.obter_qrcode_pix(txid)
 
-#     txid = '123e4567-e89b-12d3-a456-426614174000'
-#     result = pix_client.obter_qrcode_pix(txid)
-
-#     if 'qrcode' not in result:
-#         raise ValueError("Resultado deve conter 'qrcode'")
-#     if 'imagemQrcode' not in result:
-#         raise ValueError("Resultado deve conter 'imagemQrcode'")
-#     pix_client.session.get.assert_called_once()
-
+    #     if 'qrcode' not in result:
+    #         raise ValueError("Resultado deve conter 'qrcode'")
+    #     if 'imagemQrcode' not in result:
+    #         raise ValueError("Resultado deve conter 'imagemQrcode'")
+    #     pix_client.session.get.assert_called_once()
 
     def test_configurar_webhook_pix(pix_client: SicoobPixAPI) -> None:
         """Testa a configuração de webhook PIX"""
@@ -146,7 +145,7 @@ def test_consultar_webhook_pix(pix_client: SicoobPixAPI) -> None:
         'type': 'RecursoNaoEncontrado',
         'title': 'Webhook não encontrado',
         'status': 404,
-        'detail': f'Webhook para chave {chave} não encontrado'
+        'detail': f'Webhook para chave {chave} não encontrado',
     }
     pix_client.session.get.return_value = mock_response_404
     with pytest.raises(WebhookPixNaoEncontradoError) as exc_info:
@@ -206,12 +205,13 @@ def test_consultar_cobranca_pix_com_vencimento(pix_client: SicoobPixAPI) -> None
         'type': 'RecursoNaoEncontrado',
         'title': 'Cobrança não encontrada',
         'status': 404,
-        'detail': f'Cobrança com txid {txid} não encontrada'
+        'detail': f'Cobrança com txid {txid} não encontrada',
     }
     pix_client.session.get.return_value = mock_response_404
     with pytest.raises(CobrancaPixNaoEncontradaError) as exc_info:
         pix_client.consultar_cobv(txid, revisao)
     assert txid in str(exc_info.value)
+
 
 # def test_obter_qrcode_pix_com_vencimento(pix_client: SicoobPixAPI) -> None:
 #     """Testa a obtenção do QR Code de cobrança com vencimento"""
@@ -243,7 +243,7 @@ def test_excluir_webhook_pix_sucesso(pix_client: SicoobPixAPI) -> None:
     chave = '12345678901'
     result = pix_client.excluir_webhook(chave)
 
-    assert result is True, f"Esperado True, mas recebeu: {result}"
+    assert result is True, f'Esperado True, mas recebeu: {result}'
     pix_client.session.delete.assert_called_once()
 
 
@@ -257,7 +257,7 @@ def test_excluir_webhook_pix_nao_encontrado(pix_client: SicoobPixAPI) -> None:
         'type': 'RecursoNaoEncontrado',
         'title': 'Webhook não encontrado',
         'status': 404,
-        'detail': f'Webhook para chave {chave} não encontrado'
+        'detail': f'Webhook para chave {chave} não encontrado',
     }
     pix_client.session.delete.return_value = mock_response_404
 
