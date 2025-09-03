@@ -390,3 +390,141 @@ class PageSizeError(PaginationError):
     """Erro quando tamanho da página é inválido"""
     
     pass
+
+
+# Exceções de Cache
+
+
+class CacheError(SicoobError):
+    """Classe base para erros de cache"""
+    
+    def __init__(
+        self,
+        message: str,
+        key: str | None = None,
+        backend: str | None = None,
+        operation: str | None = None
+    ) -> None:
+        self.key = key
+        self.backend = backend
+        self.operation = operation
+        super().__init__(message)
+
+
+class CacheBackendError(CacheError):
+    """Erro no backend de cache"""
+    
+    def __init__(
+        self,
+        message: str,
+        backend: str | None = None,
+        original_error: Exception | None = None
+    ) -> None:
+        self.original_error = original_error
+        super().__init__(message, backend=backend)
+
+
+class CacheSerializationError(CacheError):
+    """Erro na serialização/deserialização de dados do cache"""
+    
+    def __init__(
+        self,
+        message: str,
+        key: str | None = None,
+        data_type: str | None = None,
+        original_error: Exception | None = None
+    ) -> None:
+        self.data_type = data_type
+        self.original_error = original_error
+        super().__init__(message, key=key)
+
+
+class CacheKeyError(CacheError):
+    """Erro relacionado a chaves de cache inválidas"""
+    
+    def __init__(
+        self,
+        message: str,
+        key: str | None = None,
+        reason: str | None = None
+    ) -> None:
+        self.reason = reason
+        super().__init__(message, key=key)
+
+
+class CacheConfigurationError(CacheError):
+    """Erro na configuração do sistema de cache"""
+    
+    def __init__(
+        self,
+        message: str,
+        config_key: str | None = None,
+        config_value: str | None = None
+    ) -> None:
+        self.config_key = config_key
+        self.config_value = config_value
+        super().__init__(message)
+
+
+class CacheEvictionError(CacheError):
+    """Erro durante processo de despejo de cache"""
+    
+    def __init__(
+        self,
+        message: str,
+        eviction_policy: str | None = None,
+        items_to_evict: int | None = None,
+        original_error: Exception | None = None
+    ) -> None:
+        self.eviction_policy = eviction_policy
+        self.items_to_evict = items_to_evict
+        self.original_error = original_error
+        super().__init__(message)
+
+
+class CacheFullError(CacheError):
+    """Erro quando cache está cheio e não pode aceitar novos items"""
+    
+    def __init__(
+        self,
+        message: str,
+        max_size: int | None = None,
+        current_size: int | None = None,
+        backend: str | None = None
+    ) -> None:
+        self.max_size = max_size
+        self.current_size = current_size
+        super().__init__(message, backend=backend)
+
+
+class CacheExpiredError(CacheError):
+    """Erro quando item do cache expirou"""
+    
+    def __init__(
+        self,
+        message: str,
+        key: str | None = None,
+        expiry_time: float | None = None,
+        current_time: float | None = None
+    ) -> None:
+        self.expiry_time = expiry_time
+        self.current_time = current_time
+        super().__init__(message, key=key)
+
+
+class CacheInvalidationError(CacheError):
+    """Erro durante invalidação de cache"""
+    
+    def __init__(
+        self,
+        message: str,
+        keys: list[str] | None = None,
+        tags: list[str] | None = None,
+        pattern: str | None = None,
+        original_error: Exception | None = None
+    ) -> None:
+        self.keys = keys or []
+        self.tags = tags or []
+        self.pattern = pattern
+        self.original_error = original_error
+        super().__init__(message)
