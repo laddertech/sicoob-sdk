@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from sicoob.auth import OAuth2Client
 from sicoob.cobranca import CobrancaAPI
 from sicoob.conta_corrente import ContaCorrenteAPI
+from sicoob.logging_config import get_logger
 
 
 class Sicoob:
@@ -32,6 +33,9 @@ class Sicoob:
         """
         load_dotenv()
 
+        # Inicializa logger
+        self.logger = get_logger(__name__)
+
         self.client_id = client_id or os.getenv('SICOOB_CLIENT_ID')
         self.certificado = certificado or os.getenv('SICOOB_CERTIFICADO')
         self.chave_privada = chave_privada or os.getenv('SICOOB_CHAVE_PRIVADA')
@@ -41,7 +45,25 @@ class Sicoob:
 
         # Valida credenciais mínimas
         if not self.client_id:
+            self.logger.error(
+                'Client ID não fornecido', extra={'operation': 'client_init'}
+            )
             raise ValueError('client_id é obrigatório')
+
+        # Log de inicialização
+        self.logger.info(
+            'Inicializando cliente Sicoob',
+            extra={
+                'operation': 'client_init',
+                'sandbox_mode': sandbox_mode,
+                'has_certificate': bool(certificado or certificado_pfx),
+                'auth_method': 'pfx'
+                if certificado_pfx
+                else 'pem'
+                if certificado
+                else 'env_vars',
+            },
+        )
 
         # Em modo sandbox, não é obrigatório ter certificado
         if not self.sandbox_mode:
@@ -50,6 +72,14 @@ class Sicoob:
             has_pfx = bool(certificado_pfx and senha_pfx)
 
             if not (has_pem or has_pfx):
+                self.logger.error(
+                    'Credenciais de certificado insuficientes para produção',
+                    extra={
+                        'operation': 'client_init',
+                        'has_pem': has_pem,
+                        'has_pfx': has_pfx,
+                    },
+                )
                 raise ValueError(
                     'É necessário fornecer certificado e chave privada (PEM) '
                     'ou certificado PFX e senha explicitamente'
@@ -68,12 +98,27 @@ class Sicoob:
         # para reutilização nas APIs
         self.session = self.oauth_client.session
 
+        self.logger.info(
+            'Cliente Sicoob inicializado com sucesso',
+            extra={'operation': 'client_init_complete'},
+        )
+
     def _get_token(self) -> dict[str, str]:
         """Obtém token de acesso usando OAuth2Client"""
+        self.logger.debug('Obtendo token de acesso', extra={'operation': 'get_token'})
+
         try:
             access_token = self.oauth_client.get_access_token()
+            self.logger.info(
+                'Token de acesso obtido com sucesso', extra={'operation': 'get_token'}
+            )
             return {'access_token': access_token}
         except Exception as e:
+            self.logger.error(
+                f'Falha ao obter token de acesso: {e!s}',
+                extra={'operation': 'get_token_error'},
+                exc_info=True,
+            )
             raise Exception(f'Falha ao obter token de acesso: {e!s}') from e
 
     @property

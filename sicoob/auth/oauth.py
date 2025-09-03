@@ -7,6 +7,7 @@ import requests_pkcs12
 from dotenv import load_dotenv
 
 from sicoob.constants import AUTH_URL
+from sicoob.logging_config import get_logger
 
 
 class OAuth2Client:
@@ -32,6 +33,9 @@ class OAuth2Client:
             sandbox_mode: Se True, não requer certificado (default: False)
         """
         load_dotenv()
+
+        # Inicializa logger
+        self.logger = get_logger(__name__)
 
         self.client_id = client_id or os.getenv('SICOOB_CLIENT_ID')
         self.certificado = certificado or os.getenv('SICOOB_CERTIFICADO')
@@ -85,7 +89,20 @@ class OAuth2Client:
 
         # Verifica se já existe token válido para este escopo
         if scope in self.token_cache and not self._is_token_expired(scope):
+            self.logger.debug(
+                'Token válido encontrado no cache',
+                extra={'operation': 'token_cache_hit', 'scope': scope},
+            )
             return self.token_cache[scope]['access_token']
+
+        self.logger.info(
+            'Solicitando novo token de acesso',
+            extra={
+                'operation': 'token_request',
+                'scope': scope,
+                'cached_scopes': len(self.token_cache),
+            },
+        )
 
         token_data = {
             'grant_type': 'client_credentials',
@@ -93,16 +110,42 @@ class OAuth2Client:
             'scope': scope,
         }
 
-        response = self.session.post(self.token_url, data=token_data)
-        response.raise_for_status()
+        try:
+            response = self.session.post(self.token_url, data=token_data)
+            response.raise_for_status()
 
-        token_info = response.json()
-        token_info['expires_at'] = time.time() + token_info['expires_in']
+            token_info = response.json()
+            token_info['expires_at'] = time.time() + token_info['expires_in']
 
-        # Armazena o token no cache por escopo
-        self.token_cache[scope] = token_info
+            # Armazena o token no cache por escopo
+            self.token_cache[scope] = token_info
 
-        return token_info['access_token']
+            self.logger.info(
+                'Token de acesso obtido com sucesso',
+                extra={
+                    'operation': 'token_success',
+                    'scope': scope,
+                    'expires_in': token_info['expires_in'],
+                    'token_type': token_info.get('token_type', 'Bearer'),
+                },
+            )
+
+            return token_info['access_token']
+
+        except requests.exceptions.RequestException as e:
+            self.logger.error(
+                f'Falha na requisição de token: {e!s}',
+                extra={'operation': 'token_request_error', 'scope': scope},
+                exc_info=True,
+            )
+            raise
+        except Exception as e:
+            self.logger.error(
+                f'Erro inesperado ao obter token: {e!s}',
+                extra={'operation': 'token_error', 'scope': scope},
+                exc_info=True,
+            )
+            raise
 
     def _is_token_expired(self, scope: str) -> bool:
         """Verifica se o token para o escopo especificado expirou"""
