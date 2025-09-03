@@ -359,3 +359,34 @@ class TimeoutConfigurationError(ResilienceError):
     """Erro na configuração de timeout"""
     
     pass
+
+
+# Exceções de Paginação
+
+
+class PaginationError(SicoobError):
+    """Classe base para erros de paginação"""
+    
+    def __init__(
+        self,
+        message: str,
+        page: int | None = None,
+        page_size: int | None = None,
+        total_pages: int | None = None
+    ) -> None:
+        self.page = page
+        self.page_size = page_size
+        self.total_pages = total_pages
+        super().__init__(message)
+
+
+class InvalidPageError(PaginationError):
+    """Erro quando página solicitada é inválida"""
+    
+    pass
+
+
+class PageSizeError(PaginationError):
+    """Erro quando tamanho da página é inválido"""
+    
+    pass
