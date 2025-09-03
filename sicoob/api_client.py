@@ -5,7 +5,8 @@ import uuid
 import requests
 
 from sicoob.auth import OAuth2Client
-from sicoob.constants import BASE_URL, SANDBOX_URL
+from sicoob.config import SicoobConfig
+from sicoob.constants import BASE_URL, SANDBOX_URL  # Para compatibilidade
 from sicoob.exceptions import RespostaInvalidaError
 from sicoob.logging_config import get_logger, SicoobLogger
 
@@ -32,14 +33,15 @@ class APIClientBase:
         self.logger = get_logger(__name__)
 
     def _get_base_url(self) -> str:
-        """Retorna a URL base conforme modo de operação"""
-        return SANDBOX_URL if self.sandbox_mode else BASE_URL
+        """Retorna a URL base conforme configuração do ambiente"""
+        return SicoobConfig.get_base_url()
 
     def _get_headers(self, scope: str) -> dict[str, str]:
         """Retorna headers padrão com token de acesso"""
-        if self.sandbox_mode:
-            import os
+        config = SicoobConfig.get_current_config()
 
+        if SicoobConfig.is_sandbox():
+            import os
             from dotenv import load_dotenv
 
             load_dotenv()
@@ -50,15 +52,22 @@ class APIClientBase:
             token = self.oauth_client.get_access_token(scope)
             client_id = self.oauth_client.client_id
 
-        return {
+        base_headers = {
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
-            'User-Agent': 'SicoobAPIClient/1.0',
+            'User-Agent': f'SicoobAPIClient/1.0 ({config.environment.value})',
             'client_id': client_id,
         }
+
+        # Adiciona headers customizados do ambiente
+        custom_headers = SicoobConfig.get_custom_headers()
+        if custom_headers:
+            base_headers.update(custom_headers)
+
+        return base_headers
 
     def _validate_response(self, response: requests.Response) -> dict:
         """Valida se a resposta da API é um JSON válido
@@ -110,6 +119,13 @@ class APIClientBase:
         if 'headers' in kwargs:
             headers.update(kwargs['headers'])
         kwargs['headers'] = headers
+
+        # Configurações de timeout e SSL baseadas no ambiente
+        config = SicoobConfig.get_current_config()
+        if 'timeout' not in kwargs:
+            kwargs['timeout'] = config.timeout
+        if 'verify' not in kwargs:
+            kwargs['verify'] = config.verify_ssl
 
         # Log da requisição
         SicoobLogger.log_http_request(

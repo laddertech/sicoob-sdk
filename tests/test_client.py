@@ -28,6 +28,7 @@ def test_client_init_pfx() -> None:
             client_id='test_id',
             certificado_pfx='test_cert.pfx',
             senha_pfx='test_password',
+            environment='production',  # Força production para requer certificado
         )
 
         if client.client_id != 'test_id':

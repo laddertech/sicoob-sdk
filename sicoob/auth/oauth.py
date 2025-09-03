@@ -6,7 +6,8 @@ import requests
 import requests_pkcs12
 from dotenv import load_dotenv
 
-from sicoob.constants import AUTH_URL
+from sicoob.config import SicoobConfig
+from sicoob.constants import AUTH_URL  # Para compatibilidade
 from sicoob.logging_config import get_logger
 
 
@@ -43,13 +44,13 @@ class OAuth2Client:
         self.certificado_pfx = certificado_pfx or os.getenv('SICOOB_CERTIFICADO_PFX')
         self.senha_pfx = senha_pfx or os.getenv('SICOOB_SENHA_PFX')
 
-        self.token_url = AUTH_URL  # URL de autenticação OAuth2
+        self.token_url = SicoobConfig.get_auth_url()  # URL de autenticação OAuth2
         self.token_cache = {}  # Cache de tokens por escopo
         self.session = requests.Session()
 
         self.sandbox_mode = sandbox_mode
 
-        if not self.sandbox_mode:
+        if SicoobConfig.requires_certificate():
             if self.certificado_pfx and self.senha_pfx:
                 # Configura autenticação com PFX
                 pkcs12_adapter = requests_pkcs12.Pkcs12Adapter(

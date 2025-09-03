@@ -1,12 +1,13 @@
 import os
-from typing import BinaryIO
+from typing import BinaryIO, Optional
 
 from dotenv import load_dotenv
 
 from sicoob.auth import OAuth2Client
 from sicoob.cobranca import CobrancaAPI
+from sicoob.config import SicoobConfig, Environment
 from sicoob.conta_corrente import ContaCorrenteAPI
-from sicoob.logging_config import get_logger
+from sicoob.logging_config import get_logger, SicoobLogger
 
 
 class Sicoob:
@@ -19,7 +20,8 @@ class Sicoob:
         chave_privada: str | None = None,
         certificado_pfx: str | bytes | BinaryIO | None = None,
         senha_pfx: str | None = None,
-        sandbox_mode: bool = False,
+        sandbox_mode: bool | None = None,
+        environment: str | Environment | None = None,
     ) -> None:
         """Inicializa o cliente com credenciais
 
@@ -29,9 +31,44 @@ class Sicoob:
             chave_privada: Path para a chave privada PEM (opcional)
             certificado_pfx: Path (str), bytes ou arquivo aberto (BinaryIO) do certificado PFX (opcional)
             senha_pfx: Senha do certificado PFX (opcional)
-            sandbox_mode: Modo sandbox (default: False)
+            sandbox_mode: Modo sandbox (DEPRECATED: use environment)
+            environment: Ambiente (development, test, staging, production, sandbox)
         """
         load_dotenv()
+
+        # Configura ambiente se fornecido
+        if environment is not None:
+            if isinstance(environment, str):
+                env_mapping = {
+                    'dev': Environment.DEVELOPMENT,
+                    'development': Environment.DEVELOPMENT,
+                    'test': Environment.TEST,
+                    'staging': Environment.STAGING,
+                    'prod': Environment.PRODUCTION,
+                    'production': Environment.PRODUCTION,
+                    'sandbox': Environment.SANDBOX,
+                }
+                env = env_mapping.get(environment.lower(), Environment.PRODUCTION)
+            else:
+                env = environment
+            SicoobConfig.set_environment(env)
+
+        # Para compatibilidade com sandbox_mode (DEPRECATED)
+        elif sandbox_mode is not None:
+            if sandbox_mode:
+                SicoobConfig.set_environment(Environment.SANDBOX)
+            else:
+                SicoobConfig.set_environment(Environment.PRODUCTION)
+
+        # Configuração automática de logging baseada no ambiente
+        config = SicoobConfig.get_current_config()
+        SicoobLogger.configure(
+            level=config.log_level,
+            format_type=config.log_format,
+            log_requests=config.log_requests,
+            log_responses=config.log_responses,
+            force_reconfigure=True,
+        )
 
         # Inicializa logger
         self.logger = get_logger(__name__)
@@ -41,7 +78,10 @@ class Sicoob:
         self.chave_privada = chave_privada or os.getenv('SICOOB_CHAVE_PRIVADA')
         self.certificado_pfx = certificado_pfx or os.getenv('SICOOB_CERTIFICADO_PFX')
         self.senha_pfx = senha_pfx or os.getenv('SICOOB_SENHA_PFX')
-        self.sandbox_mode = sandbox_mode
+
+        # Mantém sandbox_mode para compatibilidade
+        self.sandbox_mode = SicoobConfig.is_sandbox()
+        self.environment = config.environment
 
         # Valida credenciais mínimas
         if not self.client_id:
@@ -55,18 +95,20 @@ class Sicoob:
             'Inicializando cliente Sicoob',
             extra={
                 'operation': 'client_init',
-                'sandbox_mode': sandbox_mode,
+                'environment': config.environment.value,
+                'sandbox_mode': self.sandbox_mode,  # Para compatibilidade
                 'has_certificate': bool(certificado or certificado_pfx),
                 'auth_method': 'pfx'
                 if certificado_pfx
                 else 'pem'
                 if certificado
                 else 'env_vars',
+                'requires_certificate': config.require_certificate,
             },
         )
 
-        # Em modo sandbox, não é obrigatório ter certificado
-        if not self.sandbox_mode:
+        # Validação de certificado baseada na configuração do ambiente
+        if config.require_certificate:
             # Verifica se pelo menos um conjunto de credenciais foi fornecido explicitamente
             has_pem = bool(certificado and chave_privada)
             has_pfx = bool(certificado_pfx and senha_pfx)
