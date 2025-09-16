@@ -10,12 +10,14 @@ from typing import Any, Dict, List, Optional, Union, Callable
 class ValidationError(Exception):
     """Erro de validação de dados"""
 
-    def __init__(self, message: str, field: Optional[str] = None, value: Any = None):
+    def __init__(
+        self, message: str, field: Optional[str] = None, value: Any = None
+    ) -> None:
         super().__init__(message)
         self.field = field
         self.value = value
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.field:
             return f"Campo '{self.field}': {super().__str__()}"
         return super().__str__()
@@ -24,7 +26,7 @@ class ValidationError(Exception):
 class MultipleValidationError(Exception):
     """Múltiplos erros de validação"""
 
-    def __init__(self, errors: List[ValidationError]):
+    def __init__(self, errors: List[ValidationError]) -> None:
         self.errors = errors
         messages = [str(error) for error in errors]
         super().__init__(f'Múltiplos erros de validação: {"; ".join(messages)}')
@@ -125,7 +127,7 @@ class FieldValidator:
 class DataValidator:
     """Validador para estruturas de dados completas"""
 
-    def __init__(self, name: str, fields: List[FieldValidator]):
+    def __init__(self, name: str, fields: List[FieldValidator]) -> None:
         self.name = name
         self.fields = {field.name: field for field in fields}
 
@@ -202,7 +204,7 @@ def validate_cpf(value: str) -> str:
         raise ValueError('CPF inválido (sequência)')
 
     # Algoritmo de validação do CPF
-    def calc_digit(cpf_partial):
+    def calc_digit(cpf_partial: str) -> str:
         total = 0
         for i, digit in enumerate(cpf_partial):
             total += int(digit) * (len(cpf_partial) + 1 - i)
@@ -231,7 +233,7 @@ def validate_cnpj(value: str) -> str:
         raise ValueError('CNPJ inválido (sequência)')
 
     # Algoritmo de validação do CNPJ
-    def calc_digit(cnpj_partial, weights):
+    def calc_digit(cnpj_partial: str, weights: List[int]) -> str:
         total = sum(
             int(digit) * weight
             for digit, weight in zip(cnpj_partial, weights, strict=False)
@@ -467,11 +469,13 @@ def get_pagador_schema() -> DataValidator:
 
 
 # Decorator para validação automática
-def validate_input(schema_name: str, field_name: str = None):
+def validate_input(
+    schema_name: str, field_name: Optional[str] = None
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator para validar entrada de métodos automaticamente"""
 
-    def decorator(func):
-        def wrapper(*args, **kwargs):
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             # Mapeia schemas disponíveis
             schemas = {
                 'boleto': get_boleto_schema(),
