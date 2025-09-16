@@ -43,12 +43,12 @@ try:
     )
     from .async_boleto import AsyncBoletoAPI
     from .async_pix import AsyncPixAPI
-    
+
     _async_available = True
-    
+
     __all_async__ = [
         'AsyncSicoob',
-        'AsyncAPIClient', 
+        'AsyncAPIClient',
         'AsyncContaCorrenteAPI',
         'AsyncCobrancaAPI',
         'AsyncBoletoAPI',
@@ -59,7 +59,7 @@ try:
         'get_default_async_cache',
         'async_cached',
     ]
-    
+
 except ImportError:
     # Dependências assíncronas não instaladas
     _async_available = False
@@ -103,5 +103,7 @@ def get_async_info() -> dict:
     return {
         'available': _async_available,
         'classes': __all_async__ if _async_available else [],
-        'required_packages': ['aiohttp>=3.8.0', 'aiofiles>=24.0.0'] if not _async_available else []
+        'required_packages': ['aiohttp>=3.8.0', 'aiofiles>=24.0.0']
+        if not _async_available
+        else [],
     }

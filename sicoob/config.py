@@ -37,7 +37,7 @@ class EnvironmentConfig:
     read_timeout: int = 30  # Timeout para leitura
     max_retries: int = 3
     retry_backoff_factor: float = 1.0
-    
+
     # Timeouts específicos por operação
     pix_timeout: int = 45  # PIX pode ser mais lento
     boleto_timeout: int = 60  # Emissão de boleto pode demorar

@@ -9,7 +9,7 @@ class SicoobError(Exception):
         message: str,
         code: int | None = None,
         mensagens: list[dict] | None = None,
-        response: requests.Response | None = None
+        response: requests.Response | None = None,
     ) -> None:
         self.message = message
         self.code = code
@@ -34,7 +34,11 @@ class RespostaInvalidaError(SicoobError):
 
     def __init__(self, message: str, response: requests.Response | None = None) -> None:
         self.response = response
-        status_code = response.status_code if response and hasattr(response, 'status_code') else None
+        status_code = (
+            response.status_code
+            if response and hasattr(response, 'status_code')
+            else None
+        )
         super().__init__(message, status_code)
         self.message = message  # Definindo explicitamente após super().__init__
 
@@ -329,18 +333,18 @@ class QrCodePixError(PixError):
 
 class ResilienceError(SicoobError):
     """Classe base para erros de resiliência"""
-    
+
     pass
 
 
 class MaxRetriesExceededError(ResilienceError):
     """Erro quando o número máximo de tentativas é excedido"""
-    
+
     def __init__(
         self,
         message: str,
         attempts: int | None = None,
-        last_error: Exception | None = None
+        last_error: Exception | None = None,
     ) -> None:
         self.attempts = attempts
         self.last_error = last_error
@@ -349,12 +353,12 @@ class MaxRetriesExceededError(ResilienceError):
 
 class CircuitBreakerOpenError(ResilienceError):
     """Erro quando circuit breaker está aberto"""
-    
+
     def __init__(
         self,
         message: str,
         failure_count: int | None = None,
-        recovery_timeout: float | None = None
+        recovery_timeout: float | None = None,
     ) -> None:
         self.failure_count = failure_count
         self.recovery_timeout = recovery_timeout
@@ -363,7 +367,7 @@ class CircuitBreakerOpenError(ResilienceError):
 
 class TimeoutConfigurationError(ResilienceError):
     """Erro na configuração de timeout"""
-    
+
     pass
 
 
@@ -372,13 +376,13 @@ class TimeoutConfigurationError(ResilienceError):
 
 class PaginationError(SicoobError):
     """Classe base para erros de paginação"""
-    
+
     def __init__(
         self,
         message: str,
         page: int | None = None,
         page_size: int | None = None,
-        total_pages: int | None = None
+        total_pages: int | None = None,
     ) -> None:
         self.page = page
         self.page_size = page_size
@@ -388,13 +392,13 @@ class PaginationError(SicoobError):
 
 class InvalidPageError(PaginationError):
     """Erro quando página solicitada é inválida"""
-    
+
     pass
 
 
 class PageSizeError(PaginationError):
     """Erro quando tamanho da página é inválido"""
-    
+
     pass
 
 
@@ -403,13 +407,13 @@ class PageSizeError(PaginationError):
 
 class CacheError(SicoobError):
     """Classe base para erros de cache"""
-    
+
     def __init__(
         self,
         message: str,
         key: str | None = None,
         backend: str | None = None,
-        operation: str | None = None
+        operation: str | None = None,
     ) -> None:
         self.key = key
         self.backend = backend
@@ -419,12 +423,12 @@ class CacheError(SicoobError):
 
 class CacheBackendError(CacheError):
     """Erro no backend de cache"""
-    
+
     def __init__(
         self,
         message: str,
         backend: str | None = None,
-        original_error: Exception | None = None
+        original_error: Exception | None = None,
     ) -> None:
         self.original_error = original_error
         super().__init__(message, backend=backend)
@@ -432,13 +436,13 @@ class CacheBackendError(CacheError):
 
 class CacheSerializationError(CacheError):
     """Erro na serialização/deserialização de dados do cache"""
-    
+
     def __init__(
         self,
         message: str,
         key: str | None = None,
         data_type: str | None = None,
-        original_error: Exception | None = None
+        original_error: Exception | None = None,
     ) -> None:
         self.data_type = data_type
         self.original_error = original_error
@@ -447,12 +451,9 @@ class CacheSerializationError(CacheError):
 
 class CacheKeyError(CacheError):
     """Erro relacionado a chaves de cache inválidas"""
-    
+
     def __init__(
-        self,
-        message: str,
-        key: str | None = None,
-        reason: str | None = None
+        self, message: str, key: str | None = None, reason: str | None = None
     ) -> None:
         self.reason = reason
         super().__init__(message, key=key)
@@ -460,12 +461,12 @@ class CacheKeyError(CacheError):
 
 class CacheConfigurationError(CacheError):
     """Erro na configuração do sistema de cache"""
-    
+
     def __init__(
         self,
         message: str,
         config_key: str | None = None,
-        config_value: str | None = None
+        config_value: str | None = None,
     ) -> None:
         self.config_key = config_key
         self.config_value = config_value
@@ -474,13 +475,13 @@ class CacheConfigurationError(CacheError):
 
 class CacheEvictionError(CacheError):
     """Erro durante processo de despejo de cache"""
-    
+
     def __init__(
         self,
         message: str,
         eviction_policy: str | None = None,
         items_to_evict: int | None = None,
-        original_error: Exception | None = None
+        original_error: Exception | None = None,
     ) -> None:
         self.eviction_policy = eviction_policy
         self.items_to_evict = items_to_evict
@@ -490,13 +491,13 @@ class CacheEvictionError(CacheError):
 
 class CacheFullError(CacheError):
     """Erro quando cache está cheio e não pode aceitar novos items"""
-    
+
     def __init__(
         self,
         message: str,
         max_size: int | None = None,
         current_size: int | None = None,
-        backend: str | None = None
+        backend: str | None = None,
     ) -> None:
         self.max_size = max_size
         self.current_size = current_size
@@ -505,13 +506,13 @@ class CacheFullError(CacheError):
 
 class CacheExpiredError(CacheError):
     """Erro quando item do cache expirou"""
-    
+
     def __init__(
         self,
         message: str,
         key: str | None = None,
         expiry_time: float | None = None,
-        current_time: float | None = None
+        current_time: float | None = None,
     ) -> None:
         self.expiry_time = expiry_time
         self.current_time = current_time
@@ -520,14 +521,14 @@ class CacheExpiredError(CacheError):
 
 class CacheInvalidationError(CacheError):
     """Erro durante invalidação de cache"""
-    
+
     def __init__(
         self,
         message: str,
         keys: list[str] | None = None,
         tags: list[str] | None = None,
         pattern: str | None = None,
-        original_error: Exception | None = None
+        original_error: Exception | None = None,
     ) -> None:
         self.keys = keys or []
         self.tags = tags or []

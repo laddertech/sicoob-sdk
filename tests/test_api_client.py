@@ -30,7 +30,9 @@ class TestAPIClientBase:
     @pytest.fixture
     def api_client(self, mock_oauth_client, mock_session):
         """Fixture para APIClientBase"""
-        return APIClientBase(mock_oauth_client, mock_session, sandbox_mode=True, enable_resilience=False)
+        return APIClientBase(
+            mock_oauth_client, mock_session, sandbox_mode=True, enable_resilience=False
+        )
 
     def test_init_sandbox_mode(self, mock_oauth_client, mock_session):
         """Testa inicialização em modo sandbox"""
@@ -48,7 +50,9 @@ class TestAPIClientBase:
 
     def test_get_base_url_sandbox(self, api_client):
         """Testa obtenção da URL base em modo sandbox"""
-        with patch.object(SicoobConfig, 'get_base_url', return_value='https://sandbox.sicoob.com'):
+        with patch.object(
+            SicoobConfig, 'get_base_url', return_value='https://sandbox.sicoob.com'
+        ):
             url = api_client._get_base_url()
             assert url == 'https://sandbox.sicoob.com'
 
@@ -56,7 +60,9 @@ class TestAPIClientBase:
         """Testa obtenção da URL base em modo produção"""
         client = APIClientBase(mock_oauth_client, mock_session, sandbox_mode=False)
 
-        with patch.object(SicoobConfig, 'get_base_url', return_value='https://api.sicoob.com'):
+        with patch.object(
+            SicoobConfig, 'get_base_url', return_value='https://api.sicoob.com'
+        ):
             url = client._get_base_url()
             assert url == 'https://api.sicoob.com'
 
@@ -94,7 +100,9 @@ class TestAPIClientBase:
         mock_response.json.return_value = {'success': True}
         api_client.session.request.return_value = mock_response
 
-        response = api_client._make_request('GET', 'https://api.test.com/endpoint', 'test_scope')
+        response = api_client._make_request(
+            'GET', 'https://api.test.com/endpoint', 'test_scope'
+        )
 
         assert response == mock_response
         api_client.session.request.assert_called_once()
@@ -106,7 +114,9 @@ class TestAPIClientBase:
         api_client.session.request.return_value = mock_response
 
         data = {'key': 'value'}
-        response = api_client._make_request('POST', 'https://api.test.com/endpoint', 'test_scope', json=data)
+        response = api_client._make_request(
+            'POST', 'https://api.test.com/endpoint', 'test_scope', json=data
+        )
 
         assert response == mock_response
         api_client.session.request.assert_called_once()
@@ -120,7 +130,9 @@ class TestAPIClientBase:
         api_client.session.request.return_value = mock_response
 
         params = {'param1': 'value1', 'param2': 'value2'}
-        api_client._make_request('GET', 'https://api.test.com/endpoint', 'test_scope', params=params)
+        api_client._make_request(
+            'GET', 'https://api.test.com/endpoint', 'test_scope', params=params
+        )
 
         call_args = api_client.session.request.call_args
         assert call_args[1]['params'] == params
@@ -134,7 +146,9 @@ class TestAPIClientBase:
         api_client.session.request.return_value = mock_response
 
         with patch('sicoob.api_client.SicoobLogger') as mock_logger:
-            api_client._make_request('GET', 'https://api.test.com/endpoint', 'test_scope')
+            api_client._make_request(
+                'GET', 'https://api.test.com/endpoint', 'test_scope'
+            )
 
             # Verifica se logou a requisição
             mock_logger.log_http_request.assert_called_once()
@@ -150,7 +164,9 @@ class TestAPIClientBase:
         api_client.session.request.return_value = mock_response
 
         with patch('sicoob.api_client.SicoobLogger') as mock_logger:
-            api_client._make_request('GET', 'https://api.test.com/endpoint', 'test_scope')
+            api_client._make_request(
+                'GET', 'https://api.test.com/endpoint', 'test_scope'
+            )
 
             # Verifica se logou a resposta
             mock_logger.log_http_response.assert_called_once()
@@ -171,20 +187,21 @@ class TestAPIClientBase:
         """Testa validação de resposta com JSON inválido"""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.side_effect = json.JSONDecodeError('Invalid JSON', 'response', 0)
+        mock_response.json.side_effect = json.JSONDecodeError(
+            'Invalid JSON', 'response', 0
+        )
         mock_response.text = 'Invalid response'
         mock_response.raise_for_status.return_value = None
         mock_response.headers = {'Content-Type': 'application/json'}
         # Remove mock detection
-        delattr(mock_response, '_mock_return_value') if hasattr(mock_response, '_mock_return_value') else None
+        delattr(mock_response, '_mock_return_value') if hasattr(
+            mock_response, '_mock_return_value'
+        ) else None
 
         with pytest.raises(RespostaInvalidaError) as exc_info:
             api_client._validate_response(mock_response)
 
         assert 'JSON válido' in str(exc_info.value)
-
-
-
 
     def test_oauth_token_caching(self, api_client):
         """Testa se os tokens OAuth são reutilizados"""
@@ -217,20 +234,32 @@ class TestAPIClientBase:
     def test_request_timeout_handling(self, mock_oauth_client, mock_session):
         """Testa tratamento de timeout de requisição"""
         # Cria cliente sem resiliência para testar erros brutos
-        api_client = APIClientBase(mock_oauth_client, mock_session, enable_resilience=False)
-        api_client.session.request.side_effect = requests.exceptions.Timeout('Request timeout')
+        api_client = APIClientBase(
+            mock_oauth_client, mock_session, enable_resilience=False
+        )
+        api_client.session.request.side_effect = requests.exceptions.Timeout(
+            'Request timeout'
+        )
 
         with pytest.raises(requests.exceptions.Timeout):
-            api_client._make_request('GET', 'https://api.test.com/endpoint', 'test_scope')
+            api_client._make_request(
+                'GET', 'https://api.test.com/endpoint', 'test_scope'
+            )
 
     def test_connection_error_handling(self, mock_oauth_client, mock_session):
         """Testa tratamento de erro de conexão"""
         # Cria cliente sem resiliência para testar erros brutos
-        api_client = APIClientBase(mock_oauth_client, mock_session, enable_resilience=False)
-        api_client.session.request.side_effect = requests.exceptions.ConnectionError('Connection failed')
+        api_client = APIClientBase(
+            mock_oauth_client, mock_session, enable_resilience=False
+        )
+        api_client.session.request.side_effect = requests.exceptions.ConnectionError(
+            'Connection failed'
+        )
 
         with pytest.raises(requests.exceptions.ConnectionError):
-            api_client._make_request('GET', 'https://api.test.com/endpoint', 'test_scope')
+            api_client._make_request(
+                'GET', 'https://api.test.com/endpoint', 'test_scope'
+            )
 
     def test_custom_user_agent(self, api_client):
         """Testa se o User-Agent customizado é usado"""

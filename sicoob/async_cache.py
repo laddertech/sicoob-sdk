@@ -39,6 +39,7 @@ from typing import Any, TypeVar
 
 try:
     import aiofiles
+
     HAS_AIOFILES = True
 except ImportError:
     HAS_AIOFILES = False
@@ -175,6 +176,7 @@ class AsyncDiskCacheBackend(AsyncCacheBackend):
                     def read_cache():
                         with open(cache_path, 'rb') as f:
                             return pickle.load(f)
+
                     entry = await asyncio.to_thread(read_cache)
                     entry.mark_accessed()
                     return entry
@@ -202,6 +204,7 @@ class AsyncDiskCacheBackend(AsyncCacheBackend):
                     def write_cache():
                         with open(cache_path, 'wb') as f:
                             f.write(data)
+
                     await asyncio.to_thread(write_cache)
             except Exception as e:
                 raise CacheBackendError(

@@ -5,6 +5,7 @@
 
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
@@ -49,7 +50,7 @@ autodoc_default_options = {
     'member-order': 'bysource',
     'special-members': '__init__',
     'undoc-members': True,
-    'exclude-members': '__weakref__'
+    'exclude-members': '__weakref__',
 }
 
 # Autosummary settings
@@ -57,17 +58,17 @@ autosummary_generate = True
 autosummary_imported_members = True
 
 # Type hints settings
-autodoc_typehints = "description"
-autodoc_typehints_description_target = "documented"
+autodoc_typehints = 'description'
+autodoc_typehints_description_target = 'documented'
 
 # MyST settings
 myst_enable_extensions = [
-    "deflist",
-    "fieldlist", 
-    "colon_fence",
-    "smartquotes",
-    "strikethrough",
-    "tasklist",
+    'deflist',
+    'fieldlist',
+    'colon_fence',
+    'smartquotes',
+    'strikethrough',
+    'tasklist',
 ]
 
 templates_path = ['_templates']
@@ -95,7 +96,7 @@ html_theme_options = {
     'sticky_navigation': True,
     'navigation_depth': 4,
     'includehidden': True,
-    'titles_only': False
+    'titles_only': False,
 }
 
 # Intersphinx mapping

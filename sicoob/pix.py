@@ -13,7 +13,7 @@ enquanto o sicoob-sdk foca nas particularidades do Banco Sicoob.
 Classes:
     PixAPI: Interface principal para operações PIX
     SicoobPixAPICustom: Customização da pypix-api para Sicoob
-    
+
 Example:
     >>> from sicoob import Sicoob
     >>> cliente = Sicoob(client_id="123", sandbox_mode=True)
@@ -75,7 +75,7 @@ class PixAPI(APIClientBase):
             oauth_client: Cliente OAuth2 para autenticação
             session: Sessão HTTP (mantida por compatibilidade)
             sandbox_mode: Se True, habilita modo sandbox (default: False)
-            
+
         Note:
             Em modo sandbox, as operações não afetam dados reais e podem
             usar dados fictícios para testes.
@@ -95,14 +95,14 @@ class PixAPI(APIClientBase):
 
         Args:
             name: Nome do método/atributo a ser acessado
-            
+
         Returns:
             Método ou atributo da pypix-api, encapsulado com
             tratamento de erro se for um método
-            
+
         Raises:
             AttributeError: Se o método/atributo não existe na pypix-api
-            
+
         Note:
             Métodos são automaticamente encapsulados com tratamento
             de erro que converte exceções genéricas em PixError.
@@ -283,25 +283,25 @@ class PixAPI(APIClientBase):
             Dados do lote
         """
         return self.consultar_lotecobv(id_lote)
-    
+
     # Métodos paginados para grandes volumes
-    
+
     def listar_cobrancas_paginado(
         self,
         inicio: str,
         fim: str,
         pagination: PaginationConfig | None = None,
-        **filtros
+        **filtros,
     ) -> Generator[dict, None, None]:
         """Lista cobranças PIX com paginação automática
-        
+
         Este método retorna um iterator que busca páginas sob demanda,
         permitindo processar grandes volumes de cobranças sem carregar
         tudo na memória de uma vez.
 
         Args:
             inicio: Data/hora inicial (ISO 8601)
-            fim: Data/hora final (ISO 8601) 
+            fim: Data/hora final (ISO 8601)
             pagination: Configuração de paginação (opcional)
             **filtros: Filtros adicionais
 
@@ -312,54 +312,54 @@ class PixAPI(APIClientBase):
             >>> config = PaginationConfig(page_size=50, max_pages=10)
             >>> for cobranca in cliente.pix.listar_cobrancas_paginado(
             ...     inicio="2024-01-01T00:00:00Z",
-            ...     fim="2024-01-31T23:59:59Z", 
+            ...     fim="2024-01-31T23:59:59Z",
             ...     pagination=config
             ... ):
             ...     print(f"TXID: {cobranca['txid']}")
-        
+
         Note:
             Use este método para grandes volumes de dados. Para consultas
             simples, use listar_cobrancas() que retorna uma página única.
         """
         if pagination is None:
             pagination = PaginationConfig(page_size=100)
-        
+
         def fetch_page(params):
             # Usa o método existente para buscar dados
             return self.listar_cobrancas(
                 params.get('inicio', inicio),
                 params.get('fim', fim),
-                **{k: v for k, v in params.items() if k not in ['inicio', 'fim']}
+                **{k: v for k, v in params.items() if k not in ['inicio', 'fim']},
             )
-        
+
         strategy = SicoobPaginationStrategy()
         initial_params = {'inicio': inicio, 'fim': fim, **filtros}
-        
+
         iterator = PaginatedIterator(
             fetch_function=fetch_page,
             initial_params=initial_params,
             config=pagination,
-            strategy=strategy
+            strategy=strategy,
         )
-        
+
         yield from iterator
-    
+
     def listar_cobrancas_por_paginas(
         self,
         inicio: str,
         fim: str,
         pagination: PaginationConfig | None = None,
-        **filtros
+        **filtros,
     ) -> Generator[Any, None, None]:
         """Lista cobranças PIX retornando páginas completas
-        
+
         Similar ao listar_cobrancas_paginado(), mas retorna PagedResponse
         com metadados de paginação para cada página.
 
         Args:
             inicio: Data/hora inicial (ISO 8601)
             fim: Data/hora final (ISO 8601)
-            pagination: Configuração de paginação (opcional) 
+            pagination: Configuração de paginação (opcional)
             **filtros: Filtros adicionais
 
         Yields:
@@ -376,51 +376,49 @@ class PixAPI(APIClientBase):
         """
         if pagination is None:
             pagination = PaginationConfig(page_size=100)
-        
+
         def fetch_page(params):
             raw_response = self.listar_cobrancas(
                 params.get('inicio', inicio),
                 params.get('fim', fim),
-                **{k: v for k, v in params.items() if k not in ['inicio', 'fim']}
+                **{k: v for k, v in params.items() if k not in ['inicio', 'fim']},
             )
-            
+
             # Converte resposta em PagedResponse
             return paginated_response_from_data(
-                raw_response,
-                page=params.get('page', 1),
-                page_size=pagination.page_size
+                raw_response, page=params.get('page', 1), page_size=pagination.page_size
             )
-        
+
         strategy = SicoobPaginationStrategy()
         initial_params = {'inicio': inicio, 'fim': fim, 'page': 1, **filtros}
-        
+
         current_params = initial_params.copy()
         page_num = 1
-        
+
         while True:
             try:
                 page_response = fetch_page(current_params)
-                
+
                 if not page_response.items:
                     break
-                    
+
                 yield page_response
-                
+
                 if not page_response.page_info.has_next:
                     break
-                    
+
                 if pagination.max_pages and page_num >= pagination.max_pages:
                     break
-                
+
                 # Próxima página
                 page_num += 1
                 current_params['page'] = page_num
-                
+
             except Exception as e:
                 self.logger.error(
-                    f"Erro ao buscar página {page_num}: {e}",
+                    f'Erro ao buscar página {page_num}: {e}',
                     extra={'operation': 'pix_pagination_error', 'page': page_num},
-                    exc_info=True
+                    exc_info=True,
                 )
                 break
 

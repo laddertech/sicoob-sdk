@@ -36,7 +36,7 @@ class APIClientBase:
         self.oauth_client = oauth_client
         self.enable_resilience = enable_resilience
         self.logger = get_logger(__name__)
-        
+
         # Configura sessão com ou sem resiliência
         if enable_resilience and not hasattr(session, '_sicoob_resilient'):
             # Aplica resiliência à sessão existente se não foi aplicada ainda
@@ -45,15 +45,14 @@ class APIClientBase:
                 base_delay=1.0,
                 max_delay=30.0,
                 backoff_factor=2.0,
-                jitter=True
+                jitter=True,
             )
-            
+
             # Cria nova sessão resiliente mantendo configurações da original
             resilient_session = create_resilient_session(
-                retry_config=config,
-                timeout=getattr(session, 'timeout', (10, 30))
+                retry_config=config, timeout=getattr(session, 'timeout', (10, 30))
             )
-            
+
             # Copia configurações importantes da sessão original
             if hasattr(session, 'headers'):
                 resilient_session.headers.update(session.headers)
@@ -63,7 +62,7 @@ class APIClientBase:
                 resilient_session.verify = session.verify
             if hasattr(session, 'cert'):
                 resilient_session.cert = session.cert
-                
+
             # Marca como configurada para evitar reconfiguração
             resilient_session._sicoob_resilient = True
             self.session = resilient_session
@@ -73,27 +72,27 @@ class APIClientBase:
     def _get_base_url(self) -> str:
         """Retorna a URL base conforme configuração do ambiente"""
         return SicoobConfig.get_base_url()
-    
-    def _get_timeout_for_operation(self, operation: str = "default") -> tuple[int, int]:
+
+    def _get_timeout_for_operation(self, operation: str = 'default') -> tuple[int, int]:
         """Obtém timeout específico para tipo de operação
-        
+
         Args:
             operation: Tipo de operação (pix, boleto, extrato, default)
-            
+
         Returns:
             Tupla (connect_timeout, read_timeout) em segundos
         """
         config = SicoobConfig.get_current_config()
-        
+
         # Timeouts específicos por operação
         timeout_map = {
-            "pix": (config.connect_timeout, config.pix_timeout),
-            "boleto": (config.connect_timeout, config.boleto_timeout), 
-            "extrato": (config.connect_timeout, config.extrato_timeout),
-            "default": (config.connect_timeout, config.read_timeout),
+            'pix': (config.connect_timeout, config.pix_timeout),
+            'boleto': (config.connect_timeout, config.boleto_timeout),
+            'extrato': (config.connect_timeout, config.extrato_timeout),
+            'default': (config.connect_timeout, config.read_timeout),
         }
-        
-        return timeout_map.get(operation, timeout_map["default"])
+
+        return timeout_map.get(operation, timeout_map['default'])
 
     def _get_headers(self, scope: str) -> dict[str, str]:
         """Retorna headers padrão com token de acesso"""
@@ -159,7 +158,7 @@ class APIClientBase:
             ) from e
 
     def _make_request(
-        self, method: str, url: str, scope: str, operation: str = "default", **kwargs
+        self, method: str, url: str, scope: str, operation: str = 'default', **kwargs
     ) -> requests.Response:
         """Faz uma requisição HTTP com logging integrado
 

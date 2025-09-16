@@ -232,7 +232,10 @@ def validate_cnpj(value: str) -> str:
 
     # Algoritmo de validação do CNPJ
     def calc_digit(cnpj_partial, weights):
-        total = sum(int(digit) * weight for digit, weight in zip(cnpj_partial, weights, strict=False))
+        total = sum(
+            int(digit) * weight
+            for digit, weight in zip(cnpj_partial, weights, strict=False)
+        )
         remainder = total % 11
         return '0' if remainder < 2 else str(11 - remainder)
 

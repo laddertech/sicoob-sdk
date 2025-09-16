@@ -4,7 +4,7 @@
 
 import pytest
 
+
 def test_placeholder():
     """Teste placeholder para manter estrutura do arquivo"""
     assert True
-
