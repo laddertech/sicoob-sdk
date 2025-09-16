@@ -35,6 +35,7 @@ from typing import Any
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
 
 from sicoob.auth import OAuth2Client
+from sicoob.config import SicoobConfig
 from sicoob.exceptions import SicoobError
 
 

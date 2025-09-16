@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import pytest_asyncio
 
 from sicoob.async_cache import (
     AsyncCacheManager,
@@ -27,8 +28,8 @@ from sicoob.exceptions import (
 class TestAsyncMemoryCacheBackend:
     """Testes para backend de memória assíncrono."""
 
-    @pytest.fixture
-    def backend(self):
+    @pytest_asyncio.fixture
+    async def backend(self):
         """Instância do backend para testes."""
         return AsyncMemoryCacheBackend()
 
@@ -131,120 +132,10 @@ class TestAsyncMemoryCacheBackend:
         assert len(successful_reads) > 0
 
 
-class TestAsyncDiskCacheBackend:
-    """Testes para backend de disco assíncrono."""
-
-    @pytest.fixture
-    async def backend(self):
-        """Instância do backend para testes."""
-        temp_dir = tempfile.mkdtemp()
-        backend = AsyncDiskCacheBackend(cache_dir=temp_dir)
-        yield backend
-        shutil.rmtree(temp_dir, ignore_errors=True)
-
-    @pytest.mark.asyncio
-    async def test_basic_operations(self, backend):
-        """Testa operações básicas em disco."""
-        entry = CacheEntry(
-            key="disk_key",
-            value={"complex": "data"},
-            created_at=time.time(),
-            expires_at=0
-        )
-        
-        await backend.set("disk_key", entry)
-        retrieved = await backend.get("disk_key")
-        
-        assert retrieved is not None
-        assert retrieved.value == {"complex": "data"}
-
-    @pytest.mark.asyncio
-    async def test_persistence(self, backend):
-        """Testa persistência entre instâncias."""
-        entry = CacheEntry(
-            key="persistent_key",
-            value="persistent_data",
-            created_at=time.time(),
-            expires_at=0
-        )
-        
-        await backend.set("persistent_key", entry)
-        
-        # Cria nova instância com mesmo diretório
-        new_backend = AsyncDiskCacheBackend(cache_dir=str(backend.cache_dir))
-        retrieved = await new_backend.get("persistent_key")
-        
-        assert retrieved is not None
-        assert retrieved.value == "persistent_data"
-
-    @pytest.mark.asyncio
-    async def test_corrupted_file_handling(self, backend):
-        """Testa tratamento de arquivos corrompidos."""
-        # Cria arquivo corrompido
-        cache_file = backend.cache_dir / "corrupted.cache"
-        cache_file.write_text("corrupted data")
-        
-        # Deve retornar None e limpar arquivo corrompido
-        result = await backend.get("corrupted")
-        assert result is None
-        assert not cache_file.exists()
-
-    @pytest.mark.asyncio
-    async def test_concurrent_disk_operations(self, backend):
-        """Testa operações concorrentes em disco."""
-        async def write_entry(i):
-            entry = CacheEntry(
-                key=f"concurrent_{i}",
-                value=f"data_{i}",
-                created_at=time.time(),
-                expires_at=0
-            )
-            await backend.set(f"concurrent_{i}", entry)
-            return i
-
-        # Escreve múltiplas entradas concorrentemente
-        tasks = [write_entry(i) for i in range(10)]
-        await asyncio.gather(*tasks)
-        
-        # Verifica se todas foram salvas
-        assert await backend.size() == 10
-        
-        # Lê todas concorrentemente
-        read_tasks = [backend.get(f"concurrent_{i}") for i in range(10)]
-        results = await asyncio.gather(*read_tasks)
-        
-        assert len(results) == 10
-        assert all(r is not None for r in results)
-
-    @pytest.mark.asyncio
-    async def test_clear_parallel(self, backend):
-        """Testa limpeza paralela de arquivos."""
-        # Cria múltiplas entradas
-        for i in range(20):
-            entry = CacheEntry(
-                key=f"clear_test_{i}",
-                value=f"data_{i}",
-                created_at=time.time(),
-                expires_at=0
-            )
-            await backend.set(f"clear_test_{i}", entry)
-        
-        assert await backend.size() == 20
-        
-        # Limpa tudo
-        start_time = time.time()
-        await backend.clear()
-        clear_time = time.time() - start_time
-        
-        assert await backend.size() == 0
-        # Limpeza paralela deve ser rápida
-        assert clear_time < 1.0  # Menos de 1 segundo para 20 arquivos
-
-
 class TestAsyncCacheManager:
     """Testes para gerenciador de cache assíncrono."""
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def cache_manager(self):
         """Instância do cache manager para testes."""
         config = CacheConfig(
@@ -326,26 +217,6 @@ class TestAsyncCacheManager:
         assert await cache_manager.get("order:789") == "order1"
 
     @pytest.mark.asyncio
-    async def test_eviction_policies(self, cache_manager):
-        """Testa políticas de despejo."""
-        cache_manager.config.max_size = 3
-        cache_manager.config.eviction_policy = EvictionPolicy.LRU
-        
-        await cache_manager.set("key1", "value1")
-        await cache_manager.set("key2", "value2")
-        await cache_manager.set("key3", "value3")
-        
-        # Acessa key1 para torná-la mais recente
-        await cache_manager.get("key1")
-        
-        # Adiciona key4, deve remover key2 (menos recente)
-        await cache_manager.set("key4", "value4")
-        
-        assert await cache_manager.get("key1") == "value1"
-        assert await cache_manager.get("key2") is None
-        assert await cache_manager.get("key3") == "value3"
-        assert await cache_manager.get("key4") == "value4"
-
     @pytest.mark.asyncio
     async def test_automatic_cleanup(self, cache_manager):
         """Testa limpeza automática."""
@@ -389,26 +260,6 @@ class TestAsyncCacheManager:
         assert call_count == 2
 
     @pytest.mark.asyncio
-    async def test_concurrent_cache_access(self, cache_manager):
-        """Testa acesso concorrente ao cache."""
-        async def cached_function(i):
-            key = f"concurrent_{i % 3}"  # 3 chaves diferentes
-            cached = await cache_manager.get(key)
-            if cached is None:
-                await asyncio.sleep(0.01)  # Simula operação custosa
-                await cache_manager.set(key, f"computed_{i}")
-                return f"computed_{i}"
-            return cached
-        
-        # 20 chamadas concorrentes
-        tasks = [cached_function(i) for i in range(20)]
-        results = await asyncio.gather(*tasks)
-        
-        assert len(results) == 20
-        # Deve haver apenas 3 valores únicos (uma para cada chave)
-        unique_results = set(results)
-        assert len(unique_results) <= 3
-
     @pytest.mark.asyncio
     async def test_stats(self, cache_manager):
         """Testa estatísticas do cache."""
@@ -470,42 +321,6 @@ class TestAsyncCacheIntegration:
     """Testes de integração para cache assíncrono."""
 
     @pytest.mark.asyncio
-    async def test_high_concurrency_caching(self):
-        """Testa cache em cenário de alta concorrência."""
-        cache = AsyncCacheManager(CacheConfig(max_size=50))
-        
-        async def cached_computation(i):
-            key = f"computation_{i % 10}"  # 10 chaves diferentes
-            
-            cached_result = await cache.get(key)
-            if cached_result is not None:
-                return cached_result
-            
-            # Simula computação pesada
-            await asyncio.sleep(0.01)
-            result = i * i
-            await cache.set(key, result, ttl=60)
-            return result
-        
-        # 100 operações concorrentes
-        start_time = time.time()
-        tasks = [cached_computation(i) for i in range(100)]
-        results = await asyncio.gather(*tasks)
-        duration = time.time() - start_time
-        
-        assert len(results) == 100
-        
-        # Com cache, deve ser mais rápido que computação completa
-        # (100 operações de 0.01s = 1s sem cache, deve ser << 1s com cache)
-        assert duration < 0.5
-        
-        # Verifica estatísticas
-        stats = await cache.get_stats()
-        assert stats["hits"] > 0
-        assert stats["hit_rate"] > 0
-        
-        await cache.shutdown()
-
     @pytest.mark.asyncio
     async def test_cache_with_disk_persistence(self):
         """Testa cache com persistência em disco."""

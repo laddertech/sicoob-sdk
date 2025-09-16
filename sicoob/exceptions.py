@@ -5,10 +5,15 @@ class SicoobError(Exception):
     """Classe base para todas as exceções do pacote Sicoob"""
 
     def __init__(
-        self, message: str, code: int | None = None, mensagens: list[dict] | None = None
+        self,
+        message: str,
+        code: int | None = None,
+        mensagens: list[dict] | None = None,
+        response: requests.Response | None = None
     ) -> None:
         self.message = message
         self.code = code
+        self.response = response
         self.mensagens = mensagens or [
             {'mensagem': message, 'codigo': str(code) if code else '0'}
         ]
@@ -29,8 +34,9 @@ class RespostaInvalidaError(SicoobError):
 
     def __init__(self, message: str, response: requests.Response | None = None) -> None:
         self.response = response
-        self.message = message  # Definindo explicitamente
-        super().__init__(message, response.status_code if response else None)
+        status_code = response.status_code if response and hasattr(response, 'status_code') else None
+        super().__init__(message, status_code)
+        self.message = message  # Definindo explicitamente após super().__init__
 
 
 class BoletoError(SicoobError):

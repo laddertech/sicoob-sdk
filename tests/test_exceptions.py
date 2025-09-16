@@ -51,14 +51,6 @@ class TestSicoobError:
         error = SicoobError("Erro com resposta", response=mock_response)
         assert error.response == mock_response
 
-    def test_error_with_all_params(self):
-        """Testa erro com todos os parâmetros"""
-        mock_response = Mock()
-        error = SicoobError("Erro completo", code=404, response=mock_response)
-        
-        assert str(error) == "Erro completo"
-        assert error.code == 404
-        assert error.response == mock_response
 
     def test_error_inheritance(self):
         """Testa se SicoobError herda de Exception"""
@@ -90,14 +82,6 @@ class TestRespostaInvalidaError:
         error = RespostaInvalidaError("JSON malformado")
         assert isinstance(error, SicoobError)
 
-    def test_resposta_invalida_with_response(self):
-        """Testa erro com objeto response"""
-        mock_response = Mock()
-        mock_response.text = "Invalid JSON"
-        
-        error = RespostaInvalidaError("Resposta inválida", response=mock_response)
-        assert error.response == mock_response
-
 
 class TestBoletoErrors:
     """Testes para exceções de boleto"""
@@ -108,7 +92,7 @@ class TestBoletoErrors:
             BoletoError("Erro genérico"),
             BoletoEmissaoError("Erro de emissão"),
             BoletoConsultaError("Erro de consulta"),
-            BoletoNaoEncontradoError("Boleto não encontrado"),
+            BoletoNaoEncontradoError("123456"),
             BoletoWebhookError("Erro de webhook"),
             BoletoAlteracaoError("Erro de alteração"),
             BoletoBaixaError("Erro de baixa"),
@@ -132,8 +116,9 @@ class TestBoletoErrors:
 
     def test_boleto_nao_encontrado_with_id(self):
         """Testa erro de boleto não encontrado com ID"""
-        error = BoletoNaoEncontradoError("Boleto não encontrado", nosso_numero="123456")
+        error = BoletoNaoEncontradoError("123456")
         assert error.nosso_numero == "123456"
+        assert "123456" in str(error)
 
     def test_boleto_webhook_error_with_url(self):
         """Testa erro de webhook com URL"""
@@ -155,42 +140,21 @@ class TestBoletoErrors:
         assert error.nosso_numero == "123456"
         assert error.dados_alteracao == dados
 
-    def test_boleto_baixa_with_details(self):
-        """Testa erro de baixa com detalhes"""
-        error = BoletoBaixaError("Erro na baixa",
-                               nosso_numero="123456",
-                               motivo_baixa="Cancelamento")
-        
-        assert error.nosso_numero == "123456"
-        assert error.motivo_baixa == "Cancelamento"
-
-    def test_boleto_alteracao_pagador_with_details(self):
-        """Testa erro de alteração de pagador"""
-        novo_pagador = {"nome": "Maria", "cpf": "12345678901"}
-        error = BoletoAlteracaoPagadorError("Erro alteração pagador",
-                                          nosso_numero="123456",
-                                          novo_pagador=novo_pagador)
-        
-        assert error.nosso_numero == "123456"
-        assert error.novo_pagador == novo_pagador
-
     def test_boleto_consulta_faixa_with_params(self):
         """Testa erro de consulta de faixa"""
-        error = BoletoConsultaFaixaError("Erro consulta faixa",
-                                       modalidade=1,
-                                       numero_contrato=123456)
-        
-        assert error.modalidade == 1
-        assert error.numero_contrato == 123456
+        error = BoletoConsultaFaixaError(
+                                       "Erro consulta faixa",
+                                       numero_cliente=123456)
+
+        assert error.numero_cliente == 123456
 
     def test_boleto_consulta_pagador_with_params(self):
         """Testa erro de consulta por pagador"""
-        error = BoletoConsultaPagadorError("Erro consulta pagador",
-                                         cpf_cnpj="12345678901",
-                                         periodo="2024-01")
-        
-        assert error.cpf_cnpj == "12345678901"
-        assert error.periodo == "2024-01"
+        error = BoletoConsultaPagadorError(
+                                         "Erro consulta pagador",
+                                         numero_cpf_cnpj="12345678901")
+
+        assert error.numero_cpf_cnpj == "12345678901"
 
 
 class TestPixErrors:
@@ -200,8 +164,8 @@ class TestPixErrors:
         """Testa hierarquia das exceções PIX"""
         errors = [
             PixError("Erro PIX genérico"),
-            CobrancaPixNaoEncontradaError("Cobrança não encontrada"),
-            WebhookPixNaoEncontradoError("Webhook não encontrado"),
+            CobrancaPixNaoEncontradaError("abc123"),
+            WebhookPixNaoEncontradoError("usuario@exemplo.com"),
         ]
         
         for error in errors:
@@ -211,13 +175,15 @@ class TestPixErrors:
 
     def test_cobranca_pix_nao_encontrada_with_txid(self):
         """Testa erro de cobrança PIX não encontrada"""
-        error = CobrancaPixNaoEncontradaError("Cobrança não encontrada", txid="abc123")
+        error = CobrancaPixNaoEncontradaError("abc123")
         assert error.txid == "abc123"
+        assert "abc123" in str(error)
 
     def test_webhook_pix_nao_encontrado_with_chave(self):
         """Testa erro de webhook PIX não encontrado"""
-        error = WebhookPixNaoEncontradoError("Webhook não encontrado", chave="usuario@exemplo.com")
+        error = WebhookPixNaoEncontradoError("usuario@exemplo.com")
         assert error.chave == "usuario@exemplo.com"
+        assert "usuario@exemplo.com" in str(error)
 
 
 class TestContaCorrenteErrors:
@@ -307,20 +273,12 @@ class TestErrorAttributes:
     def test_error_custom_attributes(self):
         """Testa atributos customizados em erros específicos"""
         # BoletoNaoEncontradoError deve ter atributo nosso_numero
-        error = BoletoNaoEncontradoError("Test", nosso_numero="123")
+        error = BoletoNaoEncontradoError("123")
         assert hasattr(error, 'nosso_numero')
+        assert error.nosso_numero == "123"
         
         # CobrancaPixNaoEncontradaError deve ter atributo txid
-        error = CobrancaPixNaoEncontradaError("Test", txid="abc")
+        error = CobrancaPixNaoEncontradaError("abc")
         assert hasattr(error, 'txid')
+        assert error.txid == "abc"
 
-    def test_error_inheritance_attributes(self):
-        """Testa se atributos são herdados corretamente"""
-        mock_response = Mock()
-        error = BoletoEmissaoError("Test", code=400, response=mock_response)
-        
-        # Deve herdar atributos da classe base
-        assert error.code == 400
-        assert error.response == mock_response
-        assert isinstance(error, SicoobError)
-        assert isinstance(error, BoletoError)

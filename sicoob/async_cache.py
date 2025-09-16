@@ -37,7 +37,11 @@ from functools import wraps
 from pathlib import Path
 from typing import Any, TypeVar
 
-import aiofiles
+try:
+    import aiofiles
+    HAS_AIOFILES = True
+except ImportError:
+    HAS_AIOFILES = False
 
 from sicoob.cache import CacheConfig, CacheEntry, CacheMetrics, EvictionPolicy
 from sicoob.exceptions import (
@@ -90,7 +94,7 @@ class AsyncMemoryCacheBackend(AsyncCacheBackend):
 
     def __init__(self):
         self._cache: dict[str, CacheEntry] = {}
-        self._lock = asyncio.RLock()
+        self._lock = asyncio.Lock()
 
     async def get(self, key: str) -> CacheEntry | None:
         """Obtém entrada do cache."""
@@ -160,9 +164,18 @@ class AsyncDiskCacheBackend(AsyncCacheBackend):
                 return None
 
             try:
-                async with aiofiles.open(cache_path, 'rb') as f:
-                    data = await f.read()
-                    entry = pickle.loads(data)
+                if HAS_AIOFILES:
+                    async with aiofiles.open(cache_path, 'rb') as f:
+                        data = await f.read()
+                        entry = pickle.loads(data)
+                        entry.mark_accessed()
+                        return entry
+                else:
+                    # Fallback para operações síncronas
+                    def read_cache():
+                        with open(cache_path, 'rb') as f:
+                            return pickle.load(f)
+                    entry = await asyncio.to_thread(read_cache)
                     entry.mark_accessed()
                     return entry
             except Exception:
@@ -181,8 +194,15 @@ class AsyncDiskCacheBackend(AsyncCacheBackend):
 
             try:
                 data = pickle.dumps(entry)
-                async with aiofiles.open(cache_path, 'wb') as f:
-                    await f.write(data)
+                if HAS_AIOFILES:
+                    async with aiofiles.open(cache_path, 'wb') as f:
+                        await f.write(data)
+                else:
+                    # Fallback para operações síncronas
+                    def write_cache():
+                        with open(cache_path, 'wb') as f:
+                            f.write(data)
+                    await asyncio.to_thread(write_cache)
             except Exception as e:
                 raise CacheBackendError(
                     f'Erro ao salvar no cache de disco: {e!s}',
