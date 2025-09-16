@@ -109,13 +109,13 @@ class AsyncAPIClient:
 
     def _get_base_url(self) -> str:
         """Retorna a URL base conforme configuração do ambiente."""
-        if self._sandbox_mode:
+        if self.sandbox_mode:
             return 'https://api.sicoob.com.br/prd'  # URL de sandbox
         return 'https://api.sicoob.com.br/prd'  # URL de produção
 
     def _get_headers(self, scope: str) -> dict[str, str]:
         """Retorna headers padrão com token de acesso."""
-        token = self._oauth_client.get_access_token(scope)
+        token = self.oauth_client.get_access_token(scope)
 
         return {
             'Authorization': f'Bearer {token}',

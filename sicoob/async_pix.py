@@ -81,8 +81,7 @@ class AsyncPixAPI:
             
         except Exception as e:
             raise PixError(
-                f'Erro ao criar cobrança PIX: {e!s}',
-                txid=txid
+                f'Erro ao criar cobrança PIX: {e!s}'
             ) from e
             
     async def consultar_cobranca_imediata(
@@ -119,8 +118,7 @@ class AsyncPixAPI:
             if "404" in str(e) or "não encontrada" in str(e).lower():
                 raise CobrancaPixNaoEncontradaError(txid) from e
             raise PixError(
-                f'Erro ao consultar cobrança PIX: {e!s}',
-                txid=txid
+                f'Erro ao consultar cobrança PIX: {e!s}'
             ) from e
             
     async def listar_cobrancas(

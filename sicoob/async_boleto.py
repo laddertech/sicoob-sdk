@@ -27,7 +27,7 @@ from datetime import datetime, date
 
 from sicoob.async_client import AsyncAPIClient
 from sicoob.exceptions import BoletoError, BoletoNaoEncontradoError
-from sicoob.validation import validate_cpf_cnpj
+from sicoob.validation import validate_cpf, validate_cnpj
 
 
 class AsyncBoletoAPI:
@@ -79,8 +79,7 @@ class AsyncBoletoAPI:
             
         except Exception as e:
             raise BoletoError(
-                f'Erro ao emitir boleto: {e!s}',
-                dados_boleto=dados
+                f'Erro ao emitir boleto: {e!s}'
             ) from e
             
     async def consultar_boleto(
@@ -115,8 +114,7 @@ class AsyncBoletoAPI:
             if "404" in str(e) or "não encontrado" in str(e).lower():
                 raise BoletoNaoEncontradoError(nosso_numero) from e
             raise BoletoError(
-                f'Erro ao consultar boleto: {e!s}',
-                nosso_numero=nosso_numero
+                f'Erro ao consultar boleto: {e!s}'
             ) from e
             
     async def listar_boletos(
@@ -174,7 +172,12 @@ class AsyncBoletoAPI:
             Lista de boletos do pagador
         """
         # Valida CPF/CNPJ
-        cpf_cnpj_limpo = validate_cpf_cnpj(cpf_cnpj)
+        import re
+        cpf_cnpj_limpo = re.sub(r'[^\\d]', '', cpf_cnpj)
+        if len(cpf_cnpj_limpo) == 11:
+            cpf_cnpj_limpo = validate_cpf(cpf_cnpj)
+        else:
+            cpf_cnpj_limpo = validate_cnpj(cpf_cnpj)
         
         base_url = self.api_client._get_base_url()
         url = f"{base_url}/cobranca-bancaria/boleto/pagador"
