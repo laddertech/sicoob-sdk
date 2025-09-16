@@ -29,13 +29,13 @@ clean: ## Limpar builds anteriores
 ## @ Atualiza versão do pacote
 
 bump-patch: ## Incrementar versão (patch)
-	python scripts/bump_version.py patch
+	uv run python scripts/bump_version.py patch
 
 bump-minor: ## Incrementar versão (minor)
-	python scripts/bump_version.py minor
+	uv run python scripts/bump_version.py minor
 
 bump-major: ## Incrementar versão (major)
-	python scripts/bump_version.py major
+	uv run python scripts/bump_version.py major
 
 ## @ Verifica e formata código
 
