@@ -23,8 +23,8 @@ Example:
 """
 
 import asyncio
-from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
+from typing import Any
 
 from sicoob.async_client import AsyncAPIClient, gather_with_concurrency
 from sicoob.exceptions import (
@@ -47,8 +47,8 @@ class AsyncPixAPI:
         self.api_client = api_client
 
     async def criar_cobranca_imediata(
-        self, txid: str, dados: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, txid: str, dados: dict[str, Any]
+    ) -> dict[str, Any]:
         """Cria cobrança PIX imediata de forma assíncrona.
 
         Args:
@@ -77,7 +77,7 @@ class AsyncPixAPI:
         except Exception as e:
             raise PixError(f'Erro ao criar cobrança PIX: {e!s}') from e
 
-    async def consultar_cobranca_imediata(self, txid: str) -> Dict[str, Any]:
+    async def consultar_cobranca_imediata(self, txid: str) -> dict[str, Any]:
         """Consulta cobrança PIX imediata de forma assíncrona.
 
         Args:
@@ -107,7 +107,7 @@ class AsyncPixAPI:
 
     async def listar_cobrancas(
         self, inicio: str, fim: str, **filtros
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Lista cobranças PIX em período de forma assíncrona.
 
         Args:
@@ -128,8 +128,8 @@ class AsyncPixAPI:
         )
 
     async def criar_cobranca_com_vencimento(
-        self, txid: str, dados: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, txid: str, dados: dict[str, Any]
+    ) -> dict[str, Any]:
         """Cria cobrança PIX com vencimento de forma assíncrona.
 
         Args:
@@ -151,7 +151,7 @@ class AsyncPixAPI:
 
     async def consultar_cobranca_com_vencimento(
         self, txid: str, revisao: int = 0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Consulta cobrança PIX com vencimento de forma assíncrona.
 
         Args:
@@ -173,7 +173,7 @@ class AsyncPixAPI:
             'GET', url, scope='cobv.read', params=params
         )
 
-    async def cadastrar_webhook(self, chave: str, url_webhook: str) -> Dict[str, Any]:
+    async def cadastrar_webhook(self, chave: str, url_webhook: str) -> dict[str, Any]:
         """Cadastra webhook PIX de forma assíncrona.
 
         Args:
@@ -195,7 +195,7 @@ class AsyncPixAPI:
             'PUT', url, scope='webhook.write', json=dados
         )
 
-    async def consultar_webhook(self, chave: str) -> Dict[str, Any]:
+    async def consultar_webhook(self, chave: str) -> dict[str, Any]:
         """Consulta webhook PIX de forma assíncrona.
 
         Args:
@@ -218,7 +218,7 @@ class AsyncPixAPI:
                 raise WebhookPixNaoEncontradoError(chave) from e
             raise PixError(f'Erro ao consultar webhook: {e!s}') from e
 
-    async def excluir_webhook(self, chave: str) -> Dict[str, Any]:
+    async def excluir_webhook(self, chave: str) -> dict[str, Any]:
         """Exclui webhook PIX de forma assíncrona.
 
         Args:
@@ -233,8 +233,8 @@ class AsyncPixAPI:
         return await self.api_client._make_request('DELETE', url, scope='webhook.write')
 
     async def criar_lote_cobranca(
-        self, id_lote: int, dados: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, id_lote: int, dados: dict[str, Any]
+    ) -> dict[str, Any]:
         """Cria lote de cobranças PIX de forma assíncrona.
 
         Args:
@@ -251,7 +251,7 @@ class AsyncPixAPI:
             'PUT', url, scope='lotecobv.write', json=dados
         )
 
-    async def consultar_lote_cobranca(self, id_lote: int) -> Dict[str, Any]:
+    async def consultar_lote_cobranca(self, id_lote: int) -> dict[str, Any]:
         """Consulta lote de cobranças PIX de forma assíncrona.
 
         Args:
@@ -268,8 +268,8 @@ class AsyncPixAPI:
     # Métodos otimizados para operações em lote
 
     async def criar_cobrancas_lote(
-        self, cobrancas: List[Tuple[str, Dict[str, Any]]], max_concorrencia: int = 10
-    ) -> List[Dict[str, Any]]:
+        self, cobrancas: list[tuple[str, dict[str, Any]]], max_concorrencia: int = 10
+    ) -> list[dict[str, Any]]:
         """Cria múltiplas cobranças PIX de forma concorrente.
 
         Args:
@@ -291,8 +291,8 @@ class AsyncPixAPI:
         return await gather_with_concurrency(tasks, max_concorrencia)
 
     async def consultar_cobrancas_lote(
-        self, txids: List[str], max_concorrencia: int = 10
-    ) -> List[Dict[str, Any]]:
+        self, txids: list[str], max_concorrencia: int = 10
+    ) -> list[dict[str, Any]]:
         """Consulta múltiplas cobranças PIX de forma concorrente.
 
         Args:
@@ -314,9 +314,9 @@ class AsyncPixAPI:
         self,
         data_inicio: datetime,
         data_fim: datetime,
-        status_filtro: Optional[str] = None,
+        status_filtro: str | None = None,
         max_concorrencia: int = 5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Processa todas as cobranças de um período de forma otimizada.
 
         Args:
@@ -384,7 +384,7 @@ class AsyncPixAPI:
 
     async def monitorar_cobrancas_tempo_real(
         self,
-        chaves_pix: List[str],
+        chaves_pix: list[str],
         intervalo_segundos: int = 30,
         callback_cobranca=None,
     ):
@@ -482,8 +482,8 @@ class AsyncPixAPI:
                 await asyncio.sleep(intervalo_segundos)
 
     async def gerar_relatorio_performance(
-        self, txids: List[str], max_concorrencia: int = 10
-    ) -> Dict[str, Any]:
+        self, txids: list[str], max_concorrencia: int = 10
+    ) -> dict[str, Any]:
         """Gera relatório de performance para lista de TXIDs.
 
         Args:

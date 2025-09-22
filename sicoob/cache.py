@@ -31,30 +31,25 @@ Example:
     ...     return api.consultar_boleto(convenio, nosso_numero)
 """
 
+import builtins
 import hashlib
-import json
 import pickle
 import threading
 import time
 import zlib
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, TypeVar, Union
+from typing import Any, TypeVar
 from weakref import WeakSet
 
 from sicoob.exceptions import (
-    CacheBackendError,
     CacheConfigurationError,
     CacheError,
-    CacheEvictionError,
-    CacheExpiredError,
-    CacheFullError,
     CacheInvalidationError,
-    CacheKeyError,
-    CacheSerializationError,
 )
 from sicoob.logging_config import get_logger
 
@@ -101,7 +96,7 @@ class CacheConfig:
     eviction_policy: EvictionPolicy = EvictionPolicy.LRU
     enable_compression: bool = False
     compression_threshold: int = 1024  # 1KB
-    persist_path: Optional[str] = None
+    persist_path: str | None = None
     cleanup_interval: int = 60  # 1 minuto
     enable_metrics: bool = True
     thread_safe: bool = True
@@ -172,7 +167,7 @@ class CacheBackend(ABC):
     """Interface para backends de cache"""
 
     @abstractmethod
-    def get(self, key: str) -> Optional[CacheEntry]:
+    def get(self, key: str) -> CacheEntry | None:
         """Obtém entrada do cache"""
         pass
 
@@ -192,7 +187,7 @@ class CacheBackend(ABC):
         pass
 
     @abstractmethod
-    def keys(self) -> List[str]:
+    def keys(self) -> list[str]:
         """Lista todas as chaves"""
         pass
 
@@ -206,7 +201,7 @@ class MemoryCacheBackend(CacheBackend):
     """Backend de cache em memória"""
 
     def __init__(self, thread_safe: bool = True):
-        self._cache: Dict[str, CacheEntry] = {}
+        self._cache: dict[str, CacheEntry] = {}
         self._lock = threading.RLock() if thread_safe else None
 
     def _with_lock(self, func):
@@ -216,7 +211,7 @@ class MemoryCacheBackend(CacheBackend):
                 return func()
         return func()
 
-    def get(self, key: str) -> Optional[CacheEntry]:
+    def get(self, key: str) -> CacheEntry | None:
         def _get():
             return self._cache.get(key)
 
@@ -240,7 +235,7 @@ class MemoryCacheBackend(CacheBackend):
 
         self._with_lock(_clear)
 
-    def keys(self) -> List[str]:
+    def keys(self) -> list[str]:
         def _keys():
             return list(self._cache.keys())
 
@@ -274,7 +269,7 @@ class DiskCacheBackend(CacheBackend):
                 return func()
         return func()
 
-    def get(self, key: str) -> Optional[CacheEntry]:
+    def get(self, key: str) -> CacheEntry | None:
         def _get():
             path = self._key_to_path(key)
             if not path.exists():
@@ -318,7 +313,7 @@ class DiskCacheBackend(CacheBackend):
 
         self._with_lock(_clear)
 
-    def keys(self) -> List[str]:
+    def keys(self) -> list[str]:
         """Nota: Não conseguimos recuperar chaves originais do disco facilmente"""
 
         def _keys():
@@ -363,7 +358,7 @@ class CacheManager:
             self._start_cleanup_thread()
 
         # Observadores para invalidação
-        self._invalidation_patterns: Dict[str, Set[str]] = {}
+        self._invalidation_patterns: dict[str, set[str]] = {}
         self._observers: WeakSet = WeakSet()
 
     def _start_cleanup_thread(self):
@@ -436,7 +431,7 @@ class CacheManager:
             else:
                 break
 
-    def _select_eviction_key(self) -> Optional[str]:
+    def _select_eviction_key(self) -> str | None:
         """Seleciona chave para remoção baseada na política"""
         keys = self.memory_backend.keys()
         if not keys:
@@ -496,7 +491,7 @@ class CacheManager:
 
         return keys[0]  # Fallback
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Obtém valor do cache"""
         # Primeiro tenta memória
         entry = self.memory_backend.get(key)
@@ -533,8 +528,8 @@ class CacheManager:
         self,
         key: str,
         value: Any,
-        ttl: Optional[int] = None,
-        tags: Optional[List[str]] = None,
+        ttl: int | None = None,
+        tags: list[str] | None = None,
     ) -> None:
         """Define valor no cache"""
         ttl = ttl if ttl is not None else self.config.default_ttl
@@ -666,7 +661,7 @@ class CacheManager:
 
         return removed_count
 
-    def invalidate_by_keys(self, keys: List[str]) -> int:
+    def invalidate_by_keys(self, keys: list[str]) -> int:
         """Invalida múltiplas chaves específicas"""
         removed_count = 0
 
@@ -779,11 +774,11 @@ class CacheManager:
 
         return removed_count
 
-    def get_keys_by_tag(self, tag: str) -> Set[str]:
+    def get_keys_by_tag(self, tag: str) -> builtins.set[str]:
         """Obtém todas as chaves associadas a uma tag"""
         return self._invalidation_patterns.get(tag, set()).copy()
 
-    def get_keys_by_pattern(self, pattern: str) -> List[str]:
+    def get_keys_by_pattern(self, pattern: str) -> list[str]:
         """Obtém chaves que correspondem a um padrão regex"""
         import re
 
@@ -804,7 +799,7 @@ class CacheManager:
                 original_error=e,
             )
 
-    def get_keys_by_prefix(self, prefix: str) -> List[str]:
+    def get_keys_by_prefix(self, prefix: str) -> list[str]:
         """Obtém todas as chaves que começam com o prefixo"""
         matching_keys = []
 
@@ -816,12 +811,12 @@ class CacheManager:
 
     def bulk_invalidate(
         self,
-        tags: Optional[List[str]] = None,
-        patterns: Optional[List[str]] = None,
-        prefixes: Optional[List[str]] = None,
-        keys: Optional[List[str]] = None,
+        tags: list[str] | None = None,
+        patterns: list[str] | None = None,
+        prefixes: list[str] | None = None,
+        keys: list[str] | None = None,
         dry_run: bool = False,
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """Invalidação em lote com múltiplos critérios
 
         Args:
@@ -896,7 +891,7 @@ class CacheManager:
 
         return results
 
-    def create_invalidation_group(self, name: str, rules: Dict[str, Any]) -> None:
+    def create_invalidation_group(self, name: str, rules: dict[str, Any]) -> None:
         """Cria um grupo de regras de invalidação reutilizável
 
         Args:
@@ -926,7 +921,7 @@ class CacheManager:
 
     def invalidate_group(
         self, group_name: str, dry_run: bool = False
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """Aplica invalidação usando um grupo predefinido"""
         if (
             not hasattr(self, '_invalidation_groups')
@@ -948,10 +943,10 @@ class CacheManager:
 
     def cached(
         self,
-        ttl: Optional[int] = None,
+        ttl: int | None = None,
         key_prefix: str = '',
-        tags: Optional[List[str]] = None,
-        key_func: Optional[Callable] = None,
+        tags: list[str] | None = None,
+        key_func: Callable | None = None,
     ):
         """Decorator para cache automático de funções"""
 
@@ -982,7 +977,7 @@ class CacheManager:
 
         return decorator
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Retorna estatísticas do cache"""
         return {
             'hits': self.metrics.hits,
@@ -1004,7 +999,7 @@ class CacheManager:
 
 
 # Instância global padrão (lazy loading)
-_default_cache: Optional[CacheManager] = None
+_default_cache: CacheManager | None = None
 
 
 def get_default_cache() -> CacheManager:
@@ -1022,10 +1017,10 @@ def get_default_cache() -> CacheManager:
 
 
 def cached(
-    ttl: Optional[int] = None,
+    ttl: int | None = None,
     key_prefix: str = '',
-    tags: Optional[List[str]] = None,
-    key_func: Optional[Callable] = None,
+    tags: list[str] | None = None,
+    key_func: Callable | None = None,
 ):
     """Decorator de conveniência usando cache padrão"""
     return get_default_cache().cached(

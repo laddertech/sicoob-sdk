@@ -30,21 +30,15 @@ Example:
 import math
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from typing import (
     Any,
-    Callable,
-    Dict,
-    Generator,
     Generic,
-    Iterator,
-    List,
-    Optional,
     TypeVar,
-    Union,
 )
 
-from sicoob.exceptions import PaginationError, SicoobError
+from sicoob.exceptions import PaginationError
 from sicoob.logging_config import get_logger
 
 T = TypeVar('T')
@@ -66,7 +60,7 @@ class PaginationConfig:
     """
 
     page_size: int = 100
-    max_pages: Optional[int] = None
+    max_pages: int | None = None
     cursor_field: str = 'created_at'
     order_by: str = 'created_at'
     ascending: bool = True
@@ -92,12 +86,12 @@ class PageInfo:
 
     current_page: int
     page_size: int
-    total_items: Optional[int] = None
-    total_pages: Optional[int] = None
+    total_items: int | None = None
+    total_pages: int | None = None
     has_next: bool = False
     has_previous: bool = False
-    next_cursor: Optional[str] = None
-    previous_cursor: Optional[str] = None
+    next_cursor: str | None = None
+    previous_cursor: str | None = None
 
     @property
     def is_first_page(self) -> bool:
@@ -124,11 +118,11 @@ class PagedResponse(Generic[T]):
         pagination_config: Configuração de paginação usada
     """
 
-    items: List[T]
+    items: list[T]
     page_info: PageInfo
-    raw_response: Optional[Dict[str, Any]] = None
+    raw_response: dict[str, Any] | None = None
     request_duration: float = 0.0
-    pagination_config: Optional[PaginationConfig] = None
+    pagination_config: PaginationConfig | None = None
 
     def __len__(self) -> int:
         """Retorna número de items na página atual"""
@@ -148,8 +142,8 @@ class PaginationStrategy(ABC):
 
     @abstractmethod
     def get_next_params(
-        self, current_params: Dict[str, Any], response: PagedResponse
-    ) -> Optional[Dict[str, Any]]:
+        self, current_params: dict[str, Any], response: PagedResponse
+    ) -> dict[str, Any] | None:
         """Calcula parâmetros para próxima página
 
         Args:
@@ -163,7 +157,7 @@ class PaginationStrategy(ABC):
 
     @abstractmethod
     def extract_page_info(
-        self, response_data: Dict[str, Any], current_page: int, page_size: int
+        self, response_data: dict[str, Any], current_page: int, page_size: int
     ) -> PageInfo:
         """Extrai informações de paginação da resposta
 
@@ -192,8 +186,8 @@ class OffsetBasedStrategy(PaginationStrategy):
         self.limit_param = limit_param
 
     def get_next_params(
-        self, current_params: Dict[str, Any], response: PagedResponse
-    ) -> Optional[Dict[str, Any]]:
+        self, current_params: dict[str, Any], response: PagedResponse
+    ) -> dict[str, Any] | None:
         """Calcula offset para próxima página"""
         if not response.page_info.has_next:
             return None
@@ -207,7 +201,7 @@ class OffsetBasedStrategy(PaginationStrategy):
         return next_params
 
     def extract_page_info(
-        self, response_data: Dict[str, Any], current_page: int, page_size: int
+        self, response_data: dict[str, Any], current_page: int, page_size: int
     ) -> PageInfo:
         """Extrai informações de paginação para offset-based"""
         items_count = len(response_data.get('items', response_data.get('data', [])))
@@ -252,8 +246,8 @@ class CursorBasedStrategy(PaginationStrategy):
         self.size_param = size_param
 
     def get_next_params(
-        self, current_params: Dict[str, Any], response: PagedResponse
-    ) -> Optional[Dict[str, Any]]:
+        self, current_params: dict[str, Any], response: PagedResponse
+    ) -> dict[str, Any] | None:
         """Calcula cursor para próxima página"""
         if not response.page_info.has_next or not response.page_info.next_cursor:
             return None
@@ -264,7 +258,7 @@ class CursorBasedStrategy(PaginationStrategy):
         return next_params
 
     def extract_page_info(
-        self, response_data: Dict[str, Any], current_page: int, page_size: int
+        self, response_data: dict[str, Any], current_page: int, page_size: int
     ) -> PageInfo:
         """Extrai informações de paginação para cursor-based"""
         items = response_data.get('items', response_data.get('data', []))
@@ -291,8 +285,8 @@ class SicoobPaginationStrategy(PaginationStrategy):
     """Estratégia específica para APIs do Sicoob baseada em análise das respostas"""
 
     def get_next_params(
-        self, current_params: Dict[str, Any], response: PagedResponse
-    ) -> Optional[Dict[str, Any]]:
+        self, current_params: dict[str, Any], response: PagedResponse
+    ) -> dict[str, Any] | None:
         """Sicoob geralmente usa paginação baseada em datas/períodos"""
         if not response.page_info.has_next:
             return None
@@ -310,7 +304,7 @@ class SicoobPaginationStrategy(PaginationStrategy):
         return next_params
 
     def extract_page_info(
-        self, response_data: Dict[str, Any], current_page: int, page_size: int
+        self, response_data: dict[str, Any], current_page: int, page_size: int
     ) -> PageInfo:
         """Extrai informações baseadas na estrutura de resposta do Sicoob"""
         # Sicoob pode retornar diferentes estruturas:
@@ -346,11 +340,11 @@ class PaginatedIterator(Generic[T]):
 
     def __init__(
         self,
-        fetch_function: Callable[[Dict[str, Any]], Dict[str, Any]],
-        initial_params: Dict[str, Any],
+        fetch_function: Callable[[dict[str, Any]], dict[str, Any]],
+        initial_params: dict[str, Any],
         config: PaginationConfig,
         strategy: PaginationStrategy,
-        item_extractor: Optional[Callable[[Dict[str, Any]], List[T]]] = None,
+        item_extractor: Callable[[dict[str, Any]], list[T]] | None = None,
     ):
         """Inicializa iterator paginado
 
@@ -370,13 +364,13 @@ class PaginatedIterator(Generic[T]):
         self.current_page = 1
         self.pages_fetched = 0
         self.total_items_fetched = 0
-        self.current_items: List[T] = []
+        self.current_items: list[T] = []
         self.item_index = 0
         self.finished = False
 
         self.logger = get_logger(__name__)
 
-    def _default_item_extractor(self, response_data: Dict[str, Any]) -> List[T]:
+    def _default_item_extractor(self, response_data: dict[str, Any]) -> list[T]:
         """Extrator padrão de items da resposta"""
         if isinstance(response_data, list):
             return response_data
@@ -388,7 +382,7 @@ class PaginatedIterator(Generic[T]):
 
         return []
 
-    def _fetch_next_page(self) -> Optional[PagedResponse[T]]:
+    def _fetch_next_page(self) -> PagedResponse[T] | None:
         """Busca próxima página de dados"""
         if self.finished:
             return None
@@ -526,10 +520,10 @@ class PaginatedIterator(Generic[T]):
 
 
 def paginated_response_from_data(
-    data: Dict[str, Any],
+    data: dict[str, Any],
     page: int = 1,
     page_size: int = 100,
-    strategy: Optional[PaginationStrategy] = None,
+    strategy: PaginationStrategy | None = None,
 ) -> PagedResponse:
     """Utilitário para criar PagedResponse a partir de dados de API
 

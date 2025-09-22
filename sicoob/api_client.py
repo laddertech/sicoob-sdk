@@ -1,7 +1,6 @@
 import json
 import time
 import uuid
-from typing import Any
 
 import requests
 
@@ -9,7 +8,7 @@ from sicoob.auth import OAuth2Client
 from sicoob.config import SicoobConfig
 from sicoob.exceptions import RespostaInvalidaError
 from sicoob.logging_config import SicoobLogger, get_logger
-from sicoob.resilience import create_resilient_session, RetryConfig
+from sicoob.resilience import RetryConfig, create_resilient_session
 
 
 class APIClientBase:

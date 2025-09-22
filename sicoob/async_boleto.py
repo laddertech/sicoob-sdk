@@ -22,12 +22,12 @@ Example:
     ...         return boletos
 """
 
-from typing import Any, Dict, List, Optional
-from datetime import datetime, date
+from datetime import date
+from typing import Any
 
 from sicoob.async_client import AsyncAPIClient
 from sicoob.exceptions import BoletoError, BoletoNaoEncontradoError
-from sicoob.validation import validate_cpf, validate_cnpj
+from sicoob.validation import validate_cnpj, validate_cpf
 
 
 class AsyncBoletoAPI:
@@ -42,8 +42,8 @@ class AsyncBoletoAPI:
         self.api_client = api_client
 
     async def emitir_boleto(
-        self, dados: Dict[str, Any], nosso_numero: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, dados: dict[str, Any], nosso_numero: str | None = None
+    ) -> dict[str, Any]:
         """Emite um boleto bancário de forma assíncrona.
 
         Args:
@@ -75,7 +75,7 @@ class AsyncBoletoAPI:
         except Exception as e:
             raise BoletoError(f'Erro ao emitir boleto: {e!s}') from e
 
-    async def consultar_boleto(self, nosso_numero: str) -> Dict[str, Any]:
+    async def consultar_boleto(self, nosso_numero: str) -> dict[str, Any]:
         """Consulta um boleto por nosso número de forma assíncrona.
 
         Args:
@@ -105,11 +105,11 @@ class AsyncBoletoAPI:
 
     async def listar_boletos(
         self,
-        data_inicio: Optional[str] = None,
-        data_fim: Optional[str] = None,
-        situacao: Optional[str] = None,
+        data_inicio: str | None = None,
+        data_fim: str | None = None,
+        situacao: str | None = None,
         **filtros,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Lista boletos com filtros de forma assíncrona.
 
         Args:
@@ -141,9 +141,9 @@ class AsyncBoletoAPI:
     async def consultar_por_pagador(
         self,
         cpf_cnpj: str,
-        data_inicio: Optional[str] = None,
-        data_fim: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        data_inicio: str | None = None,
+        data_fim: str | None = None,
+    ) -> dict[str, Any]:
         """Consulta boletos por CPF/CNPJ do pagador de forma assíncrona.
 
         Args:
@@ -178,8 +178,8 @@ class AsyncBoletoAPI:
         )
 
     async def alterar_boleto(
-        self, nosso_numero: str, dados_alteracao: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, nosso_numero: str, dados_alteracao: dict[str, Any]
+    ) -> dict[str, Any]:
         """Altera dados de um boleto de forma assíncrona.
 
         Args:
@@ -197,8 +197,8 @@ class AsyncBoletoAPI:
         )
 
     async def baixar_boleto(
-        self, nosso_numero: str, dados_baixa: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, nosso_numero: str, dados_baixa: dict[str, Any]
+    ) -> dict[str, Any]:
         """Realiza baixa de um boleto de forma assíncrona.
 
         Args:
@@ -216,8 +216,8 @@ class AsyncBoletoAPI:
         )
 
     async def emitir_boletos_lote(
-        self, lista_dados: List[Dict[str, Any]], max_concorrencia: int = 10
-    ) -> List[Dict[str, Any]]:
+        self, lista_dados: list[dict[str, Any]], max_concorrencia: int = 10
+    ) -> list[dict[str, Any]]:
         """Emite múltiplos boletos de forma assíncrona e concorrente.
 
         Args:
@@ -234,7 +234,6 @@ class AsyncBoletoAPI:
             ... ]
             >>> boletos = await api.emitir_boletos_lote(dados_boletos)
         """
-        import asyncio
         from sicoob.async_client import gather_with_concurrency
 
         tasks = [self.emitir_boleto(dados) for dados in lista_dados]
@@ -242,8 +241,8 @@ class AsyncBoletoAPI:
         return await gather_with_concurrency(tasks, max_concorrencia)
 
     async def consultar_boletos_lote(
-        self, nossos_numeros: List[str], max_concorrencia: int = 10
-    ) -> List[Dict[str, Any]]:
+        self, nossos_numeros: list[str], max_concorrencia: int = 10
+    ) -> list[dict[str, Any]]:
         """Consulta múltiplos boletos de forma assíncrona e concorrente.
 
         Args:
@@ -260,7 +259,6 @@ class AsyncBoletoAPI:
             ...     "12345678903"
             ... ])
         """
-        import asyncio
         from sicoob.async_client import gather_with_concurrency
 
         tasks = [self.consultar_boleto(nosso_numero) for nosso_numero in nossos_numeros]
@@ -269,7 +267,7 @@ class AsyncBoletoAPI:
 
     async def processar_vencimentos_hoje(
         self, incluir_vencidos: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Processa boletos com vencimento hoje de forma otimizada.
 
         Args:

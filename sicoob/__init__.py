@@ -28,21 +28,21 @@ from .pix import PixAPI
 
 # Funcionalidades assíncronas (importadas opcionalmente)
 try:
-    from .async_client import (
-        AsyncSicoob,
-        AsyncAPIClient,
-        AsyncContaCorrenteAPI,
-        AsyncCobrancaAPI,
-        gather_with_concurrency,
-        async_batch_processor,
-    )
-    from .async_cache import (
+    from .async_boleto import AsyncBoletoAPI  # noqa: F401
+    from .async_cache import (  # noqa: F401
         AsyncCacheManager,
-        get_default_async_cache,
         async_cached,
+        get_default_async_cache,
     )
-    from .async_boleto import AsyncBoletoAPI
-    from .async_pix import AsyncPixAPI
+    from .async_client import (  # noqa: F401
+        AsyncAPIClient,
+        AsyncCobrancaAPI,
+        AsyncContaCorrenteAPI,
+        AsyncSicoob,
+        async_batch_processor,
+        gather_with_concurrency,
+    )
+    from .async_pix import AsyncPixAPI  # noqa: F401
 
     _async_available = True
 
@@ -90,7 +90,8 @@ __all__ = [
     'TransferenciaError',
     'WebhookPixError',
     'WebhookPixNaoEncontradoError',
-] + __all_async__
+    *__all_async__,
+]
 
 
 def is_async_available() -> bool:

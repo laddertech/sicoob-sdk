@@ -22,9 +22,10 @@ Example:
 
 import random
 import time
+from collections.abc import Callable
 from enum import Enum
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Set, Type, Union
+from typing import Any
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -32,7 +33,6 @@ from requests.adapters import HTTPAdapter
 from sicoob.exceptions import (
     CircuitBreakerOpenError,
     MaxRetriesExceededError,
-    SicoobError,
 )
 from sicoob.logging_config import get_logger
 
@@ -105,7 +105,7 @@ class CircuitBreaker:
         self,
         failure_threshold: int = 5,
         recovery_timeout: int = 60,
-        expected_exception: Type[Exception] = Exception,
+        expected_exception: type[Exception] = Exception,
     ):
         """Inicializa circuit breaker
 
@@ -119,7 +119,7 @@ class CircuitBreaker:
         self.expected_exception = expected_exception
 
         self.failure_count = 0
-        self.last_failure_time: Optional[float] = None
+        self.last_failure_time: float | None = None
         self.state = CircuitBreakerState.CLOSED
 
         self.logger = get_logger(__name__)
@@ -188,7 +188,7 @@ class CircuitBreaker:
             self._record_success()
             return result
 
-        except self.expected_exception as e:
+        except self.expected_exception:
             self._record_failure()
             raise
 
@@ -203,7 +203,7 @@ class RetryConfig:
         max_delay: float = 60.0,
         backoff_factor: float = 2.0,
         jitter: bool = True,
-        retryable_errors: Optional[Set[Type[Exception]]] = None,
+        retryable_errors: set[type[Exception]] | None = None,
     ):
         """Configuração de retry
 
@@ -308,7 +308,7 @@ class ResilientHTTPAdapter(HTTPAdapter):
 
 
 # Global circuit breakers por endpoint
-_circuit_breakers: Dict[str, CircuitBreaker] = {}
+_circuit_breakers: dict[str, CircuitBreaker] = {}
 
 
 def get_circuit_breaker(endpoint: str, **kwargs) -> CircuitBreaker:
@@ -319,9 +319,9 @@ def get_circuit_breaker(endpoint: str, **kwargs) -> CircuitBreaker:
 
 
 def create_resilient_session(
-    retry_config: Optional[RetryConfig] = None,
-    circuit_breaker_config: Optional[Dict[str, Any]] = None,
-    timeout: Union[float, tuple] = (10, 30),
+    retry_config: RetryConfig | None = None,
+    circuit_breaker_config: dict[str, Any] | None = None,
+    timeout: float | tuple = (10, 30),
 ) -> requests.Session:
     """Cria sessão HTTP com resiliência configurada
 
@@ -353,8 +353,8 @@ def create_resilient_session(
 def resilient_request(
     max_retries: int = 3,
     circuit_breaker_enabled: bool = True,
-    circuit_breaker_config: Optional[Dict[str, Any]] = None,
-    retry_config: Optional[RetryConfig] = None,
+    circuit_breaker_config: dict[str, Any] | None = None,
+    retry_config: RetryConfig | None = None,
 ):
     """Decorator para adicionar resiliência a funções de requisição HTTP
 

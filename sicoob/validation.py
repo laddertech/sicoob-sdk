@@ -1,17 +1,18 @@
 """Sistema de validação de entrada para o Sicoob SDK"""
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional, Union, Callable
+from typing import Any
 
 
 class ValidationError(Exception):
     """Erro de validação de dados"""
 
     def __init__(
-        self, message: str, field: Optional[str] = None, value: Any = None
+        self, message: str, field: str | None = None, value: Any = None
     ) -> None:
         super().__init__(message)
         self.field = field
@@ -26,7 +27,7 @@ class ValidationError(Exception):
 class MultipleValidationError(Exception):
     """Múltiplos erros de validação"""
 
-    def __init__(self, errors: List[ValidationError]) -> None:
+    def __init__(self, errors: list[ValidationError]) -> None:
         self.errors = errors
         messages = [str(error) for error in errors]
         super().__init__(f'Múltiplos erros de validação: {"; ".join(messages)}')
@@ -38,15 +39,15 @@ class FieldValidator:
 
     name: str
     required: bool = True
-    data_type: Optional[type] = None
-    min_value: Optional[Union[int, float]] = None
-    max_value: Optional[Union[int, float]] = None
-    min_length: Optional[int] = None
-    max_length: Optional[int] = None
-    pattern: Optional[str] = None
-    allowed_values: Optional[List[Any]] = None
-    custom_validator: Optional[Callable] = None
-    description: Optional[str] = None
+    data_type: type | None = None
+    min_value: int | float | None = None
+    max_value: int | float | None = None
+    min_length: int | None = None
+    max_length: int | None = None
+    pattern: str | None = None
+    allowed_values: list[Any] | None = None
+    custom_validator: Callable | None = None
+    description: str | None = None
 
     def validate(self, value: Any) -> Any:
         """Valida um valor para este campo"""
@@ -127,11 +128,11 @@ class FieldValidator:
 class DataValidator:
     """Validador para estruturas de dados completas"""
 
-    def __init__(self, name: str, fields: List[FieldValidator]) -> None:
+    def __init__(self, name: str, fields: list[FieldValidator]) -> None:
         self.name = name
         self.fields = {field.name: field for field in fields}
 
-    def validate(self, data: Dict[str, Any], strict: bool = True) -> Dict[str, Any]:
+    def validate(self, data: dict[str, Any], strict: bool = True) -> dict[str, Any]:
         """Valida uma estrutura de dados completa
 
         Args:
@@ -233,7 +234,7 @@ def validate_cnpj(value: str) -> str:
         raise ValueError('CNPJ inválido (sequência)')
 
     # Algoritmo de validação do CNPJ
-    def calc_digit(cnpj_partial: str, weights: List[int]) -> str:
+    def calc_digit(cnpj_partial: str, weights: list[int]) -> str:
         total = sum(
             int(digit) * weight
             for digit, weight in zip(cnpj_partial, weights, strict=False)
@@ -284,7 +285,7 @@ def validate_txid(value: str) -> str:
     return value
 
 
-def validate_monetary_value(value: Union[str, int, float, Decimal]) -> str:
+def validate_monetary_value(value: str | int | float | Decimal) -> str:
     """Valida valor monetário e retorna como string formatada"""
     try:
         if isinstance(value, str):
@@ -470,7 +471,7 @@ def get_pagador_schema() -> DataValidator:
 
 # Decorator para validação automática
 def validate_input(
-    schema_name: str, field_name: Optional[str] = None
+    schema_name: str, field_name: str | None = None
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator para validar entrada de métodos automaticamente"""
 

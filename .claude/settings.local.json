@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run pytest:*)",
+      "Bash(uv run ruff format:*)",
+      "Bash(uv run ruff:*)",
+      "Bash(make test:*)",
+      "Bash(pytest:*)",
+      "Bash(sed:*)",
+      "Bash(uv run:*)",
+      "Bash(sort:*)",
+      "Bash(python -m pytest tests/test_async_client_advanced.py::TestAsyncAPIClient::test_get_base_url_sandbox -xvs)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

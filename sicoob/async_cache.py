@@ -184,7 +184,7 @@ class AsyncDiskCacheBackend(AsyncCacheBackend):
                 # Remove arquivo corrompido
                 try:
                     cache_path.unlink(missing_ok=True)
-                except:
+                except (FileNotFoundError, PermissionError, OSError):
                     pass
                 return None
 

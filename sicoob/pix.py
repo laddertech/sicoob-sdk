@@ -28,7 +28,8 @@ Example:
     >>> print(cobranca["qrcode"])
 """
 
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 
 import requests
 from pypix_api.banks.sicoob import SicoobPixAPI
@@ -39,18 +40,18 @@ from sicoob.exceptions import (
     PixError,
     WebhookPixNaoEncontradoError,
 )
+from sicoob.pagination import (
+    PaginatedIterator,
+    PaginationConfig,
+    SicoobPaginationStrategy,
+    paginated_response_from_data,
+)
 from sicoob.validation import (
     MultipleValidationError,
     ValidationError,
     get_pix_cobranca_schema,
     validate_txid,
     validate_url,
-)
-from sicoob.pagination import (
-    PaginatedIterator,
-    PaginationConfig,
-    SicoobPaginationStrategy,
-    paginated_response_from_data,
 )
 
 
