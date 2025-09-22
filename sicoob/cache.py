@@ -101,7 +101,7 @@ class CacheConfig:
     enable_metrics: bool = True
     thread_safe: bool = True
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Valida configuração"""
         if self.default_ttl < 0:
             raise CacheConfigurationError('default_ttl deve ser >= 0')
@@ -134,7 +134,7 @@ class CacheEntry:
         """Idade da entrada em segundos"""
         return time.time() - self.created_at
 
-    def mark_accessed(self):
+    def mark_accessed(self) -> None:
         """Marca entrada como acessada"""
         self.access_count += 1
         self.last_accessed = time.time()
@@ -200,11 +200,11 @@ class CacheBackend(ABC):
 class MemoryCacheBackend(CacheBackend):
     """Backend de cache em memória"""
 
-    def __init__(self, thread_safe: bool = True):
+    def __init__(self, thread_safe: bool = True) -> None:
         self._cache: dict[str, CacheEntry] = {}
         self._lock = threading.RLock() if thread_safe else None
 
-    def _with_lock(self, func):
+    def _with_lock(self, func: Callable[[], T]) -> T:
         """Executa função com lock se necessário"""
         if self._lock:
             with self._lock:
@@ -212,37 +212,37 @@ class MemoryCacheBackend(CacheBackend):
         return func()
 
     def get(self, key: str) -> CacheEntry | None:
-        def _get():
+        def _get() -> CacheEntry | None:
             return self._cache.get(key)
 
         return self._with_lock(_get)
 
     def set(self, key: str, entry: CacheEntry) -> None:
-        def _set():
+        def _set() -> None:
             self._cache[key] = entry
 
         self._with_lock(_set)
 
     def delete(self, key: str) -> bool:
-        def _delete():
+        def _delete() -> bool:
             return self._cache.pop(key, None) is not None
 
         return self._with_lock(_delete)
 
     def clear(self) -> None:
-        def _clear():
+        def _clear() -> None:
             self._cache.clear()
 
         self._with_lock(_clear)
 
     def keys(self) -> list[str]:
-        def _keys():
+        def _keys() -> list[str]:
             return list(self._cache.keys())
 
         return self._with_lock(_keys)
 
     def size(self) -> int:
-        def _size():
+        def _size() -> int:
             return len(self._cache)
 
         return self._with_lock(_size)
@@ -251,7 +251,7 @@ class MemoryCacheBackend(CacheBackend):
 class DiskCacheBackend(CacheBackend):
     """Backend de cache persistente em disco"""
 
-    def __init__(self, cache_dir: str, thread_safe: bool = True):
+    def __init__(self, cache_dir: str, thread_safe: bool = True) -> None:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock() if thread_safe else None
@@ -262,7 +262,7 @@ class DiskCacheBackend(CacheBackend):
         hashed = hashlib.sha256(key.encode()).hexdigest()
         return self.cache_dir / f'{hashed}.cache'
 
-    def _with_lock(self, func):
+    def _with_lock(self, func: Callable[[], T]) -> T:
         """Executa função com lock se necessário"""
         if self._lock:
             with self._lock:
@@ -270,13 +270,14 @@ class DiskCacheBackend(CacheBackend):
         return func()
 
     def get(self, key: str) -> CacheEntry | None:
-        def _get():
+        def _get() -> CacheEntry | None:
             path = self._key_to_path(key)
             if not path.exists():
                 return None
 
             try:
                 with open(path, 'rb') as f:
+                    # nosec B301 - pickle usado para cache interno controlado
                     return pickle.load(f)
             except (pickle.PickleError, FileNotFoundError, EOFError):
                 # Remove arquivo corrompido
@@ -286,7 +287,7 @@ class DiskCacheBackend(CacheBackend):
         return self._with_lock(_get)
 
     def set(self, key: str, entry: CacheEntry) -> None:
-        def _set():
+        def _set() -> None:
             path = self._key_to_path(key)
             try:
                 with open(path, 'wb') as f:
@@ -297,7 +298,7 @@ class DiskCacheBackend(CacheBackend):
         self._with_lock(_set)
 
     def delete(self, key: str) -> bool:
-        def _delete():
+        def _delete() -> bool:
             path = self._key_to_path(key)
             if path.exists():
                 path.unlink()
@@ -307,7 +308,7 @@ class DiskCacheBackend(CacheBackend):
         return self._with_lock(_delete)
 
     def clear(self) -> None:
-        def _clear():
+        def _clear() -> None:
             for cache_file in self.cache_dir.glob('*.cache'):
                 cache_file.unlink(missing_ok=True)
 
@@ -316,13 +317,13 @@ class DiskCacheBackend(CacheBackend):
     def keys(self) -> list[str]:
         """Nota: Não conseguimos recuperar chaves originais do disco facilmente"""
 
-        def _keys():
+        def _keys() -> list[str]:
             return [f.stem for f in self.cache_dir.glob('*.cache')]
 
         return self._with_lock(_keys)
 
     def size(self) -> int:
-        def _size():
+        def _size() -> int:
             return len(list(self.cache_dir.glob('*.cache')))
 
         return self._with_lock(_size)
@@ -331,7 +332,7 @@ class DiskCacheBackend(CacheBackend):
 class CacheManager:
     """Gerenciador principal do sistema de cache"""
 
-    def __init__(self, config: CacheConfig):
+    def __init__(self, config: CacheConfig) -> None:
         self.config = config
         self.logger = get_logger(__name__)
 
@@ -361,10 +362,10 @@ class CacheManager:
         self._invalidation_patterns: dict[str, set[str]] = {}
         self._observers: WeakSet = WeakSet()
 
-    def _start_cleanup_thread(self):
+    def _start_cleanup_thread(self) -> None:
         """Inicia thread de limpeza automática"""
 
-        def cleanup_loop():
+        def cleanup_loop() -> None:
             while not self._shutdown:
                 try:
                     self._cleanup_expired()
@@ -375,7 +376,7 @@ class CacheManager:
         self._cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
         self._cleanup_thread.start()
 
-    def _cleanup_expired(self):
+    def _cleanup_expired(self) -> None:
         """Remove entradas expiradas"""
         removed_count = 0
 
@@ -418,7 +419,7 @@ class CacheManager:
         """Descomprime dados se necessário"""
         return zlib.decompress(data) if compressed else data
 
-    def _evict_if_needed(self):
+    def _evict_if_needed(self) -> None:
         """Remove entradas se cache está cheio"""
         if self.config.max_size <= 0:
             return
@@ -520,6 +521,7 @@ class CacheManager:
         # Descomprime se necessário
         value = entry.value
         if entry.compressed and isinstance(value, bytes):
+            # nosec B301 - pickle usado para cache interno controlado
             value = pickle.loads(self._decompress_if_needed(value, True))
 
         return value
@@ -947,7 +949,7 @@ class CacheManager:
         key_prefix: str = '',
         tags: list[str] | None = None,
         key_func: Callable | None = None,
-    ):
+    ) -> Callable[[Callable[..., T]], Callable[..., T]]:
         """Decorator para cache automático de funções"""
 
         def decorator(func: Callable[..., T]) -> Callable[..., T]:
@@ -991,7 +993,7 @@ class CacheManager:
             'backend_strategy': self.config.strategy.value,
         }
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Para threads e limpa recursos"""
         self._shutdown = True
         if self._cleanup_thread and self._cleanup_thread.is_alive():
@@ -1021,7 +1023,7 @@ def cached(
     key_prefix: str = '',
     tags: list[str] | None = None,
     key_func: Callable | None = None,
-):
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """Decorator de conveniência usando cache padrão"""
     return get_default_cache().cached(
         ttl=ttl, key_prefix=key_prefix, tags=tags, key_func=key_func

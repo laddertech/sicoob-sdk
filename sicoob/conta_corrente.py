@@ -1,4 +1,3 @@
-
 import requests
 
 from sicoob.api_client import APIClientBase

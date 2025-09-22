@@ -148,7 +148,7 @@ class PixAPI(APIClientBase):
         try:
             txid = validate_txid(txid)
         except ValueError as e:
-            raise ValidationError(str(e), 'txid', txid)
+            raise ValidationError(str(e), 'txid', txid) from e
 
         # Valida dados da cobrança
         try:
@@ -175,7 +175,7 @@ class PixAPI(APIClientBase):
         try:
             txid = validate_txid(txid)
         except ValueError as e:
-            raise ValidationError(str(e), 'txid', txid)
+            raise ValidationError(str(e), 'txid', txid) from e
 
         return self.consultar_cob(txid)
 
@@ -226,7 +226,7 @@ class PixAPI(APIClientBase):
         try:
             url = validate_url(url)
         except ValueError as e:
-            raise ValidationError(str(e), 'url', url)
+            raise ValidationError(str(e), 'url', url) from e
 
         return self.configurar_webhook(chave, url)
 
@@ -249,7 +249,7 @@ class PixAPI(APIClientBase):
         """
         return self._pix_api.excluir_webhook(chave)
 
-    def listar_cobrancas(self, inicio: str, fim: str, **filtros) -> dict:
+    def listar_cobrancas(self, inicio: str, fim: str, **filtros: Any) -> dict:
         """Lista cobranças em um período
 
         Args:
@@ -292,7 +292,7 @@ class PixAPI(APIClientBase):
         inicio: str,
         fim: str,
         pagination: PaginationConfig | None = None,
-        **filtros,
+        **filtros: Any,
     ) -> Generator[dict, None, None]:
         """Lista cobranças PIX com paginação automática
 
@@ -325,7 +325,7 @@ class PixAPI(APIClientBase):
         if pagination is None:
             pagination = PaginationConfig(page_size=100)
 
-        def fetch_page(params):
+        def fetch_page(params: dict) -> dict:
             # Usa o método existente para buscar dados
             return self.listar_cobrancas(
                 params.get('inicio', inicio),
@@ -350,7 +350,7 @@ class PixAPI(APIClientBase):
         inicio: str,
         fim: str,
         pagination: PaginationConfig | None = None,
-        **filtros,
+        **filtros: Any,
     ) -> Generator[Any, None, None]:
         """Lista cobranças PIX retornando páginas completas
 
@@ -378,7 +378,7 @@ class PixAPI(APIClientBase):
         if pagination is None:
             pagination = PaginationConfig(page_size=100)
 
-        def fetch_page(params):
+        def fetch_page(params: dict) -> dict:
             raw_response = self.listar_cobrancas(
                 params.get('inicio', inicio),
                 params.get('fim', fim),
@@ -390,7 +390,6 @@ class PixAPI(APIClientBase):
                 raw_response, page=params.get('page', 1), page_size=pagination.page_size
             )
 
-        strategy = SicoobPaginationStrategy()
         initial_params = {'inicio': inicio, 'fim': fim, 'page': 1, **filtros}
 
         current_params = initial_params.copy()

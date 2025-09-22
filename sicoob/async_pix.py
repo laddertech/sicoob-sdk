@@ -38,7 +38,7 @@ from sicoob.validation import validate_txid, validate_url
 class AsyncPixAPI:
     """API assíncrona para operações PIX."""
 
-    def __init__(self, api_client: AsyncAPIClient):
+    def __init__(self, api_client: AsyncAPIClient) -> None:
         """Inicializa API PIX assíncrona.
 
         Args:
@@ -106,7 +106,7 @@ class AsyncPixAPI:
             raise PixError(f'Erro ao consultar cobrança PIX: {e!s}') from e
 
     async def listar_cobrancas(
-        self, inicio: str, fim: str, **filtros
+        self, inicio: str, fim: str, **filtros: Any
     ) -> dict[str, Any]:
         """Lista cobranças PIX em período de forma assíncrona.
 
@@ -382,87 +382,79 @@ class AsyncPixAPI:
 
         return stats
 
+    async def _buscar_cobrancas_periodo(self, chaves_pix: list[str]) -> list[dict]:
+        """Busca cobranças das últimas horas para todas as chaves."""
+        agora = datetime.now()
+        inicio = agora - timedelta(hours=2)
+
+        tasks = []
+        for chave in chaves_pix:
+            tasks.append(
+                self.listar_cobrancas(
+                    inicio.isoformat() + 'Z',
+                    agora.isoformat() + 'Z',
+                    chave=chave,
+                )
+            )
+
+        return await gather_with_concurrency(tasks, 5)
+
+    async def _processar_respostas_cobrancas(
+        self, responses: list[dict], ultimas_cobrancas: set, callback_cobranca: Any
+    ) -> tuple[set, list]:
+        """Processa respostas e identifica novas cobranças."""
+        cobrancas_atuais = set()
+        novas_cobrancas = []
+
+        for response in responses:
+            cobrancas = response.get('cobs', [])
+            for cobranca in cobrancas:
+                txid = cobranca.get('txid')
+                if txid:
+                    cobrancas_atuais.add(txid)
+
+                    if txid not in ultimas_cobrancas:
+                        novas_cobrancas.append(cobranca)
+                        await self._executar_callback(callback_cobranca, cobranca)
+
+        return cobrancas_atuais, novas_cobrancas
+
+    async def _executar_callback(self, callback_cobranca: Any, cobranca: dict) -> None:
+        """Executa callback para nova cobrança."""
+        if callback_cobranca:
+            try:
+                if asyncio.iscoroutinefunction(callback_cobranca):
+                    await callback_cobranca(cobranca)
+                else:
+                    callback_cobranca(cobranca)
+            except Exception as e:
+                self.api_client.logger.error(f'Erro no callback: {e!s}')
+
     async def monitorar_cobrancas_tempo_real(
         self,
         chaves_pix: list[str],
         intervalo_segundos: int = 30,
-        callback_cobranca=None,
-    ):
-        """Monitora cobranças PIX em tempo real através de polling.
-
-        Args:
-            chaves_pix: Lista de chaves PIX para monitorar
-            intervalo_segundos: Intervalo entre verificações
-            callback_cobranca: Função chamada para cada nova cobrança
-
-        Yields:
-            Dicionário com estatísticas de monitoramento
-
-        Example:
-            >>> async def processar_cobranca(cobranca):
-            ...     print(f"Nova cobrança: {cobranca['txid']}")
-            >>>
-            >>> async for stats in api.monitorar_cobrancas_tempo_real(
-            ...     ["chave@exemplo.com"], callback_cobranca=processar_cobranca
-            ... ):
-            ...     print(f"Monitorando... {stats['cobrancas_encontradas']} cobranças")
-        """
+        callback_cobranca: Any = None,
+    ) -> Any:
+        """Monitora cobranças PIX em tempo real através de polling."""
         ultimas_cobrancas = set()
 
         while True:
             try:
-                # Busca cobranças das últimas horas
-                agora = datetime.now()
-                inicio = agora - timedelta(hours=2)
-
-                # Monitora todas as chaves em paralelo
-                tasks = []
-                for chave in chaves_pix:
-                    tasks.append(
-                        self.listar_cobrancas(
-                            inicio.isoformat() + 'Z',
-                            agora.isoformat() + 'Z',
-                            chave=chave,
-                        )
-                    )
-
-                responses = await gather_with_concurrency(tasks, 5)
-
-                # Processa resultados
-                cobrancas_atuais = set()
-                novas_cobrancas = []
-
-                for response in responses:
-                    cobrancas = response.get('cobs', [])
-                    for cobranca in cobrancas:
-                        txid = cobranca.get('txid')
-                        if txid:
-                            cobrancas_atuais.add(txid)
-
-                            # Verifica se é nova cobrança
-                            if txid not in ultimas_cobrancas:
-                                novas_cobrancas.append(cobranca)
-
-                                # Chama callback se fornecido
-                                if callback_cobranca:
-                                    try:
-                                        if asyncio.iscoroutinefunction(
-                                            callback_cobranca
-                                        ):
-                                            await callback_cobranca(cobranca)
-                                        else:
-                                            callback_cobranca(cobranca)
-                                    except Exception as e:
-                                        self.api_client.logger.error(
-                                            f'Erro no callback: {e!s}'
-                                        )
+                responses = await self._buscar_cobrancas_periodo(chaves_pix)
+                (
+                    cobrancas_atuais,
+                    novas_cobrancas,
+                ) = await self._processar_respostas_cobrancas(
+                    responses, ultimas_cobrancas, callback_cobranca
+                )
 
                 # Atualiza conjunto de cobranças conhecidas
                 ultimas_cobrancas = cobrancas_atuais
 
                 # Retorna estatísticas
                 stats = {
-                    'timestamp': agora.isoformat(),
+                    'timestamp': datetime.now().isoformat(),
                     'chaves_monitoradas': len(chaves_pix),
                     'cobrancas_encontradas': len(cobrancas_atuais),
                     'novas_cobrancas': len(novas_cobrancas),

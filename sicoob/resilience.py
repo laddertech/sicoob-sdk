@@ -25,7 +25,7 @@ import time
 from collections.abc import Callable
 from enum import Enum
 from functools import wraps
-from typing import Any
+from typing import Any, ClassVar
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -57,7 +57,7 @@ class RetryableErrors:
     )
 
     # Status HTTP que indicam erro temporário
-    TEMPORARY_HTTP_ERRORS = {
+    TEMPORARY_HTTP_ERRORS: ClassVar[set[int]] = {
         408,  # Request Timeout
         429,  # Too Many Requests
         500,  # Internal Server Error
@@ -67,7 +67,7 @@ class RetryableErrors:
     }
 
     # Status HTTP que nunca devem ser retentados
-    PERMANENT_HTTP_ERRORS = {
+    PERMANENT_HTTP_ERRORS: ClassVar[set[int]] = {
         400,  # Bad Request
         401,  # Unauthorized
         403,  # Forbidden
@@ -106,7 +106,7 @@ class CircuitBreaker:
         failure_threshold: int = 5,
         recovery_timeout: int = 60,
         expected_exception: type[Exception] = Exception,
-    ):
+    ) -> None:
         """Inicializa circuit breaker
 
         Args:
@@ -156,7 +156,7 @@ class CircuitBreaker:
                 },
             )
 
-    def call(self, func: Callable, *args, **kwargs) -> Any:
+    def call(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
         """Executa função com circuit breaker
 
         Args:
@@ -204,7 +204,7 @@ class RetryConfig:
         backoff_factor: float = 2.0,
         jitter: bool = True,
         retryable_errors: set[type[Exception]] | None = None,
-    ):
+    ) -> None:
         """Configuração de retry
 
         Args:
@@ -229,6 +229,7 @@ class RetryConfig:
         if self.jitter:
             # Adiciona ±25% de jitter
             jitter_range = delay * 0.25
+            # nosec B311 - random usado para jitter, não para criptografia
             delay += random.uniform(-jitter_range, jitter_range)
 
         return max(0, delay)
@@ -237,7 +238,7 @@ class RetryConfig:
 class ResilientHTTPAdapter(HTTPAdapter):
     """Adaptador HTTP com retry automático"""
 
-    def __init__(self, retry_config: RetryConfig, *args, **kwargs):
+    def __init__(self, retry_config: RetryConfig, *args: Any, **kwargs: Any) -> None:
         """Inicializa adaptador com configuração de retry
 
         Args:
@@ -247,7 +248,7 @@ class ResilientHTTPAdapter(HTTPAdapter):
         self.retry_config = retry_config
         self.logger = get_logger(__name__)
 
-    def send(self, request, **kwargs) -> requests.Response:
+    def send(self, request: Any, **kwargs: Any) -> requests.Response:
         """Envia requisição com retry automático"""
         attempt = 0
         last_exception = None
@@ -311,7 +312,7 @@ class ResilientHTTPAdapter(HTTPAdapter):
 _circuit_breakers: dict[str, CircuitBreaker] = {}
 
 
-def get_circuit_breaker(endpoint: str, **kwargs) -> CircuitBreaker:
+def get_circuit_breaker(endpoint: str, **kwargs: Any) -> CircuitBreaker:
     """Obtém circuit breaker para um endpoint específico"""
     if endpoint not in _circuit_breakers:
         _circuit_breakers[endpoint] = CircuitBreaker(**kwargs)
@@ -355,7 +356,7 @@ def resilient_request(
     circuit_breaker_enabled: bool = True,
     circuit_breaker_config: dict[str, Any] | None = None,
     retry_config: RetryConfig | None = None,
-):
+) -> Callable:
     """Decorator para adicionar resiliência a funções de requisição HTTP
 
     Args:
@@ -372,10 +373,7 @@ def resilient_request(
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            # Usa configuração personalizada ou padrão
-            config = retry_config or RetryConfig(max_retries=max_retries)
-
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             # Circuit breaker por função
             if circuit_breaker_enabled:
                 cb_config = circuit_breaker_config or {}

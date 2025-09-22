@@ -26,8 +26,6 @@ Example:
 import asyncio
 import json
 import ssl
-import time
-import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -70,17 +68,17 @@ class AsyncAPIClient:
         self._session = session
         self._owned_session = session is None
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> 'AsyncAPIClient':
         """Entrada do context manager."""
         await self._ensure_session()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Saída do context manager."""
         if self._owned_session and self._session:
             await self._session.close()
 
-    async def _ensure_session(self):
+    async def _ensure_session(self) -> None:
         """Garante que a sessão está inicializada."""
         if self._session is None:
             # Configuração SSL
@@ -131,7 +129,7 @@ class AsyncAPIClient:
         return data
 
     async def _make_request(
-        self, method: str, url: str, scope: str, **kwargs
+        self, method: str, url: str, scope: str, **kwargs: Any
     ) -> dict[str, Any]:
         """Faz uma requisição HTTP assíncrona com logging integrado.
 
@@ -149,8 +147,6 @@ class AsyncAPIClient:
         """
         await self._ensure_session()
 
-        request_id = str(uuid.uuid4())[:8]
-
         # Headers padrão + headers customizados
         headers = self._get_headers(scope)
         if 'headers' in kwargs:
@@ -162,12 +158,8 @@ class AsyncAPIClient:
 
         # Controle de concorrência
         async with self._semaphore:
-            start_time = time.time()
-
             try:
                 async with self._session.request(method, url, **kwargs) as response:
-                    duration_ms = (time.time() - start_time) * 1000
-
                     # Lê o corpo da resposta
                     response_text = await response.text()
 
@@ -181,7 +173,7 @@ class AsyncAPIClient:
                             error_msg = error_data.get(
                                 'message', f'HTTP {response.status}'
                             )
-                        except:
+                        except Exception:
                             error_msg = f'HTTP {response.status}: {response_text}'
 
                         raise SicoobError(error_msg, code=response.status)
@@ -194,12 +186,10 @@ class AsyncAPIClient:
                         raise SicoobError(f'Resposta não é JSON válido: {e!s}') from e
 
             except asyncio.TimeoutError as e:
-                duration_ms = (time.time() - start_time) * 1000
                 # self.logger.error(f'Timeout na requisição assíncrona')  # Temporariamente comentado
                 raise SicoobError(f'Timeout na requisição para {url}') from e
 
             except Exception as e:
-                duration_ms = (time.time() - start_time) * 1000
                 # self.logger.error(f'Erro na requisição assíncrona: {e!s}')  # Temporariamente comentado
                 pass
                 raise SicoobError(f'Erro na requisição assíncrona: {e!s}') from e
@@ -268,22 +258,22 @@ class AsyncSicoob:
 
         # self.logger = get_logger(__name__)  # Temporariamente comentado
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> 'AsyncAPIClient':
         """Entrada do context manager."""
         await self._api_client.__aenter__()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Saída do context manager."""
         await self._api_client.__aexit__(exc_type, exc_val, exc_tb)
 
     @property
-    def conta_corrente(self):
+    def conta_corrente(self) -> 'AsyncContaCorrenteAPI':
         """Retorna instância da API de conta corrente assíncrona."""
         return AsyncContaCorrenteAPI(self._api_client)
 
     @property
-    def cobranca(self):
+    def cobranca(self) -> 'AsyncCobrancaAPI':
         """Retorna instância da API de cobrança assíncrona."""
         return AsyncCobrancaAPI(self._api_client)
 
@@ -291,7 +281,7 @@ class AsyncSicoob:
 class AsyncContaCorrenteAPI:
     """API assíncrona para operações de conta corrente."""
 
-    def __init__(self, api_client: AsyncAPIClient):
+    def __init__(self, api_client: AsyncAPIClient) -> None:
         self.api_client = api_client
 
     async def get_extrato(
@@ -346,7 +336,7 @@ class AsyncContaCorrenteAPI:
 class AsyncCobrancaAPI:
     """API assíncrona para operações de cobrança."""
 
-    def __init__(self, api_client: AsyncAPIClient):
+    def __init__(self, api_client: AsyncAPIClient) -> None:
         self.api_client = api_client
 
     async def criar_cobranca_pix(
@@ -383,7 +373,7 @@ class AsyncCobrancaAPI:
         return await self.api_client._make_request('GET', url, scope='cob.read')
 
     async def listar_cobrancas_pix(
-        self, inicio: str, fim: str, **filtros
+        self, inicio: str, fim: str, **filtros: Any
     ) -> dict[str, Any]:
         """Lista cobranças PIX de forma assíncrona.
 
@@ -418,7 +408,7 @@ async def gather_with_concurrency(tasks: list, max_concurrency: int = 10) -> lis
     """
     semaphore = asyncio.Semaphore(max_concurrency)
 
-    async def bounded_task(task):
+    async def bounded_task(task: Any) -> Any:
         async with semaphore:
             return await task
 
@@ -428,7 +418,7 @@ async def gather_with_concurrency(tasks: list, max_concurrency: int = 10) -> lis
 
 @asynccontextmanager
 async def async_batch_processor(
-    items: list, process_func, batch_size: int = 10, max_concurrency: int = 5
+    items: list, process_func: Any, batch_size: int = 10, max_concurrency: int = 5
 ) -> AsyncGenerator[list, None]:
     """Context manager para processamento assíncrono em lotes.
 

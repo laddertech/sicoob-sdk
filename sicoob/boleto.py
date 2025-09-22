@@ -37,7 +37,7 @@ class BoletoAPI(APIClientBase):
         self.base_path = '/cobranca-bancaria/v3'
 
     def _handle_error_response(
-        self, response: requests.Response, error_class: type, **kwargs
+        self, response: requests.Response, error_class: type, **kwargs: Any
     ) -> None:
         """Trata respostas de erro da API de forma centralizada
 
@@ -266,12 +266,14 @@ class BoletoAPI(APIClientBase):
                         message=f'Erro na requisição: {e!s}',
                         code=getattr(response, 'status_code', 500),
                         **kwargs,
-                    )
+                    ) from e
 
         except error_class:
             raise  # Re-lança exceções já do tipo esperado
         except Exception as e:
-            raise error_class(message=f'Erro inesperado: {e!s}', code=500, **kwargs)
+            raise error_class(
+                message=f'Erro inesperado: {e!s}', code=500, **kwargs
+            ) from e
 
     def emitir_boleto(self, dados_boleto: dict) -> dict:
         """Emite um novo boleto bancário

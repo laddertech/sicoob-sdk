@@ -51,41 +51,62 @@ class FieldValidator:
 
     def validate(self, value: Any) -> Any:
         """Valida um valor para este campo"""
-        # Campo obrigatório
+        # Validação de obrigatoriedade
+        value = self._validate_required(value)
+
+        # Campo opcional e vazio - retorna cedo
+        if not self.required and (value is None or value == ''):
+            return value
+
+        # Conversão de tipo
+        value = self._validate_and_convert_type(value)
+
+        # Validações específicas
+        self._validate_numeric_range(value)
+        self._validate_string_length(value)
+        self._validate_pattern(value)
+        self._validate_allowed_values(value)
+        value = self._validate_custom(value)
+
+        return value
+
+    def _validate_required(self, value: Any) -> Any:
+        """Valida se campo obrigatório está presente."""
         if self.required and (value is None or value == ''):
             raise ValidationError(
                 'Campo obrigatório não pode estar vazio', self.name, value
             )
+        return value
 
-        # Campo opcional e vazio
-        if not self.required and (value is None or value == ''):
-            return value
-
-        # Tipo de dados
+    def _validate_and_convert_type(self, value: Any) -> Any:
+        """Valida e converte tipo de dados."""
         if self.data_type and not isinstance(value, self.data_type):
             try:
                 # Tenta conversão automática
                 if self.data_type in (int, float):
                     value = self.data_type(value)
-                elif self.data_type == str:
+                elif self.data_type is str:
                     value = str(value)
                 else:
                     raise TypeError()
-            except (ValueError, TypeError):
+            except (ValueError, TypeError) as e:
                 raise ValidationError(
                     f'Deve ser do tipo {self.data_type.__name__}, recebido {type(value).__name__}',
                     self.name,
                     value,
-                )
+                ) from e
+        return value
 
-        # Validação de range para números
-        if isinstance(value, (int, float)):
+    def _validate_numeric_range(self, value: Any) -> None:
+        """Valida range para valores numéricos."""
+        if isinstance(value, int | float):
             if self.min_value is not None and value < self.min_value:
                 raise ValidationError(f'Deve ser >= {self.min_value}', self.name, value)
             if self.max_value is not None and value > self.max_value:
                 raise ValidationError(f'Deve ser <= {self.max_value}', self.name, value)
 
-        # Validação de comprimento para strings
+    def _validate_string_length(self, value: Any) -> None:
+        """Valida comprimento de strings."""
         if isinstance(value, str):
             if self.min_length is not None and len(value) < self.min_length:
                 raise ValidationError(
@@ -98,20 +119,23 @@ class FieldValidator:
                     f'Deve ter no máximo {self.max_length} caracteres', self.name, value
                 )
 
-        # Validação de padrão regex
+    def _validate_pattern(self, value: Any) -> None:
+        """Valida padrão regex."""
         if self.pattern and isinstance(value, str):
             if not re.match(self.pattern, value):
                 raise ValidationError(
                     f'Formato inválido (padrão: {self.pattern})', self.name, value
                 )
 
-        # Valores permitidos
+    def _validate_allowed_values(self, value: Any) -> None:
+        """Valida valores permitidos."""
         if self.allowed_values and value not in self.allowed_values:
             raise ValidationError(
                 f'Deve ser um dos valores: {self.allowed_values}', self.name, value
             )
 
-        # Validador customizado
+    def _validate_custom(self, value: Any) -> Any:
+        """Executa validador customizado."""
         if self.custom_validator:
             try:
                 validated_value = self.custom_validator(value)
@@ -120,8 +144,7 @@ class FieldValidator:
             except Exception as e:
                 raise ValidationError(
                     f'Validação customizada falhou: {e}', self.name, value
-                )
-
+                ) from e
         return value
 
 
@@ -154,6 +177,23 @@ class DataValidator:
         validated_data = {}
 
         # Valida campos definidos
+        self._validate_defined_fields(data, validated_data, errors)
+
+        # Processa campos não definidos no schema
+        self._handle_undefined_fields(data, validated_data, errors, strict)
+
+        if errors:
+            raise MultipleValidationError(errors)
+
+        return validated_data
+
+    def _validate_defined_fields(
+        self,
+        data: dict[str, Any],
+        validated_data: dict[str, Any],
+        errors: list[ValidationError],
+    ) -> None:
+        """Valida campos definidos no schema."""
         for field_name, field_validator in self.fields.items():
             try:
                 value = data.get(field_name)
@@ -163,27 +203,40 @@ class DataValidator:
             except ValidationError as e:
                 errors.append(e)
 
-        # Campos não definidos no schema
+    def _handle_undefined_fields(
+        self,
+        data: dict[str, Any],
+        validated_data: dict[str, Any],
+        errors: list[ValidationError],
+        strict: bool,
+    ) -> None:
+        """Processa campos não definidos no schema."""
         if strict:
-            for field_name in data:
-                if field_name not in self.fields:
-                    errors.append(
-                        ValidationError(
-                            'Campo não permitido no schema',
-                            field_name,
-                            data[field_name],
-                        )
-                    )
+            self._reject_undefined_fields(data, errors)
         else:
-            # Inclui campos não definidos sem validação
-            for field_name, value in data.items():
-                if field_name not in validated_data:
-                    validated_data[field_name] = value
+            self._include_undefined_fields(data, validated_data)
 
-        if errors:
-            raise MultipleValidationError(errors)
+    def _reject_undefined_fields(
+        self, data: dict[str, Any], errors: list[ValidationError]
+    ) -> None:
+        """Rejeita campos não definidos no schema."""
+        for field_name in data:
+            if field_name not in self.fields:
+                errors.append(
+                    ValidationError(
+                        'Campo não permitido no schema',
+                        field_name,
+                        data[field_name],
+                    )
+                )
 
-        return validated_data
+    def _include_undefined_fields(
+        self, data: dict[str, Any], validated_data: dict[str, Any]
+    ) -> None:
+        """Inclui campos não definidos sem validação."""
+        for field_name, value in data.items():
+            if field_name not in validated_data:
+                validated_data[field_name] = value
 
 
 # Validadores customizados comuns
@@ -304,8 +357,8 @@ def validate_monetary_value(value: str | int | float | Decimal) -> str:
         # Formata com 2 casas decimais
         return f'{decimal_value:.2f}'
 
-    except (InvalidOperation, ValueError, TypeError):
-        raise ValueError('Valor monetário inválido')
+    except (InvalidOperation, ValueError, TypeError) as e:
+        raise ValueError('Valor monetário inválido') from e
 
 
 def validate_date_range(mes: int, ano: int, dia_inicial: int, dia_final: int) -> tuple:
@@ -334,7 +387,7 @@ def validate_date_range(mes: int, ano: int, dia_inicial: int, dia_final: int) ->
         datetime(ano, mes, dia_inicial)
         datetime(ano, mes, dia_final)
     except ValueError as e:
-        raise ValueError(f'Data inválida: {e}')
+        raise ValueError(f'Data inválida: {e}') from e
 
     return mes, ano, dia_inicial, dia_final
 

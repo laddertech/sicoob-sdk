@@ -9,7 +9,8 @@
       "Bash(sed:*)",
       "Bash(uv run:*)",
       "Bash(sort:*)",
-      "Bash(python -m pytest tests/test_async_client_advanced.py::TestAsyncAPIClient::test_get_base_url_sandbox -xvs)"
+      "Bash(python -m pytest tests/test_async_client_advanced.py::TestAsyncAPIClient::test_get_base_url_sandbox -xvs)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

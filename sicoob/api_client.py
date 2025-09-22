@@ -1,6 +1,7 @@
 import json
 import time
 import uuid
+from typing import Any
 
 import requests
 
@@ -157,7 +158,12 @@ class APIClientBase:
             ) from e
 
     def _make_request(
-        self, method: str, url: str, scope: str, operation: str = 'default', **kwargs
+        self,
+        method: str,
+        url: str,
+        scope: str,
+        operation: str = 'default',
+        **kwargs: Any,
     ) -> requests.Response:
         """Faz uma requisição HTTP com logging integrado
 

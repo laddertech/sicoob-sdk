@@ -33,7 +33,7 @@ from sicoob.validation import validate_cnpj, validate_cpf
 class AsyncBoletoAPI:
     """API assíncrona para operações de boleto bancário."""
 
-    def __init__(self, api_client: AsyncAPIClient):
+    def __init__(self, api_client: AsyncAPIClient) -> None:
         """Inicializa API de boleto assíncrona.
 
         Args:
@@ -108,7 +108,7 @@ class AsyncBoletoAPI:
         data_inicio: str | None = None,
         data_fim: str | None = None,
         situacao: str | None = None,
-        **filtros,
+        **filtros: Any,
     ) -> dict[str, Any]:
         """Lista boletos com filtros de forma assíncrona.
 

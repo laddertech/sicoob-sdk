@@ -93,7 +93,7 @@ class AsyncCacheBackend(ABC):
 class AsyncMemoryCacheBackend(AsyncCacheBackend):
     """Backend de cache em memória com suporte assíncrono."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._cache: dict[str, CacheEntry] = {}
         self._lock = asyncio.Lock()
 
@@ -134,7 +134,7 @@ class AsyncMemoryCacheBackend(AsyncCacheBackend):
 class AsyncDiskCacheBackend(AsyncCacheBackend):
     """Backend de cache em disco com suporte assíncrono."""
 
-    def __init__(self, cache_dir: str = '.cache'):
+    def __init__(self, cache_dir: str = '.cache') -> None:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(exist_ok=True)
         self._locks: dict[str, asyncio.Lock] = {}
@@ -168,13 +168,15 @@ class AsyncDiskCacheBackend(AsyncCacheBackend):
                 if HAS_AIOFILES:
                     async with aiofiles.open(cache_path, 'rb') as f:
                         data = await f.read()
+                        # nosec B301 - pickle usado para cache interno controlado
                         entry = pickle.loads(data)
                         entry.mark_accessed()
                         return entry
                 else:
                     # Fallback para operações síncronas
-                    def read_cache():
+                    def read_cache() -> CacheEntry:
                         with open(cache_path, 'rb') as f:
+                            # nosec B301 - pickle usado para cache interno controlado
                             return pickle.load(f)
 
                     entry = await asyncio.to_thread(read_cache)
@@ -201,7 +203,7 @@ class AsyncDiskCacheBackend(AsyncCacheBackend):
                         await f.write(data)
                 else:
                     # Fallback para operações síncronas
-                    def write_cache():
+                    def write_cache() -> None:
                         with open(cache_path, 'wb') as f:
                             f.write(data)
 
@@ -234,11 +236,12 @@ class AsyncDiskCacheBackend(AsyncCacheBackend):
         # Remove arquivos em paralelo (com limite de concorrência)
         semaphore = asyncio.Semaphore(10)
 
-        async def remove_file(file_path):
+        async def remove_file(file_path: Path) -> None:
             async with semaphore:
                 try:
                     file_path.unlink(missing_ok=True)
                 except Exception:
+                    # Log ignorado - remoção de cache é best-effort
                     pass
 
         if cache_files:
@@ -259,7 +262,7 @@ class AsyncDiskCacheBackend(AsyncCacheBackend):
 class AsyncCacheManager:
     """Gerenciador de cache assíncrono com múltiplas funcionalidades."""
 
-    def __init__(self, config: CacheConfig | None = None):
+    def __init__(self, config: CacheConfig | None = None) -> None:
         """Inicializa o gerenciador de cache assíncrono.
 
         Args:
@@ -287,10 +290,10 @@ class AsyncCacheManager:
         if self.config.cleanup_interval > 0:
             self._start_cleanup_task()
 
-    def _start_cleanup_task(self):
+    def _start_cleanup_task(self) -> None:
         """Inicia task de limpeza automática."""
 
-        async def cleanup_loop():
+        async def cleanup_loop() -> None:
             while not self._shutdown:
                 try:
                     await asyncio.sleep(self.config.cleanup_interval)
@@ -302,7 +305,7 @@ class AsyncCacheManager:
 
         self._cleanup_task = asyncio.create_task(cleanup_loop())
 
-    async def _cleanup_expired(self):
+    async def _cleanup_expired(self) -> None:
         """Remove entradas expiradas."""
         current_time = time.time()
         keys_to_remove = []
@@ -349,8 +352,10 @@ class AsyncCacheManager:
                 import zlib
 
                 decompressed = zlib.decompress(entry.value)
+                # nosec B301 - pickle usado para cache interno controlado
                 return pickle.loads(decompressed)
             elif isinstance(entry.value, bytes):
+                # nosec B301 - pickle usado para cache interno controlado
                 return pickle.loads(entry.value)
             else:
                 return entry.value
@@ -460,7 +465,7 @@ class AsyncCacheManager:
         self._invalidation_patterns.clear()
         self.metrics = CacheMetrics()
 
-    async def _evict_if_needed(self):
+    async def _evict_if_needed(self) -> None:
         """Remove entradas se cache está cheio."""
         if self.config.max_size <= 0:
             return
@@ -521,7 +526,7 @@ class AsyncCacheManager:
         # Remove em paralelo (com limite de concorrência)
         semaphore = asyncio.Semaphore(10)
 
-        async def remove_key(key):
+        async def remove_key(key: str) -> None:
             nonlocal removed_count
             async with semaphore:
                 if await self.delete(key):
@@ -552,7 +557,7 @@ class AsyncCacheManager:
         # Remove em paralelo
         semaphore = asyncio.Semaphore(10)
 
-        async def remove_key(key):
+        async def remove_key(key: str) -> None:
             nonlocal removed_count
             async with semaphore:
                 if await self.delete(key):
@@ -569,12 +574,12 @@ class AsyncCacheManager:
         key_prefix: str = '',
         tags: list[str] | None = None,
         key_func: Callable | None = None,
-    ):
+    ) -> Callable:
         """Decorator para cache assíncrono de funções."""
 
         def decorator(func: Callable[..., T]) -> Callable[..., T]:
             @wraps(func)
-            async def wrapper(*args, **kwargs) -> T:
+            async def wrapper(*args: Any, **kwargs: Any) -> T:
                 # Gera chave do cache
                 if key_func:
                     cache_key = key_func(*args, **kwargs)
@@ -614,7 +619,7 @@ class AsyncCacheManager:
             'disk_enabled': self.disk_backend is not None,
         }
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         """Para tasks e limpa recursos de forma assíncrona."""
         self._shutdown = True
 
@@ -646,12 +651,12 @@ def async_cached(
     key_prefix: str = '',
     tags: list[str] | None = None,
     key_func: Callable | None = None,
-):
+) -> Callable:
     """Decorator de conveniência usando cache assíncrono padrão."""
 
-    def decorator(func):
+    def decorator(func: Callable) -> Callable:
         @wraps(func)
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
             cache = await get_default_async_cache()
             cached_func = cache.cached(
                 ttl=ttl, key_prefix=key_prefix, tags=tags, key_func=key_func
