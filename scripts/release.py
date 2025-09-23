@@ -194,7 +194,9 @@ class ReleaseManager:
         print('📝 Next steps:')
         print('   1. Review the changes: git diff')
         print('   2. Add files: git add pyproject.toml setup.py sicoob/__init__.py')
-        print(f'   3. Commit: git commit -m "chore: :bookmark: Bump version to {new_version}"')
+        print(
+            f'   3. Commit: git commit -m "chore: :bookmark: Bump version to {new_version}"'
+        )
         print('   4. Create tag and push: make release-push')
         print('   5. Create GitHub release to trigger PyPI deployment')
 
