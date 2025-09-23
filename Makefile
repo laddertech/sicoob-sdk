@@ -29,13 +29,25 @@ clean: ## Limpar builds anteriores
 ## @ Atualiza versão do pacote
 
 bump-patch: ## Incrementar versão (patch)
-	uv run python scripts/bump_version.py patch
+	uv run python scripts/release.py patch
 
 bump-minor: ## Incrementar versão (minor)
-	uv run python scripts/bump_version.py minor
+	uv run python scripts/release.py minor
 
 bump-major: ## Incrementar versão (major)
-	uv run python scripts/bump_version.py major
+	uv run python scripts/release.py major
+
+release-patch: ## Preparar release patch completo (testes + versão + commit + tag)
+	uv run python scripts/release.py patch && git add -A && git commit -m "chore: :bookmark: Release $$(uv run python scripts/release.py --current | cut -d' ' -f3)" && git tag v$$(uv run python scripts/release.py --current | cut -d' ' -f3)
+
+release-minor: ## Preparar release minor completo (testes + versão + commit + tag)
+	uv run python scripts/release.py minor && git add -A && git commit -m "chore: :bookmark: Release $$(uv run python scripts/release.py --current | cut -d' ' -f3)" && git tag v$$(uv run python scripts/release.py --current | cut -d' ' -f3)
+
+release-major: ## Preparar release major completo (testes + versão + commit + tag)
+	uv run python scripts/release.py major && git add -A && git commit -m "chore: :bookmark: Release $$(uv run python scripts/release.py --current | cut -d' ' -f3)" && git tag v$$(uv run python scripts/release.py --current | cut -d' ' -f3)
+
+release-push: ## Fazer push do commit e tag da release
+	git push origin master --tags
 
 ## @ Verifica e formata código
 
