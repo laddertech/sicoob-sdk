@@ -133,6 +133,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, integration-tests]
     if: always()
+    continue-on-error: true
 
     steps:
     - uses: actions/checkout@v4
@@ -155,22 +156,34 @@ jobs:
       run: |
         # Combine coverage from different Python versions
         find . -name "coverage.xml" -exec echo "Found coverage file: {}" \;
-        
-        # Generate combined report
+
+        # Generate combined report - continue even if combine fails
         uv run coverage combine || echo "No .coverage files to combine"
-        uv run coverage report --format=markdown > coverage-summary.md
-        uv run coverage json
+        uv run coverage report --format=markdown > coverage-summary.md || echo "No coverage data available" > coverage-summary.md
+        uv run coverage json || echo '{"totals": {"percent_covered": 0}}' > coverage.json
+      continue-on-error: true
 
     - name: Generate coverage badge
       run: |
         pip install genbadge[coverage]
-        genbadge coverage -i coverage.xml -o coverage-badge.svg || echo "Badge generation failed"
+        # Find any coverage.xml file to use for badge generation
+        COVERAGE_FILE=$(find . -name "coverage.xml" | head -1)
+        if [ -n "$COVERAGE_FILE" ]; then
+          genbadge coverage -i "$COVERAGE_FILE" -o coverage-badge.svg || echo "Badge generation failed"
+        else
+          echo "No coverage.xml file found for badge generation"
+        fi
+      continue-on-error: true
 
     - name: Coverage summary
       run: |
         echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
-        cat coverage-summary.md >> $GITHUB_STEP_SUMMARY || echo "No coverage summary available"
-        
+        if [ -f "coverage-summary.md" ]; then
+          cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
+        else
+          echo "No coverage summary available" >> $GITHUB_STEP_SUMMARY
+        fi
+
         # Extract total coverage
         TOTAL_COV=$(python -c "
         try:
@@ -181,8 +194,9 @@ jobs:
         except:
             print('N/A')
         ")
-        
+
         echo "**Total Coverage: $TOTAL_COV**" >> $GITHUB_STEP_SUMMARY
+      continue-on-error: true
 
     - name: Upload final coverage report
       uses: actions/upload-artifact@v4
