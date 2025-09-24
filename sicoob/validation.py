@@ -396,22 +396,58 @@ def validate_date_range(mes: int, ano: int, dia_inicial: int, dia_final: int) ->
 
 
 def get_boleto_schema() -> DataValidator:
-    """Schema para emissão de boleto"""
+    """Schema para emissão de boleto conforme documentação oficial da API Sicoob"""
     return DataValidator(
         'boleto',
         [
-            FieldValidator('numeroContrato', required=True, data_type=int, min_value=1),
+            # Campos obrigatórios básicos
+            FieldValidator('numeroCliente', required=True, data_type=int, min_value=1),
             FieldValidator(
-                'modalidade', required=True, data_type=int, allowed_values=[1, 2, 3]
+                'codigoModalidade', required=True, data_type=int, allowed_values=[1]
             ),
             FieldValidator(
                 'numeroContaCorrente', required=True, data_type=int, min_value=1
             ),
             FieldValidator(
-                'especieDocumento',
+                'codigoEspecieDocumento',
                 required=True,
                 data_type=str,
-                allowed_values=['DM', 'DS', 'NP', 'RC', 'CH'],
+                max_length=3,
+                allowed_values=[
+                    'CH',
+                    'DM',
+                    'DMI',
+                    'DS',
+                    'DSI',
+                    'DR',
+                    'LC',
+                    'NCC',
+                    'NCE',
+                    'NCI',
+                    'NCR',
+                    'NP',
+                    'NPR',
+                    'TM',
+                    'TS',
+                    'NS',
+                    'RC',
+                    'FAT',
+                    'ND',
+                    'AP',
+                    'ME',
+                    'PC',
+                    'NF',
+                    'DD',
+                    'CC',
+                    'BDP',
+                    'OU',
+                ],
+            ),
+            FieldValidator(
+                'dataEmissao',
+                required=True,
+                data_type=str,
+                pattern=r'^\d{4}-\d{2}-\d{2}$',
             ),
             FieldValidator(
                 'dataVencimento',
@@ -420,27 +456,101 @@ def get_boleto_schema() -> DataValidator:
                 pattern=r'^\d{4}-\d{2}-\d{2}$',
             ),
             FieldValidator(
-                'valorNominal',
+                'valor',
+                required=True,
+                data_type=float,
+                min_value=0.01,
+            ),
+            FieldValidator(
+                'seuNumero',
                 required=True,
                 data_type=str,
-                custom_validator=validate_monetary_value,
+                max_length=18,
             ),
-            FieldValidator('nossoNumero', required=False, data_type=str, max_length=20),
-            FieldValidator('seuNumero', required=False, data_type=str, max_length=15),
             FieldValidator(
-                'tipoDesconto',
-                required=False,
+                'identificacaoEmissaoBoleto',
+                required=True,
                 data_type=int,
-                allowed_values=[0, 1, 2, 3],
+                allowed_values=[1, 2],
             ),
             FieldValidator(
-                'valorDesconto1',
+                'identificacaoDistribuicaoBoleto',
+                required=True,
+                data_type=int,
+                allowed_values=[1, 2],
+            ),
+            # Campos opcionais
+            FieldValidator('nossoNumero', required=False, data_type=int),
+            FieldValidator(
+                'identificacaoBoletoEmpresa',
                 required=False,
                 data_type=str,
-                custom_validator=validate_monetary_value,
+                max_length=25,
             ),
             FieldValidator(
-                'dataDesconto1',
+                'dataLimitePagamento',
+                required=False,
+                data_type=str,
+                pattern=r'^\d{4}-\d{2}-\d{2}$',
+            ),
+            FieldValidator(
+                'valorAbatimento',
+                required=False,
+                data_type=float,
+                min_value=0,
+            ),
+            # Campos de desconto
+            FieldValidator(
+                'tipoDesconto',
+                required=True,
+                data_type=int,
+                allowed_values=[0, 1, 2, 3, 4, 5, 6],
+            ),
+            FieldValidator(
+                'dataPrimeiroDesconto',
+                required=False,
+                data_type=str,
+                pattern=r'^\d{4}-\d{2}-\d{2}$',
+            ),
+            FieldValidator(
+                'valorPrimeiroDesconto',
+                required=False,
+                data_type=float,
+                min_value=0,
+            ),
+            FieldValidator(
+                'dataSegundoDesconto',
+                required=False,
+                data_type=str,
+                pattern=r'^\d{4}-\d{2}-\d{2}$',
+            ),
+            FieldValidator(
+                'valorSegundoDesconto',
+                required=False,
+                data_type=float,
+                min_value=0,
+            ),
+            FieldValidator(
+                'dataTerceiroDesconto',
+                required=False,
+                data_type=str,
+                pattern=r'^\d{4}-\d{2}-\d{2}$',
+            ),
+            FieldValidator(
+                'valorTerceiroDesconto',
+                required=False,
+                data_type=float,
+                min_value=0,
+            ),
+            # Campos de multa
+            FieldValidator(
+                'tipoMulta',
+                required=True,
+                data_type=int,
+                allowed_values=[0, 1, 2],
+            ),
+            FieldValidator(
+                'dataMulta',
                 required=False,
                 data_type=str,
                 pattern=r'^\d{4}-\d{2}-\d{2}$',
@@ -448,18 +558,79 @@ def get_boleto_schema() -> DataValidator:
             FieldValidator(
                 'valorMulta',
                 required=False,
-                data_type=str,
-                custom_validator=validate_monetary_value,
+                data_type=float,
+                min_value=0,
+            ),
+            # Campos de juros
+            FieldValidator(
+                'tipoJurosMora',
+                required=True,
+                data_type=int,
+                allowed_values=[1, 2, 3],
             ),
             FieldValidator(
-                'valorJuros',
+                'dataJurosMora',
                 required=False,
                 data_type=str,
-                custom_validator=validate_monetary_value,
+                pattern=r'^\d{4}-\d{2}-\d{2}$',
             ),
+            FieldValidator(
+                'valorJurosMora',
+                required=False,
+                data_type=float,
+                min_value=0,
+            ),
+            # Outros campos
+            FieldValidator(
+                'numeroParcela',
+                required=True,
+                data_type=int,
+                min_value=1,
+                max_value=99,
+            ),
+            FieldValidator('aceite', required=False, data_type=bool),
+            FieldValidator(
+                'codigoNegativacao',
+                required=False,
+                data_type=int,
+                allowed_values=[2, 3],
+            ),
+            FieldValidator(
+                'numeroDiasNegativacao',
+                required=False,
+                data_type=int,
+                min_value=1,
+            ),
+            FieldValidator(
+                'codigoProtesto',
+                required=False,
+                data_type=int,
+                allowed_values=[1, 2, 3],
+            ),
+            FieldValidator(
+                'numeroDiasProtesto',
+                required=False,
+                data_type=int,
+                min_value=1,
+            ),
+            # Estruturas complexas
             FieldValidator('pagador', required=True, data_type=dict),
             FieldValidator('beneficiarioFinal', required=False, data_type=dict),
-            FieldValidator('mensagem', required=False, data_type=str, max_length=500),
+            FieldValidator('mensagensInstrucao', required=False, data_type=list),
+            FieldValidator('gerarPdf', required=False, data_type=bool),
+            FieldValidator('rateioCreditos', required=False, data_type=list),
+            FieldValidator(
+                'codigoCadastrarPIX',
+                required=False,
+                data_type=int,
+                allowed_values=[0, 1, 2],
+            ),
+            FieldValidator(
+                'numeroContratoCobranca',
+                required=False,
+                data_type=int,
+                min_value=1,
+            ),
         ],
     )
 
@@ -496,27 +667,110 @@ def get_webhook_schema() -> DataValidator:
 
 
 def get_pagador_schema() -> DataValidator:
-    """Schema para dados do pagador"""
+    """Schema para dados do pagador conforme documentação oficial da API Sicoob"""
     return DataValidator(
         'pagador',
         [
             FieldValidator(
-                'nome', required=True, data_type=str, min_length=1, max_length=70
-            ),
-            FieldValidator(
-                'cpfCnpj',
+                'numeroCpfCnpj',
                 required=True,
                 data_type=str,
+                max_length=14,
                 custom_validator=lambda x: validate_cpf(x)
                 if len(re.sub(r'[^\d]', '', x)) == 11
                 else validate_cnpj(x),
             ),
             FieldValidator(
+                'nome', required=True, data_type=str, min_length=1, max_length=50
+            ),
+            FieldValidator('endereco', required=True, data_type=str, max_length=40),
+            FieldValidator('bairro', required=True, data_type=str, max_length=30),
+            FieldValidator('cidade', required=True, data_type=str, max_length=40),
+            FieldValidator(
+                'cep', required=True, data_type=str, max_length=8, pattern=r'^\d{8}$'
+            ),
+            FieldValidator(
+                'uf', required=True, data_type=str, max_length=2, pattern=r'^[A-Z]{2}$'
+            ),
+            FieldValidator(
                 'email', required=False, data_type=str, custom_validator=validate_email
             ),
-            FieldValidator('endereco', required=False, data_type=dict),
+        ],
+    )
+
+
+def get_beneficiario_final_schema() -> DataValidator:
+    """Schema para dados do beneficiário final (antigo sacador avalista)"""
+    return DataValidator(
+        'beneficiario_final',
+        [
             FieldValidator(
-                'telefone', required=False, data_type=str, pattern=r'^\d{10,11}$'
+                'numeroCpfCnpj',
+                required=True,
+                data_type=str,
+                max_length=14,
+                custom_validator=lambda x: validate_cpf(x)
+                if len(re.sub(r'[^\d]', '', x)) == 11
+                else validate_cnpj(x),
+            ),
+            FieldValidator(
+                'nome', required=True, data_type=str, min_length=1, max_length=50
+            ),
+        ],
+    )
+
+
+def get_rateio_credito_schema() -> DataValidator:
+    """Schema para dados de rateio de crédito"""
+    return DataValidator(
+        'rateio_credito',
+        [
+            FieldValidator('numeroBanco', required=True, data_type=int, min_value=1),
+            FieldValidator('numeroAgencia', required=True, data_type=int, min_value=1),
+            FieldValidator('numeroContaCorrente', required=True, data_type=str),
+            FieldValidator('contaPrincipal', required=True, data_type=bool),
+            FieldValidator(
+                'codigoTipoValorRateio',
+                required=True,
+                data_type=int,
+                allowed_values=[1, 2],
+            ),
+            FieldValidator('valorRateio', required=True, data_type=str),
+            FieldValidator(
+                'codigoTipoCalculoRateio',
+                required=False,
+                data_type=int,
+                allowed_values=[1],
+            ),
+            FieldValidator(
+                'numeroCpfCnpjTitular',
+                required=False,
+                data_type=str,
+                max_length=14,
+            ),
+            FieldValidator('nomeTitular', required=True, data_type=str, max_length=50),
+            FieldValidator(
+                'codigoFinalidadeTed',
+                required=False,
+                data_type=str,
+            ),
+            FieldValidator(
+                'codigoTipoContaDestinoTed',
+                required=False,
+                data_type=str,
+                allowed_values=['CC', 'CD', 'CG'],
+            ),
+            FieldValidator(
+                'quantidadeDiasFloat',
+                required=False,
+                data_type=int,
+                min_value=1,
+            ),
+            FieldValidator(
+                'dataFloatCredito',
+                required=False,
+                data_type=str,
+                pattern=r'^\d{4}-\d{2}-\d{2}$',
             ),
         ],
     )
@@ -536,6 +790,8 @@ def validate_input(
                 'pix_cobranca': get_pix_cobranca_schema(),
                 'webhook': get_webhook_schema(),
                 'pagador': get_pagador_schema(),
+                'beneficiario_final': get_beneficiario_final_schema(),
+                'rateio_credito': get_rateio_credito_schema(),
             }
 
             if schema_name not in schemas:

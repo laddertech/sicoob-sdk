@@ -38,13 +38,29 @@ def test_emitir_boleto_sucesso(boleto_client: BoletoAPI) -> None:
 
     # Dados de teste
     dados = {
-        'numeroContrato': 123456,
-        'modalidade': 1,
+        'numeroCliente': 123456,
+        'codigoModalidade': 1,
         'numeroContaCorrente': 12345,
-        'especieDocumento': 'DM',
+        'codigoEspecieDocumento': 'DM',
+        'dataEmissao': '2024-01-01',
         'dataVencimento': '2024-12-31',
-        'valorNominal': '100.50',
-        'pagador': {'nome': 'João Silva', 'cpfCnpj': '11144477735'},
+        'valor': 100.50,
+        'seuNumero': '123456789',
+        'identificacaoEmissaoBoleto': 1,
+        'identificacaoDistribuicaoBoleto': 1,
+        'tipoDesconto': 0,
+        'tipoMulta': 0,
+        'tipoJurosMora': 3,
+        'numeroParcela': 1,
+        'pagador': {
+            'numeroCpfCnpj': '11144477735',
+            'nome': 'João Silva',
+            'endereco': 'Rua Teste, 123',
+            'bairro': 'Centro',
+            'cidade': 'São Paulo',
+            'cep': '01001000',
+            'uf': 'SP',
+        },
     }
 
     # Chama o método
@@ -74,13 +90,29 @@ def test_emitir_boleto_erro_http(boleto_client: BoletoAPI) -> None:
     boleto_client.session.post.return_value = mock_response
 
     dados = {
-        'numeroContrato': 123456,
-        'modalidade': 1,
+        'numeroCliente': 123456,
+        'codigoModalidade': 1,
         'numeroContaCorrente': 12345,
-        'especieDocumento': 'DM',
+        'codigoEspecieDocumento': 'DM',
+        'dataEmissao': '2024-01-01',
         'dataVencimento': '2024-12-31',
-        'valorNominal': '100.50',
-        'pagador': {'nome': 'João Silva', 'cpfCnpj': '11144477735'},
+        'valor': 100.50,
+        'seuNumero': '123456789',
+        'identificacaoEmissaoBoleto': 1,
+        'identificacaoDistribuicaoBoleto': 1,
+        'tipoDesconto': 0,
+        'tipoMulta': 0,
+        'tipoJurosMora': 3,
+        'numeroParcela': 1,
+        'pagador': {
+            'numeroCpfCnpj': '11144477735',
+            'nome': 'João Silva',
+            'endereco': 'Rua Teste, 123',
+            'bairro': 'Centro',
+            'cidade': 'São Paulo',
+            'cep': '01001000',
+            'uf': 'SP',
+        },
     }
 
     # Verifica se exceção é levantada
@@ -101,13 +133,29 @@ def test_emitir_boleto_erro_generico(boleto_client: BoletoAPI) -> None:
     )
 
     dados = {
-        'numeroContrato': 123456,
-        'modalidade': 1,
+        'numeroCliente': 123456,
+        'codigoModalidade': 1,
         'numeroContaCorrente': 12345,
-        'especieDocumento': 'DM',
+        'codigoEspecieDocumento': 'DM',
+        'dataEmissao': '2024-01-01',
         'dataVencimento': '2024-12-31',
-        'valorNominal': '100.50',
-        'pagador': {'nome': 'João Silva', 'cpfCnpj': '11144477735'},
+        'valor': 100.50,
+        'seuNumero': '123456789',
+        'identificacaoEmissaoBoleto': 1,
+        'identificacaoDistribuicaoBoleto': 1,
+        'tipoDesconto': 0,
+        'tipoMulta': 0,
+        'tipoJurosMora': 3,
+        'numeroParcela': 1,
+        'pagador': {
+            'numeroCpfCnpj': '11144477735',
+            'nome': 'João Silva',
+            'endereco': 'Rua Teste, 123',
+            'bairro': 'Centro',
+            'cidade': 'São Paulo',
+            'cep': '01001000',
+            'uf': 'SP',
+        },
     }
 
     # Verifica se exceção é levantada

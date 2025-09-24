@@ -384,23 +384,39 @@ class TestSchemas:
         schema = get_boleto_schema()
 
         valid_data = {
-            'numeroContrato': 12345,
-            'modalidade': 1,
+            'numeroCliente': 12345,
+            'codigoModalidade': 1,
             'numeroContaCorrente': 67890,
-            'especieDocumento': 'DM',
+            'codigoEspecieDocumento': 'DM',
+            'dataEmissao': '2024-01-01',
             'dataVencimento': '2024-12-31',
-            'valorNominal': '100.00',
-            'pagador': {'nome': 'João', 'cpf': '12345678901'},
+            'valor': 100.00,
+            'seuNumero': '123456789',
+            'identificacaoEmissaoBoleto': 1,
+            'identificacaoDistribuicaoBoleto': 1,
+            'tipoDesconto': 0,
+            'tipoMulta': 0,
+            'tipoJurosMora': 3,
+            'numeroParcela': 1,
+            'pagador': {
+                'numeroCpfCnpj': '11144477735',
+                'nome': 'João Silva',
+                'endereco': 'Rua Teste, 123',
+                'bairro': 'Centro',
+                'cidade': 'São Paulo',
+                'cep': '01001000',
+                'uf': 'SP',
+            },
         }
 
         # Deve validar sem erro
         result = schema.validate(valid_data, strict=False)
-        assert result['numeroContrato'] == 12345
-        assert result['modalidade'] == 1
+        assert result['numeroCliente'] == 12345
+        assert result['codigoModalidade'] == 1
 
         # Campo obrigatório faltando
         invalid_data = valid_data.copy()
-        del invalid_data['numeroContrato']
+        del invalid_data['numeroCliente']
 
         with pytest.raises(MultipleValidationError):
             schema.validate(invalid_data)
@@ -436,13 +452,18 @@ class TestSchemas:
         schema = get_pagador_schema()
 
         valid_data = {
+            'numeroCpfCnpj': '11144477735',
             'nome': 'João Silva',
-            'cpfCnpj': '11144477735',
+            'endereco': 'Rua Teste, 123',
+            'bairro': 'Centro',
+            'cidade': 'São Paulo',
+            'cep': '01001000',
+            'uf': 'SP',
         }
 
         result = schema.validate(valid_data, strict=False)
         assert result['nome'] == 'João Silva'
-        assert result['cpfCnpj'] == '11144477735'
+        assert result['numeroCpfCnpj'] == '11144477735'
 
 
 class TestValidateInputDecorator:
