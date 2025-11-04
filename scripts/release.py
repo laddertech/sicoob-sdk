@@ -120,11 +120,41 @@ class ReleaseManager:
 
         return result
 
+    def auto_commit_uv_lock(self) -> None:
+        """Automatically commit uv.lock if it's the only modified file."""
+        result = self.run_command(['git', 'status', '--porcelain'])
+        if not result.stdout.strip():
+            return
+
+        # Verifica se há mudanças no uv.lock
+        uv_lock_changes = [
+            line
+            for line in result.stdout.strip().split('\n')
+            if line and line.strip().endswith('uv.lock')
+        ]
+
+        if uv_lock_changes:
+            print('📦 uv.lock foi modificado, adicionando ao commit automaticamente...')
+            self.run_command(['git', 'add', 'uv.lock'])
+            self.run_command(
+                [
+                    'git',
+                    'commit',
+                    '-m',
+                    'chore: :lock: Update uv.lock\n\nDependency lock file updated automatically.',
+                ]
+            )
+            print('✅ uv.lock commitado com sucesso')
+
     def check_git_status(self) -> None:
-        """Check if git working directory is clean (ignoring uv.lock)."""
+        """Check if git working directory is clean (auto-committing uv.lock if needed)."""
+        # Primeiro tenta commitar uv.lock automaticamente se necessário
+        self.auto_commit_uv_lock()
+
+        # Agora verifica se há outras mudanças
         result = self.run_command(['git', 'status', '--porcelain'])
         if result.stdout.strip():
-            # Filtrar apenas mudanças que não sejam uv.lock
+            # Filtrar mudanças (uv.lock já foi tratado)
             changes = [
                 line
                 for line in result.stdout.strip().split('\n')
