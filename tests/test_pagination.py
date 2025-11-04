@@ -1,8 +1,6 @@
 """Testes para módulo de paginação."""
 
-import math
-import time
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -14,7 +12,6 @@ from sicoob.pagination import (
     PageInfo,
     PaginatedIterator,
     PaginationConfig,
-    PaginationStrategy,
     SicoobPaginationStrategy,
     paginated_response_from_data,
 )

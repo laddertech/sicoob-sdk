@@ -1,6 +1,5 @@
 """Testes para o módulo async_pix.py"""
 
-import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, Mock, patch
 

@@ -15,9 +15,9 @@ Exemplos incluídos:
 import asyncio
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any
 
-from sicoob.async_cache import AsyncCacheManager, async_cached
+from sicoob.async_cache import AsyncCacheManager
 from sicoob.async_client import (
     AsyncSicoob,
     async_batch_processor,
@@ -283,7 +283,7 @@ async def exemplo_processamento_grandes_volumes():
         print(f'Processando extratos de {len(contas)} contas')
         print(f'Período: {data_inicio} a {data_fim}')
 
-        async def processar_conta(numero_conta: str) -> Dict[str, Any]:
+        async def processar_conta(numero_conta: str) -> dict[str, Any]:
             """Processa extrato de uma conta específica."""
             try:
                 extrato = await client.conta_corrente.get_extrato(
@@ -441,7 +441,7 @@ async def exemplo_integracao_completa():
         print('\n💰 Criando cobranças PIX...')
         cobrancas_criar = []
 
-        for i, (conta, saldo_info) in enumerate(zip(contas, saldos)):
+        for i, (conta, saldo_info) in enumerate(zip(contas, saldos, strict=False)):
             if isinstance(saldo_info, dict) and not saldo_info.get('erro'):
                 valor = min(100.0, float(saldo_info.get('saldo', 0)) * 0.1)
 

@@ -3,13 +3,11 @@
 import asyncio
 import json
 import ssl
-import time
-import uuid
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 import pytest_asyncio
-from aiohttp import ClientSession, ClientTimeout, TCPConnector
+from aiohttp import ClientSession
 
 from sicoob.async_client import (
     AsyncAPIClient,

@@ -2,8 +2,6 @@
 
 from unittest.mock import Mock
 
-import pytest
-
 from sicoob.exceptions import (
     AutenticacaoError,
     BoletoAlteracaoError,

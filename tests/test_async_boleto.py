@@ -1,7 +1,6 @@
 """Testes para o módulo async_boleto.py"""
 
-import asyncio
-from datetime import date, timedelta
+from datetime import date
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest

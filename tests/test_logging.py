@@ -4,10 +4,7 @@ import io
 import json
 import logging
 import os
-import sys
-from unittest.mock import Mock, patch
-
-import pytest
+from unittest.mock import patch
 
 from sicoob.logging_config import (
     JSONFormatter,

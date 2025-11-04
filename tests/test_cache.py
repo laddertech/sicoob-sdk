@@ -5,8 +5,6 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any
-from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -25,12 +23,7 @@ from sicoob.exceptions import (
     CacheBackendError,
     CacheConfigurationError,
     CacheError,
-    CacheEvictionError,
-    CacheExpiredError,
-    CacheFullError,
     CacheInvalidationError,
-    CacheKeyError,
-    CacheSerializationError,
 )
 
 

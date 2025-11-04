@@ -4,22 +4,18 @@ import asyncio
 import shutil
 import tempfile
 import time
-from pathlib import Path
-from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
 
 from sicoob.async_cache import (
     AsyncCacheManager,
-    AsyncDiskCacheBackend,
     AsyncMemoryCacheBackend,
     async_cached,
     get_default_async_cache,
 )
 from sicoob.cache import CacheConfig, CacheEntry, EvictionPolicy
 from sicoob.exceptions import (
-    CacheBackendError,
     CacheError,
     CacheSerializationError,
 )

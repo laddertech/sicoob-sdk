@@ -1,8 +1,7 @@
 """Testes para o sistema de autenticação OAuth2"""
 
-import os
 import time
-from unittest.mock import Mock, mock_open, patch
+from unittest.mock import Mock, patch
 
 import pytest
 import requests
