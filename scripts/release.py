@@ -121,14 +121,21 @@ class ReleaseManager:
         return result
 
     def check_git_status(self) -> None:
-        """Check if git working directory is clean."""
+        """Check if git working directory is clean (ignoring uv.lock)."""
         result = self.run_command(['git', 'status', '--porcelain'])
         if result.stdout.strip():
-            print(
-                '❌ Git working directory is not clean. Please commit your changes first.'
-            )
-            print(result.stdout)
-            sys.exit(1)
+            # Filtrar apenas mudanças que não sejam uv.lock
+            changes = [
+                line
+                for line in result.stdout.strip().split('\n')
+                if line and not line.strip().endswith('uv.lock')
+            ]
+            if changes:
+                print(
+                    '❌ Git working directory is not clean. Please commit your changes first.'
+                )
+                print('\n'.join(changes))
+                sys.exit(1)
         print('✅ Git working directory is clean')
 
     def run_tests(self) -> None:
