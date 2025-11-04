@@ -308,6 +308,94 @@ class ResilientHTTPAdapter(HTTPAdapter):
         ) from last_exception
 
 
+class ResilientPKCS12Adapter(ResilientHTTPAdapter):
+    """Adaptador HTTP resiliente que preserva funcionalidade PKCS12"""
+
+    def __init__(
+        self,
+        retry_config: RetryConfig,
+        pkcs12_adapter: Any,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """Inicializa adaptador híbrido com retry e PKCS12
+
+        Args:
+            retry_config: Configuração de retry
+            pkcs12_adapter: Adaptador PKCS12 original a ser preservado
+        """
+        super().__init__(retry_config, *args, **kwargs)
+        self.pkcs12_adapter = pkcs12_adapter
+
+        # Preserva propriedades do adaptador PKCS12 original
+        if hasattr(pkcs12_adapter, 'pkcs12_data'):
+            self.pkcs12_data = pkcs12_adapter.pkcs12_data
+        if hasattr(pkcs12_adapter, 'pkcs12_filename'):
+            self.pkcs12_filename = pkcs12_adapter.pkcs12_filename
+        if hasattr(pkcs12_adapter, 'pkcs12_password'):
+            self.pkcs12_password = pkcs12_adapter.pkcs12_password
+
+    def send(self, request: Any, **kwargs: Any) -> requests.Response:
+        """Envia requisição com retry automático preservando autenticação PKCS12"""
+        attempt = 0
+        last_exception = None
+
+        while attempt <= self.retry_config.max_retries:
+            try:
+                # Usa o adaptador PKCS12 original para enviar a requisição
+                response = self.pkcs12_adapter.send(request, **kwargs)
+
+                # Verifica se status indica erro temporário
+                if response.status_code in RetryableErrors.TEMPORARY_HTTP_ERRORS:
+                    raise requests.exceptions.HTTPError(
+                        f'Erro HTTP temporário: {response.status_code}',
+                        response=response,
+                    )
+
+                return response
+
+            except Exception as e:
+                last_exception = e
+
+                # Se é erro permanente, não tenta novamente
+                if RetryableErrors.is_permanent_error(e):
+                    self.logger.info(
+                        f'Erro permanente detectado, não tentando novamente: {e}',
+                        extra={'operation': 'permanent_error_no_retry'},
+                    )
+                    raise
+
+                # Se não é retentável ou já tentou todas as vezes
+                if (
+                    not RetryableErrors.is_retryable_error(e)
+                    or attempt >= self.retry_config.max_retries
+                ):
+                    break
+
+                delay = self.retry_config.calculate_delay(attempt)
+
+                self.logger.warning(
+                    f'Tentativa {attempt + 1}/{self.retry_config.max_retries + 1} falhou: {e}. '
+                    f'Tentando novamente em {delay:.2f}s',
+                    extra={
+                        'operation': 'retry_attempt_pkcs12',
+                        'attempt': attempt + 1,
+                        'max_retries': self.retry_config.max_retries + 1,
+                        'delay': delay,
+                        'error': str(e),
+                    },
+                )
+
+                time.sleep(delay)
+                attempt += 1
+
+        # Se chegou aqui, todas as tentativas falharam
+        raise MaxRetriesExceededError(
+            f'Máximo de {self.retry_config.max_retries} tentativas excedido com PKCS12. '
+            f'Último erro: {last_exception}'
+        ) from last_exception
+
+
 # Global circuit breakers por endpoint
 _circuit_breakers: dict[str, CircuitBreaker] = {}
 

@@ -5,6 +5,7 @@ para diferentes cenários de uso: desenvolvimento, testes, produção, etc.
 """
 
 import os
+
 from sicoob import Sicoob
 from sicoob.logging_config import SicoobLogger
 
@@ -262,4 +263,4 @@ if __name__ == '__main__':
         exemplos[ambiente]()
     else:
         print(f'Ambientes disponíveis: {", ".join(exemplos.keys())}')
-        print(f'Execute: EXEMPLO_AMBIENTE=producao python logging_examples.py')
+        print('Execute: EXEMPLO_AMBIENTE=producao python logging_examples.py')

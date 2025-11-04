@@ -1,13 +1,14 @@
 """Testes para o módulo async_pix.py"""
 
 import asyncio
+from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
 import pytest_asyncio
-from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime, timedelta
 
-from sicoob.async_pix import AsyncPixAPI
 from sicoob.async_client import AsyncAPIClient
+from sicoob.async_pix import AsyncPixAPI
 from sicoob.exceptions import (
     CobrancaPixNaoEncontradaError,
     PixError,

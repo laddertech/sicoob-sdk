@@ -20,7 +20,6 @@ class Sicoob:
         chave_privada: str | None = None,
         certificado_pfx: str | bytes | BinaryIO | None = None,
         senha_pfx: str | None = None,
-        sandbox_mode: bool | None = None,
         environment: str | Environment | None = None,
     ) -> None:
         """Inicializa o cliente com credenciais
@@ -31,7 +30,6 @@ class Sicoob:
             chave_privada: Path para a chave privada PEM (opcional)
             certificado_pfx: Path (str), bytes ou arquivo aberto (BinaryIO) do certificado PFX (opcional)
             senha_pfx: Senha do certificado PFX (opcional)
-            sandbox_mode: Modo sandbox (DEPRECATED: use environment)
             environment: Ambiente (development, test, staging, production, sandbox)
         """
         load_dotenv()
@@ -53,13 +51,6 @@ class Sicoob:
                 env = environment
             SicoobConfig.set_environment(env)
 
-        # Para compatibilidade com sandbox_mode (DEPRECATED)
-        elif sandbox_mode is not None:
-            if sandbox_mode:
-                SicoobConfig.set_environment(Environment.SANDBOX)
-            else:
-                SicoobConfig.set_environment(Environment.PRODUCTION)
-
         # Configuração automática de logging baseada no ambiente
         config = SicoobConfig.get_current_config()
         SicoobLogger.configure(
@@ -79,8 +70,6 @@ class Sicoob:
         self.certificado_pfx = certificado_pfx or os.getenv('SICOOB_CERTIFICADO_PFX')
         self.senha_pfx = senha_pfx or os.getenv('SICOOB_SENHA_PFX')
 
-        # Mantém sandbox_mode para compatibilidade
-        self.sandbox_mode = SicoobConfig.is_sandbox()
         self.environment = config.environment
 
         # Valida credenciais mínimas
@@ -96,7 +85,6 @@ class Sicoob:
             extra={
                 'operation': 'client_init',
                 'environment': config.environment.value,
-                'sandbox_mode': self.sandbox_mode,  # Para compatibilidade
                 'has_certificate': bool(certificado or certificado_pfx),
                 'auth_method': 'pfx'
                 if certificado_pfx
@@ -133,7 +121,6 @@ class Sicoob:
             chave_privada=self.chave_privada,
             certificado_pfx=self.certificado_pfx,
             senha_pfx=self.senha_pfx,
-            sandbox_mode=self.sandbox_mode,
         )
 
         # Armazena a sessão do OAuth2Client
@@ -177,7 +164,7 @@ class Sicoob:
             >>> pix = sicoob.cobranca.pix.criar_cobranca_pix(txid, dados)
         """
 
-        return CobrancaAPI(self.oauth_client, self.session, self.sandbox_mode)
+        return CobrancaAPI(self.oauth_client, self.session)
 
     @property
     def conta_corrente(self) -> ContaCorrenteAPI:
@@ -195,4 +182,4 @@ class Sicoob:
             >>> transferencia = sicoob.conta_corrente.transferencia(valor, conta_destino)
         """
 
-        return ContaCorrenteAPI(self.oauth_client, self.session, self.sandbox_mode)
+        return ContaCorrenteAPI(self.oauth_client, self.session)

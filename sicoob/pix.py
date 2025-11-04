@@ -16,7 +16,7 @@ Classes:
 
 Example:
     >>> from sicoob import Sicoob
-    >>> cliente = Sicoob(client_id="123", sandbox_mode=True)
+    >>> cliente = Sicoob(client_id="123", environment="sandbox")
     >>> cobranca = cliente.pix.criar_cobranca_imediata(
     ...     txid="abcd1234567890123456789012345",
     ...     dados={
@@ -35,6 +35,7 @@ import requests
 from pypix_api.banks.sicoob import SicoobPixAPI
 
 from sicoob.api_client import APIClientBase
+from sicoob.config import SicoobConfig
 from sicoob.exceptions import (
     CobrancaPixNaoEncontradaError,
     PixError,
@@ -69,23 +70,21 @@ class PixAPI(APIClientBase):
         - Validações específicas do Sicoob (se necessário)
     """
 
-    def __init__(self, oauth_client, session, sandbox_mode=False):
+    def __init__(self, oauth_client, session):
         """Inicializa a API PIX.
 
         Args:
             oauth_client: Cliente OAuth2 para autenticação
             session: Sessão HTTP (mantida por compatibilidade)
-            sandbox_mode: Se True, habilita modo sandbox (default: False)
 
         Note:
-            Em modo sandbox, as operações não afetam dados reais e podem
-            usar dados fictícios para testes.
+            O ambiente é controlado via SicoobConfig.
         """
-        super().__init__(oauth_client, session, sandbox_mode)
+        super().__init__(oauth_client, session)
 
         # Inicializa a implementação PIX customizada do Sicoob
         self._pix_api = SicoobPixAPICustom(
-            oauth=oauth_client, sandbox_mode=sandbox_mode
+            oauth=oauth_client, sandbox_mode=SicoobConfig.is_sandbox()
         )
 
     def __getattr__(self, name: str) -> Any:

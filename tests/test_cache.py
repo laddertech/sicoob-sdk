@@ -1,36 +1,36 @@
 """Testes para o sistema de cache sofisticado."""
 
-import time
-import threading
-import tempfile
 import shutil
+import tempfile
+import threading
+import time
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 from typing import Any
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 from sicoob.cache import (
     CacheConfig,
-    CacheManager,
-    EvictionPolicy,
-    CacheStrategy,
-    MemoryCacheBackend,
-    DiskCacheBackend,
     CacheEntry,
+    CacheManager,
+    CacheStrategy,
+    DiskCacheBackend,
+    EvictionPolicy,
+    MemoryCacheBackend,
     cached,
     get_default_cache,
 )
 from sicoob.exceptions import (
-    CacheError,
     CacheBackendError,
     CacheConfigurationError,
+    CacheError,
+    CacheEvictionError,
+    CacheExpiredError,
+    CacheFullError,
     CacheInvalidationError,
     CacheKeyError,
     CacheSerializationError,
-    CacheFullError,
-    CacheExpiredError,
-    CacheEvictionError,
 )
 
 

@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from sicoob.auth import OAuth2Client
 
 from sicoob.boleto import BoletoAPI
+from sicoob.config import SicoobConfig
 from sicoob.pix import PixAPI
 
 
@@ -22,20 +23,18 @@ class CobrancaAPI:
         self,
         oauth_client: 'OAuth2Client',
         session: 'requests.Session',
-        sandbox_mode: bool = False,
     ):
         """Inicializa a API de cobrança
 
         Args:
             oauth_client: Cliente OAuth2 para autenticação
             session: Sessão de requests configurada
-            sandbox_mode: Modo sandbox (default: False)
         """
-        self.boleto = BoletoAPI(oauth_client, session, sandbox_mode=sandbox_mode)
-        self.pix = PixAPI(oauth_client, session, sandbox_mode=sandbox_mode)
+        self.boleto = BoletoAPI(oauth_client, session)
+        self.pix = PixAPI(oauth_client, session)
 
     def __repr__(self):
-        return f'<CobrancaAPI sandbox={self.boleto.sandbox_mode}>'
+        return f'<CobrancaAPI environment={SicoobConfig.get_current_config().environment.value}>'
 
 
 __all__ = ['BoletoAPI', 'CobrancaAPI', 'PixAPI']

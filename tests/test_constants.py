@@ -1,7 +1,9 @@
 """Testes para o módulo constants.py"""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from sicoob import constants
 from sicoob.config import SicoobConfig
 

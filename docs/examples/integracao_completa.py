@@ -55,7 +55,7 @@ def exemplo_completo():
         },
     )
 
-    print(f'✅ Cobrança PIX criada!')
+    print('✅ Cobrança PIX criada!')
     print(f'   - TxID: {cobranca_pix.get("txid")}')
     print(f'   - Status: {cobranca_pix.get("status")}')
     print(f'   - QR Code: {cobranca_pix.get("pixCopiaECola", "")[:50]}...')
@@ -121,7 +121,7 @@ def exemplo_completo():
         }
     )
 
-    print(f'✅ Boleto emitido!')
+    print('✅ Boleto emitido!')
     print(f'   - Nosso Número: {boleto.get("nossoNumero")}')
     print(f'   - Linha Digitável: {boleto.get("linhaDigitavel", "")[:20]}...')
 

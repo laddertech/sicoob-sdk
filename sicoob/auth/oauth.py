@@ -20,7 +20,6 @@ class OAuth2Client:
         chave_privada: str | None = None,
         certificado_pfx: str | bytes | BinaryIO | None = None,
         senha_pfx: str | None = None,
-        sandbox_mode: bool = False,
     ) -> None:
         """Inicializa o cliente OAuth2
 
@@ -30,7 +29,6 @@ class OAuth2Client:
             chave_privada: Path para a chave privada PEM (opcional)
             certificado_pfx: Path ou dados do certificado PFX (opcional)
             senha_pfx: Senha do certificado PFX (opcional)
-            sandbox_mode: Se True, não requer certificado (default: False)
         """
         load_dotenv()
 
@@ -46,8 +44,6 @@ class OAuth2Client:
         self.token_url = SicoobConfig.get_auth_url()  # URL de autenticação OAuth2
         self.token_cache = {}  # Cache de tokens por escopo
         self.session = requests.Session()
-
-        self.sandbox_mode = sandbox_mode
 
         if SicoobConfig.requires_certificate():
             if self.certificado_pfx and self.senha_pfx:

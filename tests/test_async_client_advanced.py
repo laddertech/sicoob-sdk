@@ -5,18 +5,19 @@ import json
 import ssl
 import time
 import uuid
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
 import pytest
 import pytest_asyncio
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
 
 from sicoob.async_client import (
     AsyncAPIClient,
-    AsyncSicoob,
-    AsyncContaCorrenteAPI,
     AsyncCobrancaAPI,
-    gather_with_concurrency,
+    AsyncContaCorrenteAPI,
+    AsyncSicoob,
     async_batch_processor,
+    gather_with_concurrency,
 )
 from sicoob.auth import OAuth2Client
 from sicoob.config import SicoobConfig
@@ -49,7 +50,6 @@ async def async_api_client(mock_oauth_client, mock_session):
     client = AsyncAPIClient(
         oauth_client=mock_oauth_client,
         session=mock_session,
-        sandbox_mode=True,
         max_concurrent_requests=5,
         request_timeout=10,
     )
@@ -64,13 +64,11 @@ class TestAsyncAPIClient:
         """Testa inicialização do cliente API"""
         client = AsyncAPIClient(
             oauth_client=mock_oauth_client,
-            sandbox_mode=True,
             max_concurrent_requests=5,
             request_timeout=10,
         )
 
         assert client.oauth_client is mock_oauth_client
-        assert client.sandbox_mode is True
         assert client.max_concurrent_requests == 5
         assert client.request_timeout == 10
         assert client._session is None
@@ -132,15 +130,21 @@ class TestAsyncAPIClient:
 
     def test_get_base_url_sandbox(self, mock_oauth_client):
         """Testa URL base em modo sandbox"""
-        client = AsyncAPIClient(oauth_client=mock_oauth_client, sandbox_mode=True)
-        url = client._get_base_url()
-        assert 'api.sicoob.com.br' in url
+        with patch.object(
+            SicoobConfig, 'get_base_url', return_value='https://sandbox.sicoob.com.br'
+        ):
+            client = AsyncAPIClient(oauth_client=mock_oauth_client)
+            url = client._get_base_url()
+            assert 'sandbox.sicoob.com.br' in url
 
     def test_get_base_url_production(self, mock_oauth_client):
         """Testa URL base em modo produção"""
-        client = AsyncAPIClient(oauth_client=mock_oauth_client, sandbox_mode=False)
-        url = client._get_base_url()
-        assert 'api.sicoob.com.br' in url
+        with patch.object(
+            SicoobConfig, 'get_base_url', return_value='https://api.sicoob.com.br'
+        ):
+            client = AsyncAPIClient(oauth_client=mock_oauth_client)
+            url = client._get_base_url()
+            assert 'api.sicoob.com.br' in url
 
     def test_get_headers(self, mock_oauth_client):
         """Testa geração de headers"""
@@ -259,7 +263,7 @@ class TestAsyncSicoob:
                 chave_privada='key.pem',
                 certificado_pfx='cert.pfx',
                 senha_pfx='password',
-                sandbox_mode=True,
+                environment='sandbox',
                 max_concurrent_requests=20,
                 request_timeout=60,
             )
@@ -269,7 +273,6 @@ class TestAsyncSicoob:
             assert client.chave_privada == 'key.pem'
             assert client.certificado_pfx == 'cert.pfx'
             assert client.senha_pfx == 'password'
-            assert client.sandbox_mode is True
 
     @pytest.mark.asyncio
     async def test_context_manager(self):

@@ -1,22 +1,23 @@
 """Testes para módulo de paginação."""
 
 import math
-import pytest
 import time
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
+import pytest
+
+from sicoob.exceptions import PaginationError
 from sicoob.pagination import (
-    PaginationConfig,
-    PageInfo,
-    PagedResponse,
-    PaginationStrategy,
-    OffsetBasedStrategy,
     CursorBasedStrategy,
-    SicoobPaginationStrategy,
+    OffsetBasedStrategy,
+    PagedResponse,
+    PageInfo,
     PaginatedIterator,
+    PaginationConfig,
+    PaginationStrategy,
+    SicoobPaginationStrategy,
     paginated_response_from_data,
 )
-from sicoob.exceptions import PaginationError
 
 
 class TestPaginationConfig:

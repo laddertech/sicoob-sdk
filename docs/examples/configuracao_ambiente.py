@@ -1,6 +1,7 @@
 """Exemplos de configuração por ambiente no Sicoob SDK"""
 
 import os
+
 from sicoob import Sicoob
 from sicoob.config import Environment, SicoobConfig
 
@@ -35,7 +36,7 @@ def exemplo_testes():
     print(f'✅ Ambiente: {config.environment.value}')
     print(f'✅ Log Level: {config.log_level} (mínimo para performance)')
     print(f'✅ Log Format: {config.log_format} (simples)')
-    print(f'✅ HTTP Logging: Desabilitado (performance)')
+    print('✅ HTTP Logging: Desabilitado (performance)')
     print(f'✅ Timeout: {config.timeout}s')
     print()
 
@@ -56,8 +57,8 @@ def exemplo_staging():
     print(f'✅ Ambiente: {config.environment.value}')
     print(f'✅ URL Base: {config.base_url} (produção)')
     print(f'✅ Log Format: {config.log_format} (estruturado)')
-    print(f'✅ Certificado: Obrigatório')
-    print(f'✅ HTTP Logging: Habilitado (para debug)')
+    print('✅ Certificado: Obrigatório')
+    print('✅ HTTP Logging: Habilitado (para debug)')
     print()
 
 
@@ -78,7 +79,7 @@ def exemplo_producao():
     print(f'✅ URL Base: {config.base_url}')
     print(f'✅ Max Retries: {config.max_retries} (otimizado)')
     print(f'✅ Log Format: {config.log_format} (estruturado)')
-    print(f'✅ HTTP Logging: Desabilitado (performance)')
+    print('✅ HTTP Logging: Desabilitado (performance)')
     print(f'✅ SSL Verification: {config.verify_ssl}')
     print()
 
@@ -234,8 +235,9 @@ def exemplo_user_agent_dinamico():
     print('🔖 USER-AGENT DINÂMICO')
     print('=' * 50)
 
-    from sicoob.api_client import APIClientBase
     from unittest.mock import Mock
+
+    from sicoob.api_client import APIClientBase
 
     # Simula diferentes ambientes
     ambientes = ['development', 'staging', 'production']

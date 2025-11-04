@@ -2,7 +2,7 @@
 
 import os
 import time
-from unittest.mock import Mock, patch, mock_open
+from unittest.mock import Mock, mock_open, patch
 
 import pytest
 import requests
@@ -97,14 +97,14 @@ class TestOAuth2Client:
         assert client._is_token_expired('nonexistent_scope') is True
 
     @patch('sicoob.auth.oauth.load_dotenv')
-    def test_sandbox_mode(self, mock_load_dotenv):
-        """Testa modo sandbox"""
+    def test_environment_configuration(self, mock_load_dotenv):
+        """Testa configuração de ambiente"""
         with patch(
             'sicoob.config.SicoobConfig.requires_certificate', return_value=False
         ):
-            client = OAuth2Client(client_id='test_id', sandbox_mode=True)
+            client = OAuth2Client(client_id='test_id')
 
-        assert client.sandbox_mode is True
+        assert client.client_id == 'test_id'
 
     @patch('sicoob.auth.oauth.load_dotenv')
     @patch('requests.Session.post')

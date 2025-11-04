@@ -30,23 +30,21 @@ class TestAPIClientBase:
     @pytest.fixture
     def api_client(self, mock_oauth_client, mock_session):
         """Fixture para APIClientBase"""
-        return APIClientBase(
-            mock_oauth_client, mock_session, sandbox_mode=True, enable_resilience=False
-        )
+        return APIClientBase(mock_oauth_client, mock_session, enable_resilience=False)
 
-    def test_init_sandbox_mode(self, mock_oauth_client, mock_session):
-        """Testa inicialização em modo sandbox"""
-        client = APIClientBase(mock_oauth_client, mock_session, sandbox_mode=True)
+    def test_init_default_mode(self, mock_oauth_client, mock_session):
+        """Testa inicialização com configurações padrão"""
+        client = APIClientBase(mock_oauth_client, mock_session)
 
         assert client.oauth_client == mock_oauth_client
         assert client.session is not None  # Session foi configurada
-        assert client.sandbox_mode is True
 
-    def test_init_production_mode(self, mock_oauth_client, mock_session):
-        """Testa inicialização em modo produção"""
-        client = APIClientBase(mock_oauth_client, mock_session, sandbox_mode=False)
+    def test_init_with_resilience_disabled(self, mock_oauth_client, mock_session):
+        """Testa inicialização com resiliência desabilitada"""
+        client = APIClientBase(mock_oauth_client, mock_session, enable_resilience=False)
 
-        assert client.sandbox_mode is False
+        assert client.oauth_client == mock_oauth_client
+        assert client.session is not None
 
     def test_get_base_url_sandbox(self, api_client):
         """Testa obtenção da URL base em modo sandbox"""
@@ -58,7 +56,7 @@ class TestAPIClientBase:
 
     def test_get_base_url_production(self, mock_oauth_client, mock_session):
         """Testa obtenção da URL base em modo produção"""
-        client = APIClientBase(mock_oauth_client, mock_session, sandbox_mode=False)
+        client = APIClientBase(mock_oauth_client, mock_session)
 
         with patch.object(
             SicoobConfig, 'get_base_url', return_value='https://api.sicoob.com'
@@ -271,3 +269,51 @@ class TestAPIClientBase:
         headers = api_client._get_headers('test_scope')
         assert headers['Content-Type'] == 'application/json'
         assert headers['Accept'] == 'application/json'
+
+    def test_pkcs12_adapter_preservation_with_resilience(self, mock_oauth_client):
+        """Testa se adaptador PKCS12 é preservado quando enable_resilience=True"""
+        # Cria uma sessão mock com adaptador PKCS12
+        session = Mock(spec=requests.Session)
+        session.adapters = {}
+
+        # Mock adaptador PKCS12
+        pkcs12_adapter = Mock()
+        pkcs12_adapter.pkcs12_data = b'test_data'
+        pkcs12_adapter.pkcs12_filename = 'test.pfx'
+        pkcs12_adapter.pkcs12_password = 'test_password'
+        session.adapters['https://'] = pkcs12_adapter
+
+        # Cria cliente com resiliência habilitada
+        with patch('sicoob.api_client.create_resilient_session') as mock_create_session:
+            resilient_session = Mock(spec=requests.Session)
+            resilient_session.adapters = {}
+            resilient_session.headers = {}
+            mock_create_session.return_value = resilient_session
+
+            client = APIClientBase(mock_oauth_client, session, enable_resilience=True)
+
+            # Verifica se a sessão resiliente foi criada
+            mock_create_session.assert_called_once()
+
+            # Verifica se o adaptador PKCS12 foi preservado na sessão final
+            assert hasattr(client.session, '_sicoob_resilient')
+            assert client.session._sicoob_resilient is True
+
+    def test_regular_session_without_pkcs12_adapter(self, mock_oauth_client):
+        """Testa comportamento normal sem adaptador PKCS12"""
+        # Cria uma sessão sem adaptador PKCS12
+        session = Mock(spec=requests.Session)
+        session.adapters = {}
+
+        with patch('sicoob.api_client.create_resilient_session') as mock_create_session:
+            resilient_session = Mock(spec=requests.Session)
+            resilient_session.adapters = {}
+            resilient_session.headers = {}
+            mock_create_session.return_value = resilient_session
+
+            client = APIClientBase(mock_oauth_client, session, enable_resilience=True)
+
+            # Verifica se a sessão resiliente foi criada normalmente
+            mock_create_session.assert_called_once()
+            assert hasattr(client.session, '_sicoob_resilient')
+            assert client.session._sicoob_resilient is True

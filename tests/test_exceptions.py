@@ -1,29 +1,30 @@
 """Testes para o sistema de exceções do Sicoob SDK"""
 
-import pytest
 from unittest.mock import Mock
 
+import pytest
+
 from sicoob.exceptions import (
-    SicoobError,
     AutenticacaoError,
-    RespostaInvalidaError,
-    BoletoError,
-    BoletoEmissaoError,
-    BoletoConsultaError,
-    BoletoNaoEncontradoError,
-    BoletoWebhookError,
     BoletoAlteracaoError,
-    BoletoBaixaError,
     BoletoAlteracaoPagadorError,
+    BoletoBaixaError,
+    BoletoConsultaError,
     BoletoConsultaFaixaError,
     BoletoConsultaPagadorError,
-    PixError,
+    BoletoEmissaoError,
+    BoletoError,
+    BoletoNaoEncontradoError,
+    BoletoWebhookError,
     CobrancaPixNaoEncontradaError,
-    WebhookPixNaoEncontradoError,
     ContaCorrenteError,
     ExtratoError,
+    PixError,
+    RespostaInvalidaError,
     SaldoError,
+    SicoobError,
     TransferenciaError,
+    WebhookPixNaoEncontradoError,
 )
 
 

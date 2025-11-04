@@ -1,24 +1,25 @@
 """Testes para módulo de resiliência."""
 
-import pytest
 import time
-from unittest.mock import Mock, patch, MagicMock
-import requests
-from requests.exceptions import ConnectionError, Timeout, HTTPError
+from unittest.mock import MagicMock, Mock, patch
 
-from sicoob.resilience import (
-    CircuitBreakerState,
-    RetryableErrors,
-    CircuitBreaker,
-    RetryConfig,
-    ResilientHTTPAdapter,
-    get_circuit_breaker,
-    create_resilient_session,
-    resilient_request,
-)
+import pytest
+import requests
+from requests.exceptions import ConnectionError, HTTPError, Timeout
+
 from sicoob.exceptions import (
     CircuitBreakerOpenError,
     MaxRetriesExceededError,
+)
+from sicoob.resilience import (
+    CircuitBreaker,
+    CircuitBreakerState,
+    ResilientHTTPAdapter,
+    RetryableErrors,
+    RetryConfig,
+    create_resilient_session,
+    get_circuit_breaker,
+    resilient_request,
 )
 
 

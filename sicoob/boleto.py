@@ -23,17 +23,14 @@ from sicoob.validation import (
 class BoletoAPI(APIClientBase):
     """Implementação da API de Boletos do Sicoob"""
 
-    def __init__(
-        self, oauth_client: Any, session: requests.Session, sandbox_mode: bool = False
-    ) -> None:
+    def __init__(self, oauth_client: Any, session: requests.Session) -> None:
         """Inicializa a API de boletos.
 
         Args:
             oauth_client: Cliente OAuth2 para autenticação
             session: Sessão HTTP existente
-            sandbox_mode: Se True, usa URL de sandbox (default: False)
         """
-        super().__init__(oauth_client, session, sandbox_mode)
+        super().__init__(oauth_client, session)
         self.base_path = '/cobranca-bancaria/v3'
 
     def _handle_error_response(

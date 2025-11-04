@@ -33,7 +33,7 @@ from typing import Any
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
 
 from sicoob.auth import OAuth2Client
-from sicoob.config import SicoobConfig
+from sicoob.config import Environment, SicoobConfig
 from sicoob.exceptions import SicoobError
 
 
@@ -44,7 +44,6 @@ class AsyncAPIClient:
         self,
         oauth_client: OAuth2Client,
         session: ClientSession | None = None,
-        sandbox_mode: bool = False,
         max_concurrent_requests: int = 10,
         request_timeout: int = 30,
     ) -> None:
@@ -53,12 +52,10 @@ class AsyncAPIClient:
         Args:
             oauth_client: Cliente OAuth2 para autenticação
             session: Sessão aiohttp existente (opcional)
-            sandbox_mode: Se True, usa URL de sandbox
             max_concurrent_requests: Limite de requisições concorrentes
             request_timeout: Timeout padrão para requisições em segundos
         """
         self.oauth_client = oauth_client
-        self.sandbox_mode = sandbox_mode
         self.max_concurrent_requests = max_concurrent_requests
         self.request_timeout = request_timeout
         # self.logger = get_logger(__name__)  # Temporariamente comentado
@@ -107,9 +104,7 @@ class AsyncAPIClient:
 
     def _get_base_url(self) -> str:
         """Retorna a URL base conforme configuração do ambiente."""
-        if self.sandbox_mode:
-            return 'https://api.sicoob.com.br/prd'  # URL de sandbox
-        return 'https://api.sicoob.com.br/prd'  # URL de produção
+        return SicoobConfig.get_base_url()
 
     def _get_headers(self, scope: str) -> dict[str, str]:
         """Retorna headers padrão com token de acesso."""
@@ -205,7 +200,7 @@ class AsyncSicoob:
         chave_privada: str | None = None,
         certificado_pfx: str | bytes | None = None,
         senha_pfx: str | None = None,
-        sandbox_mode: bool = False,
+        environment: str | Environment | None = None,
         max_concurrent_requests: int = 10,
         request_timeout: int = 30,
     ) -> None:
@@ -217,7 +212,7 @@ class AsyncSicoob:
             chave_privada: Path para a chave privada PEM (opcional)
             certificado_pfx: Path ou bytes do certificado PFX (opcional)
             senha_pfx: Senha do certificado PFX (opcional)
-            sandbox_mode: Se True, usa modo sandbox
+            environment: Ambiente (development, test, staging, production, sandbox)
             max_concurrent_requests: Limite de requisições concorrentes
             request_timeout: Timeout padrão para requisições
         """
@@ -232,7 +227,22 @@ class AsyncSicoob:
         self.chave_privada = chave_privada or os.getenv('SICOOB_CHAVE_PRIVADA')
         self.certificado_pfx = certificado_pfx or os.getenv('SICOOB_CERTIFICADO_PFX')
         self.senha_pfx = senha_pfx or os.getenv('SICOOB_SENHA_PFX')
-        self.sandbox_mode = sandbox_mode
+        # Configura ambiente se fornecido
+        if environment is not None:
+            if isinstance(environment, str):
+                env_mapping = {
+                    'dev': Environment.DEVELOPMENT,
+                    'development': Environment.DEVELOPMENT,
+                    'test': Environment.TEST,
+                    'sandbox': Environment.SANDBOX,
+                    'staging': Environment.STAGING,
+                    'prod': Environment.PRODUCTION,
+                    'production': Environment.PRODUCTION,
+                }
+                env = env_mapping.get(environment.lower(), Environment.PRODUCTION)
+            else:
+                env = environment
+            SicoobConfig.set_environment(env)
 
         # Valida credenciais mínimas
         if not self.client_id:
@@ -245,13 +255,11 @@ class AsyncSicoob:
             chave_privada=self.chave_privada,
             certificado_pfx=self.certificado_pfx,
             senha_pfx=self.senha_pfx,
-            sandbox_mode=sandbox_mode,
         )
 
         # Inicializa cliente assíncrono
         self._api_client = AsyncAPIClient(
             oauth_client=self.oauth_client,
-            sandbox_mode=sandbox_mode,
             max_concurrent_requests=max_concurrent_requests,
             request_timeout=request_timeout,
         )

@@ -18,7 +18,7 @@ def sicoob_client():
 
     return Sicoob(
         client_id=client_id,
-        sandbox_mode=True,  # Modo sandbox não requer certificado
+        environment='sandbox',  # Modo sandbox não requer certificado
     )
 
 

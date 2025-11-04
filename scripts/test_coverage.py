@@ -97,7 +97,7 @@ def main():
         html_file = Path('htmlcov/index.html')
         if html_file.exists():
             webbrowser.open(html_file.as_uri())
-            print(f'🌐 Relatório HTML aberto no browser')
+            print('🌐 Relatório HTML aberto no browser')
 
     # Exibe dicas finais
     print('\n💡 Dicas:')

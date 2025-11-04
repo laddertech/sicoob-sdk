@@ -1,6 +1,7 @@
 """Exemplo de uso do sistema de resiliência do Sicoob SDK"""
 
 import requests
+
 from sicoob import Sicoob
 from sicoob.resilience import RetryConfig, create_resilient_session, resilient_request
 
@@ -14,7 +15,7 @@ def example_basic_resilience():
         client_id='seu_client_id',
         certificate_path='/path/to/certificate.pem',
         private_key_path='/path/to/private_key.key',
-        sandbox_mode=True,
+        environment='sandbox',
     )
 
     try:
@@ -50,7 +51,7 @@ def example_custom_retry_config():
         client_id='seu_client_id',
         certificate_path='/path/to/certificate.pem',
         private_key_path='/path/to/private_key.key',
-        sandbox_mode=True,
+        environment='sandbox',
         enable_resilience=True,
         retry_config=retry_config,
     )
@@ -79,7 +80,7 @@ def example_disable_resilience():
         client_id='seu_client_id',
         certificate_path='/path/to/certificate.pem',
         private_key_path='/path/to/private_key.key',
-        sandbox_mode=True,
+        environment='sandbox',
         enable_resilience=False,  # Desabilita retry e circuit breaker
     )
 

@@ -14,7 +14,7 @@ def example_basic_pagination():
         client_id='seu_client_id',
         certificate_path='/path/to/certificate.pem',
         private_key_path='/path/to/private_key.key',
-        sandbox_mode=True,
+        environment='sandbox',
     )
 
     # Período de 30 dias
@@ -44,7 +44,7 @@ def example_custom_pagination_config():
         client_id='seu_client_id',
         certificate_path='/path/to/certificate.pem',
         private_key_path='/path/to/private_key.key',
-        sandbox_mode=True,
+        environment='sandbox',
     )
 
     # Configuração personalizada
@@ -80,7 +80,7 @@ def example_page_by_page():
         client_id='seu_client_id',
         certificate_path='/path/to/certificate.pem',
         private_key_path='/path/to/private_key.key',
-        sandbox_mode=True,
+        environment='sandbox',
     )
 
     config = PaginationConfig(page_size=25, max_pages=3)
@@ -110,7 +110,7 @@ def example_page_by_page():
         total_value += page_value
         print(f'Valor total da página: R$ {page_value:.2f}')
 
-    print(f'\n=== Resumo Final ===')
+    print('\n=== Resumo Final ===')
     print(f'Total de cobranças: {total_items}')
     print(f'Valor total: R$ {total_value:.2f}')
 
@@ -123,7 +123,7 @@ def example_large_dataset_processing():
         client_id='seu_client_id',
         certificate_path='/path/to/certificate.pem',
         private_key_path='/path/to/private_key.key',
-        sandbox_mode=True,
+        environment='sandbox',
     )
 
     # Para grandes volumes, use páginas maiores
@@ -194,7 +194,7 @@ def example_error_handling():
         client_id='seu_client_id',
         certificate_path='/path/to/certificate.pem',
         private_key_path='/path/to/private_key.key',
-        sandbox_mode=True,
+        environment='sandbox',
     )
 
     config = PaginationConfig(
@@ -244,7 +244,7 @@ def example_filtered_pagination():
         client_id='seu_client_id',
         certificate_path='/path/to/certificate.pem',
         private_key_path='/path/to/private_key.key',
-        sandbox_mode=True,
+        environment='sandbox',
     )
 
     config = PaginationConfig(page_size=50)

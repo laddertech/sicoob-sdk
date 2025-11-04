@@ -13,7 +13,7 @@ from sicoob.pix import PixAPI
 def pix_client(mock_oauth_client: Mock) -> PixAPI:
     """Fixture que retorna um cliente PixAPI configurado para testes"""
     mock_session = Mock()
-    return PixAPI(mock_oauth_client, mock_session, sandbox_mode=True)
+    return PixAPI(mock_oauth_client, mock_session)
 
 
 def test_criar_cobranca_pix(pix_client: PixAPI) -> None:

@@ -19,7 +19,6 @@ class APIClientBase:
         self,
         oauth_client: OAuth2Client,
         session: requests.Session,
-        sandbox_mode: bool = False,
         enable_resilience: bool = True,
         retry_config: RetryConfig | None = None,
     ) -> None:
@@ -28,11 +27,9 @@ class APIClientBase:
         Args:
             oauth_client: Cliente OAuth2 para autenticação
             session: Sessão HTTP existente
-            sandbox_mode: Se True, usa URL de sandbox (default: False)
             enable_resilience: Se True, habilita retry e circuit breaker (default: True)
             retry_config: Configuração personalizada de retry
         """
-        self.sandbox_mode = sandbox_mode
         self.oauth_client = oauth_client
         self.enable_resilience = enable_resilience
         self.logger = get_logger(__name__)
@@ -48,6 +45,16 @@ class APIClientBase:
                 jitter=True,
             )
 
+            # Verifica se existe adaptador PKCS12 na sessão original
+            original_https_adapter = None
+            if hasattr(session, 'adapters') and 'https://' in session.adapters:
+                original_adapter = session.adapters['https://']
+                # Verifica se é um adaptador PKCS12
+                if hasattr(original_adapter, 'pkcs12_data') or hasattr(
+                    original_adapter, 'pkcs12_filename'
+                ):
+                    original_https_adapter = original_adapter
+
             # Cria nova sessão resiliente mantendo configurações da original
             resilient_session = create_resilient_session(
                 retry_config=config, timeout=getattr(session, 'timeout', (10, 30))
@@ -62,6 +69,14 @@ class APIClientBase:
                 resilient_session.verify = session.verify
             if hasattr(session, 'cert'):
                 resilient_session.cert = session.cert
+
+            # Preserva adaptador PKCS12 se existir, criando um adaptador híbrido
+            if original_https_adapter is not None:
+                from sicoob.resilience import ResilientPKCS12Adapter
+
+                # Cria adaptador resiliente híbrido que preserva funcionalidade PKCS12
+                hybrid_adapter = ResilientPKCS12Adapter(config, original_https_adapter)
+                resilient_session.mount('https://', hybrid_adapter)
 
             # Marca como configurada para evitar reconfiguração
             resilient_session._sicoob_resilient = True

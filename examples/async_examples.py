@@ -15,14 +15,14 @@ Exemplos incluídos:
 import asyncio
 import time
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
+from sicoob.async_cache import AsyncCacheManager, async_cached
 from sicoob.async_client import (
     AsyncSicoob,
-    gather_with_concurrency,
     async_batch_processor,
+    gather_with_concurrency,
 )
-from sicoob.async_cache import AsyncCacheManager, async_cached
 from sicoob.cache import CacheConfig
 
 
@@ -35,7 +35,7 @@ async def exemplo_basico_async():
         'client_id': 'seu_client_id',
         'certificado_pfx': '/path/to/certificate.pfx',
         'senha_pfx': 'sua_senha_pfx',
-        'sandbox_mode': True,
+        'environment': 'sandbox',
         'max_concurrent_requests': 10,
     }
 
@@ -74,7 +74,7 @@ async def exemplo_processamento_lote_pix():
     print('=== Exemplo 2: Processamento em Lote PIX ===')
 
     async with AsyncSicoob(
-        client_id='seu_client_id', sandbox_mode=True, max_concurrent_requests=15
+        client_id='seu_client_id', environment='sandbox', max_concurrent_requests=15
     ) as client:
         # Dados para criar cobranças em lote
         dados_cobrancas = []
@@ -135,7 +135,7 @@ async def exemplo_processamento_lote_pix():
 
         duration = time.time() - start_time
 
-        print(f'\nResultados finais:')
+        print('\nResultados finais:')
         print(f'  Total: {len(dados_cobrancas)} cobranças')
         print(f'  Sucessos: {total_sucessos}')
         print(f'  Erros: {total_erros}')
@@ -148,7 +148,7 @@ async def exemplo_monitoramento_tempo_real():
     """Monitoramento de cobranças PIX em tempo real."""
     print('=== Exemplo 3: Monitoramento Tempo Real ===')
 
-    async with AsyncSicoob(client_id='seu_client_id', sandbox_mode=True) as client:
+    async with AsyncSicoob(client_id='seu_client_id', environment='sandbox') as client:
         # Lista de chaves PIX para monitorar
         chaves_monitorar = [
             'usuario@exemplo.com',
@@ -219,7 +219,7 @@ async def exemplo_cache_assincrono():
 
     cache = AsyncCacheManager(cache_config)
 
-    async with AsyncSicoob(client_id='seu_client_id', sandbox_mode=True) as client:
+    async with AsyncSicoob(client_id='seu_client_id', environment='sandbox') as client:
         # Função com cache automático
         @cache.cached(ttl=600, key_prefix='cobranca_pix:', tags=['pix'])
         async def consultar_cobranca_cached(txid: str):
@@ -251,7 +251,7 @@ async def exemplo_cache_assincrono():
 
             # Estatísticas do cache
             stats = await cache.get_stats()
-            print(f'\nEstatísticas do cache:')
+            print('\nEstatísticas do cache:')
             print(f'  Hits: {stats["hits"]}')
             print(f'  Misses: {stats["misses"]}')
             print(f'  Hit rate: {stats["hit_rate"]:.2%}')
@@ -269,7 +269,7 @@ async def exemplo_processamento_grandes_volumes():
     print('=== Exemplo 5: Grandes Volumes ===')
 
     async with AsyncSicoob(
-        client_id='seu_client_id', sandbox_mode=True, max_concurrent_requests=20
+        client_id='seu_client_id', environment='sandbox', max_concurrent_requests=20
     ) as client:
         # Simula processamento de extrato de múltiplas contas
         contas = [f'12345-{i:02d}' for i in range(10)]
@@ -334,7 +334,7 @@ async def exemplo_processamento_grandes_volumes():
             print(f'Erros: {len(erros)}')
 
             if sucessos:
-                print(f'\nResumo financeiro:')
+                print('\nResumo financeiro:')
                 total_movimentos = sum(r['movimentos'] for r in sucessos)
                 total_credito = sum(r['total_credito'] for r in sucessos)
                 total_debito = sum(r['total_debito'] for r in sucessos)
@@ -345,7 +345,7 @@ async def exemplo_processamento_grandes_volumes():
                 print(f'  Saldo líquido: R$ {total_credito - total_debito:,.2f}')
 
             if erros:
-                print(f'\nContas com erro:')
+                print('\nContas com erro:')
                 for erro in erros:
                     print(f'  {erro["conta"]}: {erro["erro"]}')
 
@@ -356,7 +356,7 @@ async def exemplo_relatorio_performance():
     """Geração de relatório de performance para operações PIX."""
     print('=== Exemplo 6: Relatório de Performance ===')
 
-    async with AsyncSicoob(client_id='seu_client_id', sandbox_mode=True) as client:
+    async with AsyncSicoob(client_id='seu_client_id', environment='sandbox') as client:
         # Lista de TXIDs para análise de performance
         txids = [f'perf_test_txid_{i:05d}' for i in range(100)]
 
@@ -388,7 +388,7 @@ async def exemplo_relatorio_performance():
                 print(f'  Erro com concorrência {max_concorrencia}: {e}')
 
         # Análise comparativa
-        print(f'\n=== Análise Comparativa ===')
+        print('\n=== Análise Comparativa ===')
 
         if resultados_performance:
             melhor_throughput = max(
@@ -420,7 +420,7 @@ async def exemplo_integracao_completa():
     cache = AsyncCacheManager(CacheConfig(default_ttl=600, enable_compression=True))
 
     async with AsyncSicoob(
-        client_id='seu_client_id', sandbox_mode=True, max_concurrent_requests=10
+        client_id='seu_client_id', environment='sandbox', max_concurrent_requests=10
     ) as client:
         print('🚀 Iniciando processamento integrado...')
 
@@ -497,13 +497,13 @@ async def exemplo_integracao_completa():
             print(f'  Erro no monitoramento: {e}')
 
         # 4. Relatório final
-        print(f'\n📈 Estatísticas finais:')
+        print('\n📈 Estatísticas finais:')
         cache_stats = await cache.get_stats()
 
         print(
             f'  Cache - Hits: {cache_stats["hits"]}, Hit rate: {cache_stats["hit_rate"]:.2%}'
         )
-        print(f'  Operações realizadas:')
+        print('  Operações realizadas:')
         print(f'    - Consultas de saldo: {len(contas)}')
         print(
             f'    - Cobranças criadas: {len(cobrancas_criar) if "cobrancas_criar" in locals() else 0}'
