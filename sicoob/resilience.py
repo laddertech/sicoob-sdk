@@ -325,15 +325,10 @@ class ResilientPKCS12Adapter(ResilientHTTPAdapter):
             pkcs12_adapter: Adaptador PKCS12 original a ser preservado
         """
         super().__init__(retry_config, *args, **kwargs)
+        # Preserva a referência ao adaptador PKCS12 original
+        # O Pkcs12Adapter não armazena os dados originais do certificado,
+        # apenas o ssl_context. Por isso, mantemos a referência completa.
         self.pkcs12_adapter = pkcs12_adapter
-
-        # Preserva propriedades do adaptador PKCS12 original
-        if hasattr(pkcs12_adapter, 'pkcs12_data'):
-            self.pkcs12_data = pkcs12_adapter.pkcs12_data
-        if hasattr(pkcs12_adapter, 'pkcs12_filename'):
-            self.pkcs12_filename = pkcs12_adapter.pkcs12_filename
-        if hasattr(pkcs12_adapter, 'pkcs12_password'):
-            self.pkcs12_password = pkcs12_adapter.pkcs12_password
 
     def send(self, request: Any, **kwargs: Any) -> requests.Response:
         """Envia requisição com retry automático preservando autenticação PKCS12"""

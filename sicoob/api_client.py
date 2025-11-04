@@ -49,10 +49,9 @@ class APIClientBase:
             original_https_adapter = None
             if hasattr(session, 'adapters') and 'https://' in session.adapters:
                 original_adapter = session.adapters['https://']
-                # Verifica se é um adaptador PKCS12
-                if hasattr(original_adapter, 'pkcs12_data') or hasattr(
-                    original_adapter, 'pkcs12_filename'
-                ):
+                # Verifica se é um adaptador PKCS12 pela classe
+                adapter_class_name = original_adapter.__class__.__name__
+                if adapter_class_name == 'Pkcs12Adapter':
                     original_https_adapter = original_adapter
 
             # Cria nova sessão resiliente mantendo configurações da original
