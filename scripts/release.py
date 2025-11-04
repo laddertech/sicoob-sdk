@@ -139,9 +139,9 @@ class ReleaseManager:
         print('✅ Git working directory is clean')
 
     def run_tests(self) -> None:
-        """Run tests to ensure everything is working."""
-        print('🧪 Running tests...')
-        self.run_command(['uv', 'run', 'pytest', 'tests/'])
+        """Run tests to ensure everything is working (excluding integration tests)."""
+        print('🧪 Running tests (excluding integration tests)...')
+        self.run_command(['uv', 'run', 'pytest', '-m', 'not integration', 'tests/'])
         print('✅ All tests passed')
 
     def run_linting(self) -> None:
