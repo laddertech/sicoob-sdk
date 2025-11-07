@@ -26,7 +26,9 @@ Example:
 import asyncio
 import json
 import logging
+import os
 import ssl
+import tempfile
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -85,6 +87,9 @@ class AsyncAPIClient:
         self._session = session
         self._owned_session = session is None
 
+        # Arquivos temporários de certificado (para limpeza posterior)
+        self._temp_cert_files: list[str] = []
+
     async def __aenter__(self) -> 'AsyncAPIClient':
         """Entrada do context manager."""
         await self._ensure_session()
@@ -94,6 +99,93 @@ class AsyncAPIClient:
         """Saída do context manager."""
         if self._owned_session and self._session:
             await self._session.close()
+
+        # Limpa arquivos temporários de certificado
+        self._cleanup_temp_cert_files()
+
+    def _cleanup_temp_cert_files(self) -> None:
+        """Limpa arquivos temporários de certificado."""
+        for filepath in self._temp_cert_files:
+            try:
+                if os.path.exists(filepath):
+                    os.unlink(filepath)
+                    logger.debug(f'Arquivo temporário removido: {filepath}')
+            except Exception as e:
+                logger.warning(f'Falha ao remover arquivo temporário {filepath}: {e}')
+        self._temp_cert_files.clear()
+
+    def _load_pfx_certificate(
+        self, ssl_context: ssl.SSLContext, pfx_path_or_data: str | bytes, password: str
+    ) -> None:
+        """Carrega certificado PFX/PKCS12 no contexto SSL.
+
+        Args:
+            ssl_context: Contexto SSL para carregar o certificado
+            pfx_path_or_data: Caminho para o arquivo PFX ou dados binários
+            password: Senha do certificado PFX
+
+        Raises:
+            ImportError: Se cryptography não estiver instalado
+            ValueError: Se o certificado for inválido
+        """
+        try:
+            from cryptography.hazmat.backends import default_backend
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.primitives.serialization import pkcs12
+        except ImportError as e:
+            raise ImportError(
+                'O pacote cryptography é necessário para usar certificados PFX. '
+                'Instale com: pip install cryptography'
+            ) from e
+
+        try:
+            # Lê o PFX
+            if isinstance(pfx_path_or_data, str):
+                with open(pfx_path_or_data, 'rb') as f:
+                    pfx_data = f.read()
+            else:
+                pfx_data = pfx_path_or_data
+
+            # Extrai certificado e chave privada
+            password_bytes = password.encode() if password else None
+            private_key, certificate, _ = pkcs12.load_key_and_certificates(
+                pfx_data, password_bytes, default_backend()
+            )
+
+            if not private_key or not certificate:
+                raise ValueError('Certificado PFX inválido ou vazio')
+
+            # Cria arquivos temporários para certificado e chave
+            # (aiohttp/ssl requer arquivos em disco)
+            with tempfile.NamedTemporaryFile(
+                mode='wb', delete=False, suffix='.pem'
+            ) as cert_file:
+                cert_file.write(certificate.public_bytes(serialization.Encoding.PEM))
+                cert_path = cert_file.name
+
+            with tempfile.NamedTemporaryFile(
+                mode='wb', delete=False, suffix='.key'
+            ) as key_file:
+                key_file.write(
+                    private_key.private_bytes(
+                        encoding=serialization.Encoding.PEM,
+                        format=serialization.PrivateFormat.TraditionalOpenSSL,
+                        encryption_algorithm=serialization.NoEncryption(),
+                    )
+                )
+                key_path = key_file.name
+
+            # Registra arquivos para limpeza posterior
+            self._temp_cert_files.extend([cert_path, key_path])
+
+            # Carrega no contexto SSL
+            ssl_context.load_cert_chain(cert_path, key_path)
+
+            logger.info('Certificado PFX carregado com sucesso no contexto SSL')
+
+        except Exception as e:
+            logger.error(f'Erro ao carregar certificado PFX: {e}', exc_info=True)
+            raise ValueError(f'Falha ao carregar certificado PFX: {e}') from e
 
     async def _ensure_session(self) -> None:
         """Garante que a sessão está inicializada."""
@@ -105,6 +197,39 @@ class AsyncAPIClient:
             if not config.verify_ssl:
                 ssl_context.check_hostname = False
                 ssl_context.verify_mode = ssl.CERT_NONE
+
+            # Carrega certificado cliente se necessário
+            if config.require_certificate:
+                oauth_client = self.oauth_client
+
+                # Prioriza PFX
+                if (
+                    hasattr(oauth_client, 'certificado_pfx')
+                    and oauth_client.certificado_pfx
+                    and hasattr(oauth_client, 'senha_pfx')
+                    and oauth_client.senha_pfx
+                ):
+                    logger.debug('Carregando certificado PFX para AsyncAPIClient')
+                    self._load_pfx_certificate(
+                        ssl_context,
+                        oauth_client.certificado_pfx,
+                        oauth_client.senha_pfx,
+                    )
+                # Fallback para PEM
+                elif (
+                    hasattr(oauth_client, 'certificado')
+                    and oauth_client.certificado
+                    and hasattr(oauth_client, 'chave_privada')
+                    and oauth_client.chave_privada
+                ):
+                    logger.debug('Carregando certificado PEM para AsyncAPIClient')
+                    ssl_context.load_cert_chain(
+                        oauth_client.certificado, oauth_client.chave_privada
+                    )
+                else:
+                    logger.warning(
+                        'Certificado requerido mas não fornecido no OAuth2Client'
+                    )
 
             # Configuração do conector
             connector = TCPConnector(

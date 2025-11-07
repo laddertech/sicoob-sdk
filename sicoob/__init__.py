@@ -26,6 +26,14 @@ from .exceptions import (
 )
 from .pix import PixAPI
 
+# Utilitários de debug
+from .debug import (
+    debug_mode,
+    disable_http_logging,
+    enable_http_logging,
+    suppress_sicoob_logs,
+)  # noqa: F401
+
 # Funcionalidades assíncronas (importadas opcionalmente)
 try:
     from .async_boleto import AsyncBoletoAPI  # noqa: F401
@@ -90,6 +98,11 @@ __all__ = [
     'TransferenciaError',
     'WebhookPixError',
     'WebhookPixNaoEncontradoError',
+    # Debug utilities
+    'debug_mode',
+    'enable_http_logging',
+    'disable_http_logging',
+    'suppress_sicoob_logs',
     *__all_async__,
 ]
 
