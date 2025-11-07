@@ -152,6 +152,71 @@ class AsyncBoletoAPI:
         # Retorna resultado da emissão mesmo sem verificação completa
         return resultado
 
+    async def emitir_com_recovery(
+        self,
+        dados: dict[str, Any],
+        tentar_consulta_em_404: bool = True,
+        nosso_numero: str | None = None,
+    ) -> dict[str, Any]:
+        """Emite boleto com recovery automático em caso de duplicação.
+
+        Se a emissão falhar com 404, tenta recuperar o boleto via consulta.
+        Útil para garantir idempotência em reprocessamentos e retries.
+
+        Args:
+            dados: Dados do boleto
+            tentar_consulta_em_404: Se True, tenta consultar em caso de 404 (default: True)
+            nosso_numero: Nosso número específico (opcional)
+
+        Returns:
+            Dados do boleto (emitido ou recuperado)
+
+        Raises:
+            BoletoError: Se emissão e recovery falharem
+
+        Example:
+            >>> # Útil para reprocessamento de falhas
+            >>> async with AsyncSicoob(client_id="...") as client:
+            ...     try:
+            ...         # Tenta emitir, mas se já existe, recupera automaticamente
+            ...         resultado = await client.cobranca.boleto.emitir_com_recovery(
+            ...             dados_boleto
+            ...         )
+            ...     except BoletoError:
+            ...         # Emissão e recovery falharam
+            ...         pass
+        """
+        try:
+            # Tenta emitir normalmente
+            return await self.emitir_boleto(dados, nosso_numero)
+
+        except BoletoError as e:
+            # Se não deve tentar recovery, relança
+            if not tentar_consulta_em_404:
+                raise
+
+            # Tenta recovery apenas em caso de 404
+            if hasattr(e, 'code') and e.code == 404:
+                # Extrai nosso número para tentar consulta
+                numero_para_consulta = nosso_numero or dados.get('nossoNumero')
+
+                if numero_para_consulta:
+                    try:
+                        # Tenta recuperar boleto existente
+                        boleto_existente = await self.consultar_boleto(
+                            str(numero_para_consulta)
+                        )
+
+                        # Retorna boleto existente como resultado (recovery bem-sucedido)
+                        return {'resultado': boleto_existente, '_recovery': True}
+
+                    except Exception:
+                        # Recovery falhou, relança erro original
+                        pass
+
+            # Se não conseguiu fazer recovery, relança erro original
+            raise
+
     async def consultar_boleto(self, nosso_numero: str) -> dict[str, Any]:
         """Consulta um boleto por nosso número de forma assíncrona.
 

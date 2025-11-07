@@ -503,6 +503,94 @@ class BoletoAPI(APIClientBase):
         # Retorna o resultado da emissão mesmo sem verificação
         return resultado
 
+    def emitir_com_recovery(
+        self, dados_boleto: dict, tentar_consulta_em_404: bool = True
+    ) -> dict:
+        """Emite boleto com recovery automático em caso de duplicação.
+
+        Se a emissão falhar com 404, tenta recuperar o boleto via consulta.
+        Útil para garantir idempotência em reprocessamentos e retries.
+
+        Args:
+            dados_boleto: Dados do boleto
+            tentar_consulta_em_404: Se True, tenta consultar em caso de 404 (default: True)
+
+        Returns:
+            Dados do boleto (emitido ou recuperado)
+
+        Raises:
+            BoletoEmissaoError: Se emissão e recovery falharem
+
+        Example:
+            >>> # Útil para reprocessamento de falhas
+            >>> with Sicoob(client_id="...") as client:
+            ...     try:
+            ...         # Tenta emitir, mas se já existe, recupera automaticamente
+            ...         resultado = client.cobranca.boleto.emitir_com_recovery(
+            ...             dados_boleto
+            ...         )
+            ...     except BoletoEmissaoError:
+            ...         # Emissão e recovery falharam
+            ...         pass
+        """
+        try:
+            # Tenta emitir normalmente
+            return self.emitir_boleto(dados_boleto)
+
+        except BoletoEmissaoError as e:
+            # Se não deve tentar recovery, relança
+            if not tentar_consulta_em_404:
+                raise
+
+            # Tenta recovery apenas em caso de 404
+            if e.code == 404:
+                # Extrai informações para consulta
+                numero_cliente = dados_boleto.get('numeroCliente')
+                codigo_modalidade = dados_boleto.get('codigoModalidade')
+                nosso_numero = dados_boleto.get('nossoNumero')
+
+                if numero_cliente and codigo_modalidade and nosso_numero:
+                    try:
+                        # Tenta recuperar boleto existente
+                        self.logger.info(
+                            f'Tentando recovery de boleto após 404: {nosso_numero}',
+                            extra={
+                                'operation': 'boleto_recovery',
+                                'nosso_numero': nosso_numero,
+                            },
+                        )
+
+                        boleto_existente = self.consultar_boleto(
+                            numero_cliente=numero_cliente,
+                            codigo_modalidade=codigo_modalidade,
+                            nosso_numero=nosso_numero,
+                        )
+
+                        if boleto_existente:
+                            self.logger.info(
+                                f'Recovery bem-sucedido para boleto: {nosso_numero}',
+                                extra={
+                                    'operation': 'boleto_recovery_sucesso',
+                                    'nosso_numero': nosso_numero,
+                                },
+                            )
+                            # Retorna boleto existente como resultado (recovery bem-sucedido)
+                            return {'resultado': boleto_existente, '_recovery': True}
+
+                    except Exception as recovery_error:
+                        # Recovery falhou, loga e relança erro original
+                        self.logger.warning(
+                            f'Recovery falhou para boleto {nosso_numero}: {recovery_error}',
+                            extra={
+                                'operation': 'boleto_recovery_falha',
+                                'nosso_numero': nosso_numero,
+                                'error': str(recovery_error),
+                            },
+                        )
+
+            # Se não conseguiu fazer recovery, relança erro original
+            raise
+
     def consultar_boletos_por_pagador(
         self,
         numero_cpf_cnpj: str,

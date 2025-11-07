@@ -618,6 +618,195 @@ boleto = sicoob.cobranca.boleto.emitir_boleto({
 })
 
 pix = sicoob.cobranca.pix.criar_cobranca_pix(
-    "tx123", 
+    "tx123",
     {"valor": {"original": "100.50"}}
 )
+```
+
+---
+
+## 🔧 Troubleshooting
+
+### Erro 404 mesmo com boleto criado
+
+**Sintoma:** API retorna 404 mas o boleto existe no banco e aparece no DDA
+
+**Causa:** Comportamento não-padrão da API Sicoob em alguns cenários. A API pode retornar status 404 mas incluir os dados do boleto no corpo da resposta.
+
+**Solução:**
+- A biblioteca **já trata isso automaticamente** desde v0.1.34
+- Use `emitir_e_verificar_boleto()` para maior robustez com retry automático
+- Use `emitir_com_recovery()` para idempotência em reprocessamentos
+
+```python
+# Método 1: Com verificação e retry automático
+resultado = client.cobranca.boleto.emitir_e_verificar_boleto(
+    dados_boleto,
+    max_tentativas=3,  # Tenta verificar até 3 vezes
+    delay_inicial=1.0  # Delays: 1s, 2s, 4s
+)
+
+# Método 2: Com recovery automático (ideal para retries)
+resultado = client.cobranca.boleto.emitir_com_recovery(
+    dados_boleto,
+    tentar_consulta_em_404=True  # Tenta recuperar se já existe
+)
+```
+
+---
+
+### Delay de propagação no DDA
+
+**Sintoma:** Boleto emitido com sucesso mas não aparece em consulta imediatamente
+
+**Causa:** Delay de propagação entre sistemas internos do Sicoob. O boleto é registrado mas leva alguns segundos para estar disponível via API de consulta.
+
+**Solução:** Use `emitir_e_verificar_boleto()` que implementa retry com exponential backoff
+
+```python
+# Aguarda propagação automaticamente
+resultado = client.cobranca.boleto.emitir_e_verificar_boleto(
+    dados_boleto,
+    max_tentativas=3,  # 3 tentativas de verificação
+    delay_inicial=1.0  # Delays exponenciais: 1s, 2s, 4s
+)
+```
+
+---
+
+### Diferenças entre métodos de emissão
+
+**Quando usar cada método:**
+
+| Método | Caso de Uso | Retry | Recovery |
+|--------|-------------|-------|----------|
+| `emitir_boleto()` | Emissão simples, sem retry | ❌ | ❌ |
+| `emitir_e_verificar_boleto()` | Delay de propagação DDA | ✅ | ❌ |
+| `emitir_com_recovery()` | Reprocessamento, idempotência | ❌ | ✅ |
+
+**Exemplo de escolha:**
+
+```python
+# Caso 1: Emissão normal (primeira vez)
+boleto = client.cobranca.boleto.emitir_boleto(dados)
+
+# Caso 2: Emissão com verificação (produção, alto volume)
+boleto = client.cobranca.boleto.emitir_e_verificar_boleto(
+    dados,
+    max_tentativas=2
+)
+
+# Caso 3: Reprocessamento de falhas (sistema de retry)
+for boleto_pendente in obter_boletos_com_erro():
+    try:
+        # Tenta emitir, mas se já existe, apenas recupera
+        resultado = client.cobranca.boleto.emitir_com_recovery(
+            boleto_pendente.dados
+        )
+        if resultado.get('_recovery'):
+            print(f"Boleto recuperado: {resultado['resultado']['nossoNumero']}")
+    except BoletoEmissaoError:
+        marcar_erro_definitivo(boleto_pendente)
+```
+
+---
+
+### Versão Async vs Sync
+
+**Diferenças principais:**
+
+| Aspecto | Sync (`Sicoob`) | Async (`AsyncSicoob`) |
+|---------|-----------------|------------------------|
+| Uso | `with Sicoob(...) as client` | `async with AsyncSicoob(...) as client` |
+| Chamadas | `client.cobranca.boleto.emitir_boleto(...)` | `await client.cobranca.boleto.emitir_boleto(...)` |
+| Performance | Sequential | Concurrent |
+| Melhor para | Scripts simples, CLI | Processamento em lote, APIs |
+
+**Métodos disponíveis:**
+
+✅ Ambas versões têm paridade completa:
+- `emitir_boleto()` / `async emitir_boleto()`
+- `emitir_e_verificar_boleto()` / `async emitir_e_verificar_boleto()`
+- `emitir_com_recovery()` / `async emitir_com_recovery()`
+- `consultar_boleto()` / `async consultar_boleto()`
+
+**Exemplo de migração:**
+
+```python
+# Sync (antes)
+with Sicoob(client_id="...") as client:
+    resultado = client.cobranca.boleto.emitir_e_verificar_boleto(dados)
+
+# Async (depois)
+async with AsyncSicoob(client_id="...") as client:
+    resultado = await client.cobranca.boleto.emitir_e_verificar_boleto(dados)
+```
+
+---
+
+### Rate Limiting
+
+**Limites conhecidos:**
+- API Sicoob: ~4.5 requisições/segundo
+- Recomendado: Implementar rate limiting no lado do cliente
+
+**Exemplo com versão async:**
+
+```python
+import asyncio
+from asyncio import Semaphore
+
+async def emitir_lote_com_rate_limit(boletos):
+    limiter = Semaphore(5)  # Max 5 concurrent
+
+    async def emitir_com_limite(dados):
+        async with limiter:
+            await asyncio.sleep(1/4.5)  # Rate limit
+            return await client.cobranca.boleto.emitir_boleto(dados)
+
+    # Processa em lote respeitando rate limit
+    return await asyncio.gather(
+        *[emitir_com_limite(b) for b in boletos],
+        return_exceptions=True
+    )
+```
+
+Veja [examples/emissao_lote_async.py](examples/emissao_lote_async.py) para exemplo completo.
+
+---
+
+### Logs e Debugging
+
+**Habilitar logs detalhados:**
+
+```python
+import logging
+
+# Configure logging antes de usar o cliente
+logging.basicConfig(level=logging.DEBUG)
+
+# Agora os logs mostrarão:
+# - Requisições HTTP (URL, método, headers)
+# - Respostas (status code, tempo de resposta)
+# - Retries e recoveries
+# - Erros com stack traces
+```
+
+**Operações logadas:**
+- `boleto_emissao_request` - Antes de emitir
+- `boleto_emissao_response` - Resposta da emissão
+- `boleto_emissao_404` - 404 detectado
+- `boleto_emissao_404_sucesso` - 404 mas com dados válidos
+- `boleto_verificacao_delay` - Aguardando retry
+- `boleto_verificacao_sucesso` - Verificação bem-sucedida
+- `boleto_recovery` - Tentando recovery
+- `boleto_recovery_sucesso` - Recovery bem-sucedido
+
+---
+
+## 📚 Recursos Adicionais
+
+- **Guia de Migração Sync → Async**: [docs/MIGRATION_GUIDE.md](docs/MIGRATION_GUIDE.md)
+- **Exemplos Práticos**: [examples/](examples/)
+- **Documentação Completa**: [docs/](docs/)
+- **Issues e Sugestões**: [GitHub Issues](https://github.com/laddertech/sicoob-sdk/issues)
