@@ -309,6 +309,62 @@ class SicoobConfig:
         return cls.get_current_config().verify_ssl
 
     @classmethod
+    def enable_debug(cls) -> None:
+        """Ativa modo debug com logs verbosos
+
+        Configura o ambiente para modo debug:
+        - Ativa debug_mode
+        - Define log_level para DEBUG
+        - Ativa log_requests e log_responses
+        - Configura logging do Python para DEBUG
+
+        Example:
+            >>> from sicoob import SicoobConfig
+            >>> SicoobConfig.enable_debug()
+            >>> # Agora todos os logs de DEBUG serão exibidos
+        """
+        import logging
+
+        instance = cls()
+        config = instance._current_config
+
+        # Ativa flags de debug
+        config.debug_mode = True
+        config.log_level = 'DEBUG'
+        config.log_requests = True
+        config.log_responses = True
+
+        # Configura logging do Python
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s | %(levelname)-8s | %(name)s | %(funcName)s:%(lineno)d | %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S',
+        )
+
+        # Ativa DEBUG para loggers do sicoob
+        for logger_name in ['sicoob', 'sicoob.async_client', 'sicoob.async_boleto']:
+            logging.getLogger(logger_name).setLevel(logging.DEBUG)
+
+    @classmethod
+    def disable_debug(cls) -> None:
+        """Desativa modo debug
+
+        Restaura configurações de logging para o nível INFO
+        """
+        import logging
+
+        instance = cls()
+        config = instance._current_config
+
+        config.debug_mode = False
+        config.log_level = 'INFO'
+        config.log_requests = False
+        config.log_responses = False
+
+        # Restaura nível de log
+        logging.basicConfig(level=logging.INFO)
+
+    @classmethod
     def get_custom_headers(cls) -> dict[str, str]:
         """Retorna headers customizados"""
         return cls.get_current_config().custom_headers.copy()

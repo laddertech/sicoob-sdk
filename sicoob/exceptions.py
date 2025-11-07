@@ -1,8 +1,19 @@
+import json
+
 import requests
 
 
 class SicoobError(Exception):
-    """Classe base para todas as exceções do pacote Sicoob"""
+    """Classe base para todas as exceções do pacote Sicoob
+
+    Attributes:
+        message: Mensagem de erro principal
+        code: Código HTTP do erro (se aplicável)
+        mensagens: Lista de mensagens de erro da API
+        response: Objeto response completo (requests.Response)
+        response_text: Corpo da resposta HTTP como texto
+        response_headers: Headers da resposta HTTP
+    """
 
     def __init__(
         self,
@@ -10,10 +21,14 @@ class SicoobError(Exception):
         code: int | None = None,
         mensagens: list[dict] | None = None,
         response: requests.Response | None = None,
+        response_text: str | None = None,
+        response_headers: dict | None = None,
     ) -> None:
         self.message = message
         self.code = code
         self.response = response
+        self.response_text = response_text
+        self.response_headers = response_headers
         self.mensagens = mensagens or [
             {'mensagem': message, 'codigo': str(code) if code else '0'}
         ]
@@ -27,6 +42,30 @@ class SicoobError(Exception):
     def to_dict(self) -> dict:
         """Retorna o erro no formato padrão da API Sicoob"""
         return {'mensagens': self.mensagens}
+
+    def get_error_details(self) -> dict:
+        """Retorna dict com detalhes completos do erro extraídos do response_text
+
+        Returns:
+            Dict com dados do erro, ou dict vazio se não houver response_text.
+            Se response_text não for JSON válido, retorna {'raw_response': response_text}
+
+        Example:
+            >>> try:
+            ...     client.emitir_boleto(dados)
+            ... except SicoobError as e:
+            ...     details = e.get_error_details()
+            ...     if 'mensagens' in details:
+            ...         for msg in details['mensagens']:
+            ...             print(f"Campo: {msg.get('campo')}, Erro: {msg.get('mensagem')}")
+        """
+        if not self.response_text:
+            return {}
+
+        try:
+            return json.loads(self.response_text)
+        except json.JSONDecodeError:
+            return {'raw_response': self.response_text}
 
 
 class RespostaInvalidaError(SicoobError):

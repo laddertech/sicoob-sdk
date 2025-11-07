@@ -25,6 +25,7 @@ Example:
 
 import asyncio
 import json
+import logging
 import ssl
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -35,6 +36,9 @@ from aiohttp import ClientSession, ClientTimeout, TCPConnector
 from sicoob.auth import OAuth2Client
 from sicoob.config import Environment, SicoobConfig
 from sicoob.exceptions import SicoobError
+
+# Logger para debugging
+logger = logging.getLogger(__name__)
 
 
 class AsyncAPIClient:
@@ -224,19 +228,51 @@ class AsyncAPIClient:
             # Controle de concorrência
             async with self._semaphore:
                 try:
+                    # Log ANTES da requisição (apenas em DEBUG)
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(
+                            f'Requisição HTTP: {method} {url}',
+                            extra={
+                                'method': method,
+                                'url': url,
+                                'tentativa': tentativa + 1,
+                                'max_tentativas': max_tentativas,
+                                # Não loga Authorization por segurança
+                                'headers': {
+                                    k: v
+                                    for k, v in kwargs.get('headers', {}).items()
+                                    if k.lower() not in ['authorization', 'client_id']
+                                },
+                            },
+                        )
+
                     async with self._session.request(method, url, **kwargs) as response:
                         # Lê o corpo da resposta
                         response_text = await response.text()
 
-                        # Log da resposta (simplificado)
-                        # TODO: Implementar logging apropriado quando SicoobLogger estiver disponível
+                        # Log APÓS resposta
+                        if logger.isEnabledFor(logging.DEBUG):
+                            logger.debug(
+                                f'Resposta HTTP {response.status}: {method} {url}',
+                                extra={
+                                    'method': method,
+                                    'url': url,
+                                    'status': response.status,
+                                    'response_size': len(response_text),
+                                    # Primeiros 1000 chars apenas em DEBUG
+                                    'response_preview': response_text[:1000]
+                                    if response_text
+                                    else '',
+                                    'headers': dict(response.headers),
+                                },
+                            )
 
                         # Verifica se houve erro HTTP
                         if response.status >= 400:
                             # Tratamento especial para 404 (comportamento não-padrão da API Sicoob)
                             if response.status == 404:
                                 try:
-                                    error_data = await response.json()
+                                    error_data = json.loads(response_text)
 
                                     # Se contém dados válidos de boleto, processa como sucesso
                                     # (API Sicoob pode retornar 404 mas com dados válidos)
@@ -255,29 +291,51 @@ class AsyncAPIClient:
                             # Verifica se deve fazer retry
                             if self._should_retry(response.status, tentativa):
                                 delay = self._calcular_delay_retry(tentativa)
-                                # TODO: Log de retry quando SicoobLogger estiver disponível
-                                # print(f'Retry {tentativa + 1}/{max_tentativas} após {delay:.2f}s (HTTP {response.status})')
+                                logger.info(
+                                    f'Retry {tentativa + 1}/{max_tentativas} após {delay:.2f}s (HTTP {response.status})',
+                                    extra={
+                                        'operation': 'http_retry',
+                                        'tentativa': tentativa + 1,
+                                        'max_tentativas': max_tentativas,
+                                        'delay': delay,
+                                        'status': response.status,
+                                        'url': url,
+                                    },
+                                )
                                 await asyncio.sleep(delay)
                                 continue  # Tenta novamente
 
                             # Erro padrão para outros casos
                             try:
-                                error_data = await response.json()
+                                error_data = json.loads(response_text)
                                 error_msg = error_data.get(
                                     'message', f'HTTP {response.status}'
                                 )
-                            except Exception:
+
+                                # Extrai mensagens detalhadas se disponíveis
+                                if 'mensagens' in error_data:
+                                    mensagens_detalhadas = error_data['mensagens']
+                                    if mensagens_detalhadas:
+                                        error_msg = f'HTTP {response.status}: {mensagens_detalhadas}'
+                            except json.JSONDecodeError:
                                 error_msg = f'HTTP {response.status}: {response_text}'
 
-                            raise SicoobError(error_msg, code=response.status)
+                            raise SicoobError(
+                                error_msg,
+                                code=response.status,
+                                response_text=response_text,
+                                response_headers=dict(response.headers),
+                            )
 
                         # Parse JSON - sucesso
                         try:
-                            data = await response.json()
+                            data = json.loads(response_text)
                             return self._validate_response_data(data, response.status)
                         except json.JSONDecodeError as e:
                             raise SicoobError(
-                                f'Resposta não é JSON válido: {e!s}'
+                                f'Resposta não é JSON válido: {e!s}',
+                                response_text=response_text,
+                                response_headers=dict(response.headers),
                             ) from e
 
                 except asyncio.TimeoutError as e:

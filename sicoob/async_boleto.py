@@ -26,7 +26,7 @@ from datetime import date
 from typing import Any
 
 from sicoob.async_client import AsyncAPIClient
-from sicoob.exceptions import BoletoError, BoletoNaoEncontradoError
+from sicoob.exceptions import BoletoError, BoletoNaoEncontradoError, SicoobError
 from sicoob.validation import validate_cnpj, validate_cpf
 
 
@@ -72,8 +72,37 @@ class AsyncBoletoAPI:
 
             return response
 
+        except SicoobError as e:
+            # Extrai mensagens específicas da API Sicoob
+            error_details = e.get_error_details()
+
+            if 'mensagens' in error_details and error_details['mensagens']:
+                # Formata mensagens de validação de forma legível
+                msgs = error_details['mensagens']
+                formatted_msgs = '\n'.join(
+                    [
+                        f'  - {msg.get("mensagem", "Erro desconhecido")} '
+                        f'(campo: {msg.get("campo", "N/A")})'
+                        for msg in msgs
+                    ]
+                )
+                raise BoletoError(
+                    f'Falha na validação do boleto:\n{formatted_msgs}',
+                    code=e.code,
+                    response_text=e.response_text,
+                    response_headers=e.response_headers,
+                ) from e
+
+            # Erro genérico, preserva detalhes
+            raise BoletoError(
+                f'Erro ao emitir boleto: {e!s}',
+                code=e.code,
+                response_text=e.response_text,
+                response_headers=e.response_headers,
+            ) from e
+
         except Exception as e:
-            raise BoletoError(f'Erro ao emitir boleto: {e!s}') from e
+            raise BoletoError(f'Erro inesperado ao emitir boleto: {e!s}') from e
 
     async def emitir_e_verificar_boleto(
         self,
