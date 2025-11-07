@@ -169,6 +169,156 @@ def test_emitir_boleto_erro_generico(boleto_client: BoletoAPI) -> None:
     assert exc_info.value.dados_boleto == dados
 
 
+def test_emitir_boleto_404_com_dados_validos(boleto_client: BoletoAPI) -> None:
+    """Testa emissão com status 404 mas JSON válido (comportamento não-padrão da API)"""
+    # Configura o mock para retornar 404 mas com dados válidos
+    mock_response = Mock()
+    mock_response.status_code = 404
+    mock_response.headers = {'Content-Type': 'application/json'}
+    mock_response.text = '{"resultado": {"nossoNumero": 123456}}'
+    mock_response.json.return_value = {
+        'resultado': {'nossoNumero': 123456, 'codigoBarras': '123456789'}
+    }
+    boleto_client.session.post.return_value = mock_response
+
+    dados = {
+        'numeroCliente': 123456,
+        'codigoModalidade': 1,
+        'numeroContaCorrente': 12345,
+        'codigoEspecieDocumento': 'DM',
+        'dataEmissao': '2024-01-01',
+        'dataVencimento': '2024-12-31',
+        'valor': 100.50,
+        'seuNumero': '123456789',
+        'identificacaoEmissaoBoleto': 1,
+        'identificacaoDistribuicaoBoleto': 1,
+        'tipoDesconto': 0,
+        'tipoMulta': 0,
+        'tipoJurosMora': 3,
+        'numeroParcela': 1,
+        'pagador': {
+            'numeroCpfCnpj': '11144477735',
+            'nome': 'João Silva',
+            'endereco': 'Rua Teste, 123',
+            'bairro': 'Centro',
+            'cidade': 'São Paulo',
+            'cep': '01001000',
+            'uf': 'SP',
+        },
+    }
+
+    # Deve processar como sucesso apesar do 404
+    resultado = boleto_client.emitir_boleto(dados)
+
+    # Verificações
+    assert resultado['resultado']['nossoNumero'] == 123456
+    assert resultado['resultado']['codigoBarras'] == '123456789'
+
+
+def test_emitir_boleto_404_sem_dados(boleto_client: BoletoAPI) -> None:
+    """Testa emissão com status 404 sem dados válidos"""
+    # Configura o mock para retornar 404 sem dados
+    mock_response = Mock()
+    mock_response.status_code = 404
+    mock_response.headers = {'Content-Type': 'application/json'}
+    mock_response.text = '{"mensagem": "Não encontrado"}'
+    mock_response.json.return_value = {'mensagem': 'Não encontrado'}
+    boleto_client.session.post.return_value = mock_response
+
+    dados = {
+        'numeroCliente': 123456,
+        'codigoModalidade': 1,
+        'numeroContaCorrente': 12345,
+        'codigoEspecieDocumento': 'DM',
+        'dataEmissao': '2024-01-01',
+        'dataVencimento': '2024-12-31',
+        'valor': 100.50,
+        'seuNumero': '123456789',
+        'identificacaoEmissaoBoleto': 1,
+        'identificacaoDistribuicaoBoleto': 1,
+        'tipoDesconto': 0,
+        'tipoMulta': 0,
+        'tipoJurosMora': 3,
+        'numeroParcela': 1,
+        'pagador': {
+            'numeroCpfCnpj': '11144477735',
+            'nome': 'João Silva',
+            'endereco': 'Rua Teste, 123',
+            'bairro': 'Centro',
+            'cidade': 'São Paulo',
+            'cep': '01001000',
+            'uf': 'SP',
+        },
+    }
+
+    # Deve lançar exceção
+    with pytest.raises(BoletoEmissaoError) as exc_info:
+        boleto_client.emitir_boleto(dados)
+
+    # Verificações
+    assert exc_info.value.code == 404
+    assert 'Boleto não encontrado (404)' in str(exc_info.value)
+
+
+def test_emitir_e_verificar_boleto_sucesso(boleto_client: BoletoAPI) -> None:
+    """Testa emissão e verificação de boleto com sucesso"""
+    # Mock da emissão
+    mock_emissao = Mock()
+    mock_emissao.status_code = 200
+    mock_emissao.headers = {'Content-Type': 'application/json'}
+    mock_emissao.json.return_value = {
+        'resultado': {'nossoNumero': 123456, 'codigoBarras': '123456789'}
+    }
+
+    # Mock da consulta (primeira tentativa)
+    mock_consulta = Mock()
+    mock_consulta.status_code = 200
+    mock_consulta.headers = {'Content-Type': 'application/json'}
+    mock_consulta.json.return_value = {
+        'nossoNumero': 123456,
+        'valor': 100.50,
+        'dataVencimento': '2024-12-31',
+    }
+
+    boleto_client.session.post.return_value = mock_emissao
+    boleto_client.session.get.return_value = mock_consulta
+
+    dados = {
+        'numeroCliente': 123456,
+        'codigoModalidade': 1,
+        'numeroContaCorrente': 12345,
+        'codigoEspecieDocumento': 'DM',
+        'dataEmissao': '2024-01-01',
+        'dataVencimento': '2024-12-31',
+        'valor': 100.50,
+        'seuNumero': '123456789',
+        'identificacaoEmissaoBoleto': 1,
+        'identificacaoDistribuicaoBoleto': 1,
+        'tipoDesconto': 0,
+        'tipoMulta': 0,
+        'tipoJurosMora': 3,
+        'numeroParcela': 1,
+        'pagador': {
+            'numeroCpfCnpj': '11144477735',
+            'nome': 'João Silva',
+            'endereco': 'Rua Teste, 123',
+            'bairro': 'Centro',
+            'cidade': 'São Paulo',
+            'cep': '01001000',
+            'uf': 'SP',
+        },
+    }
+
+    # Emite e verifica com delay reduzido para teste
+    resultado = boleto_client.emitir_e_verificar_boleto(
+        dados, max_tentativas=1, delay_inicial=0.1
+    )
+
+    # Verificações
+    assert resultado['resultado']['nossoNumero'] == 123456
+    assert resultado['resultado']['codigoBarras'] == '123456789'
+
+
 def test_consultar_boleto_sucesso(boleto_client: BoletoAPI) -> None:
     """Testa a consulta de boleto com sucesso"""
     # Configura o mock

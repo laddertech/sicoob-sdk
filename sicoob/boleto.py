@@ -296,7 +296,79 @@ class BoletoAPI(APIClientBase):
         try:
             url = f'{self._get_base_url()}/cobranca-bancaria/v3/boletos'
             headers = self._get_headers(scope='boletos_inclusao')
+
+            # Log antes da requisição
+            self.logger.info(
+                'Emitindo boleto',
+                extra={
+                    'operation': 'boleto_emissao_request',
+                    'url': url,
+                    'numero_cliente': dados_boleto.get('numeroCliente'),
+                    'codigo_modalidade': dados_boleto.get('codigoModalidade'),
+                },
+            )
+
             response = self.session.post(url, json=dados_boleto, headers=headers)
+
+            # Log detalhado da resposta
+            response_size = 0
+            try:
+                response_size = len(response.text) if response.text else 0
+            except (TypeError, AttributeError):
+                pass  # Mock object durante testes
+
+            self.logger.info(
+                f'Resposta da emissão de boleto - Status: {response.status_code}',
+                extra={
+                    'operation': 'boleto_emissao_response',
+                    'status_code': response.status_code,
+                    'content_type': response.headers.get('Content-Type'),
+                    'response_size': response_size,
+                },
+            )
+
+            # Tratamento especial para 404
+            if response.status_code == 404:
+                self.logger.warning(
+                    'API retornou 404 na emissão de boleto (comportamento não-padrão)',
+                    extra={
+                        'operation': 'boleto_emissao_404',
+                        'response_text': response.text[:500],
+                    },
+                )
+
+                # Tenta processar JSON mesmo com 404
+                try:
+                    data = response.json()
+                    # Se contém dados válidos de boleto, processa como sucesso
+                    if (
+                        'resultado' in data
+                        and 'nossoNumero' in data.get('resultado', {})
+                    ) or 'nossoNumero' in data:
+                        self.logger.warning(
+                            'Boleto emitido com sucesso apesar de status 404! '
+                            'Possível inconsistência na API do Sicoob',
+                            extra={
+                                'operation': 'boleto_emissao_404_sucesso',
+                                'nosso_numero': data.get('resultado', {}).get(
+                                    'nossoNumero'
+                                )
+                                or data.get('nossoNumero'),
+                            },
+                        )
+                        return data
+                except Exception as json_error:
+                    self.logger.error(
+                        f'Erro ao processar JSON de resposta 404: {json_error}',
+                        extra={'operation': 'boleto_emissao_404_json_error'},
+                    )
+
+                # Se não conseguiu processar, lança exceção
+                raise BoletoEmissaoError(
+                    'Boleto não encontrado (404) - verifique se os dados estão corretos',
+                    code=404,
+                    dados_boleto=dados_boleto,
+                )
 
             self._handle_error_response(
                 response, BoletoEmissaoError, dados_boleto=dados_boleto
@@ -319,6 +391,117 @@ class BoletoAPI(APIClientBase):
                 f'Falha na comunicação com API de boletos: {e!s}',
                 dados_boleto=dados_boleto,
             ) from e
+
+    def emitir_e_verificar_boleto(
+        self,
+        dados_boleto: dict,
+        max_tentativas: int = 3,
+        delay_inicial: float = 1.0,
+    ) -> dict:
+        """Emite boleto e verifica se foi registrado com retry e exponential backoff
+
+        Este método é útil quando há delay de propagação entre a emissão
+        e a disponibilidade do boleto para consulta (ex: DDA).
+
+        Args:
+            dados_boleto: Dicionário com dados do boleto conforme especificação da API
+            max_tentativas: Número máximo de tentativas de verificação (default: 3)
+            delay_inicial: Delay inicial em segundos para backoff exponencial (default: 1.0)
+
+        Returns:
+            Resposta da API com dados do boleto emitido
+
+        Raises:
+            ValidationError: Em caso de dados inválidos
+            MultipleValidationError: Em caso de múltiplos erros de validação
+            BoletoEmissaoError: Em caso de falha na emissão
+        """
+        import time
+
+        # Emite o boleto
+        resultado = self.emitir_boleto(dados_boleto)
+
+        # Extrai informações para verificação
+        try:
+            # Tenta pegar nossoNumero do resultado
+            if 'resultado' in resultado:
+                nosso_numero = resultado['resultado'].get('nossoNumero')
+            else:
+                nosso_numero = resultado.get('nossoNumero')
+
+            if not nosso_numero:
+                self.logger.warning(
+                    'nossoNumero não encontrado na resposta da emissão, '
+                    'pulando verificação',
+                    extra={'operation': 'boleto_verificacao_skip'},
+                )
+                return resultado
+
+            # Aguarda propagação e verifica com exponential backoff
+            for tentativa in range(max_tentativas):
+                delay = delay_inicial * (2**tentativa)  # 1s, 2s, 4s, 8s...
+
+                self.logger.info(
+                    f'Aguardando {delay}s antes da tentativa {tentativa + 1} '
+                    f'de verificação do boleto',
+                    extra={
+                        'operation': 'boleto_verificacao_delay',
+                        'tentativa': tentativa + 1,
+                        'delay': delay,
+                    },
+                )
+
+                time.sleep(delay)
+
+                # Tenta consultar o boleto
+                try:
+                    consulta = self.consultar_boleto(
+                        numero_cliente=dados_boleto['numeroCliente'],
+                        codigo_modalidade=dados_boleto['codigoModalidade'],
+                        nosso_numero=nosso_numero,
+                    )
+
+                    if consulta is not None:
+                        self.logger.info(
+                            f'Boleto verificado com sucesso após {tentativa + 1} tentativa(s)',
+                            extra={
+                                'operation': 'boleto_verificacao_sucesso',
+                                'tentativa': tentativa + 1,
+                                'nosso_numero': nosso_numero,
+                            },
+                        )
+                        return resultado
+
+                except Exception as e:
+                    self.logger.warning(
+                        f'Erro na tentativa {tentativa + 1} de verificação: {e}',
+                        extra={
+                            'operation': 'boleto_verificacao_erro',
+                            'tentativa': tentativa + 1,
+                            'error': str(e),
+                        },
+                    )
+
+            # Se chegou aqui, não conseguiu verificar
+            self.logger.warning(
+                f'Boleto emitido mas não encontrado em consulta '
+                f'após {max_tentativas} tentativa(s). '
+                f'O boleto pode estar em processamento.',
+                extra={
+                    'operation': 'boleto_verificacao_timeout',
+                    'tentativas': max_tentativas,
+                    'nosso_numero': nosso_numero,
+                },
+            )
+
+        except Exception as e:
+            self.logger.error(
+                f'Erro ao verificar boleto emitido: {e}',
+                extra={'operation': 'boleto_verificacao_exception', 'error': str(e)},
+            )
+
+        # Retorna o resultado da emissão mesmo sem verificação
+        return resultado
 
     def consultar_boletos_por_pagador(
         self,
