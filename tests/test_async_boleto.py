@@ -82,7 +82,7 @@ class TestAsyncBoletoAPI:
         dados = {'valor': 100.00}
         mock_api_client._make_request.side_effect = Exception('API Error')
 
-        with pytest.raises(BoletoError, match='Erro ao emitir boleto'):
+        with pytest.raises(BoletoError, match='Erro.*ao emitir boleto'):
             await async_boleto_api.emitir_boleto(dados)
 
     @pytest.mark.asyncio

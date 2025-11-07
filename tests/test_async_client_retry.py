@@ -95,8 +95,8 @@ class TestAsyncAPIClientRetry:
 
             mock_response = AsyncMock(spec=ClientResponse)
             mock_response.status = 500
-            mock_response.text = AsyncMock(return_value='{"error": "server error"}')
-            mock_response.json = AsyncMock(return_value={'message': 'Server Error'})
+            mock_response.text = AsyncMock(return_value='{"message": "Server Error"}')
+            mock_response.headers = {}  # Mock headers para não quebrar
             return mock_response
 
         with patch.object(api_client_with_retry._session, 'request') as mock_request:
@@ -240,8 +240,8 @@ class TestAsyncAPIClientRetry:
 
             mock_response = AsyncMock(spec=ClientResponse)
             mock_response.status = 500
-            mock_response.text = AsyncMock(return_value='{"error": "server error"}')
-            mock_response.json = AsyncMock(return_value={'message': 'Server Error'})
+            mock_response.text = AsyncMock(return_value='{"message": "Server Error"}')
+            mock_response.headers = {}  # Mock headers para não quebrar
             return mock_response
 
         try:

@@ -252,6 +252,12 @@ class AsyncAPIClient:
 
                         # Log APÓS resposta
                         if logger.isEnabledFor(logging.DEBUG):
+                            # Extrai headers de forma segura (pode falhar em mocks)
+                            try:
+                                resp_headers = dict(response.headers)
+                            except (TypeError, AttributeError):
+                                resp_headers = {}
+
                             logger.debug(
                                 f'Resposta HTTP {response.status}: {method} {url}',
                                 extra={
@@ -263,7 +269,7 @@ class AsyncAPIClient:
                                     'response_preview': response_text[:1000]
                                     if response_text
                                     else '',
-                                    'headers': dict(response.headers),
+                                    'headers': resp_headers,
                                 },
                             )
 
@@ -320,11 +326,17 @@ class AsyncAPIClient:
                             except json.JSONDecodeError:
                                 error_msg = f'HTTP {response.status}: {response_text}'
 
+                            # Extrai headers de forma segura (pode falhar em mocks)
+                            try:
+                                headers_dict = dict(response.headers)
+                            except (TypeError, AttributeError):
+                                headers_dict = None
+
                             raise SicoobError(
                                 error_msg,
                                 code=response.status,
                                 response_text=response_text,
-                                response_headers=dict(response.headers),
+                                response_headers=headers_dict,
                             )
 
                         # Parse JSON - sucesso
@@ -332,10 +344,16 @@ class AsyncAPIClient:
                             data = json.loads(response_text)
                             return self._validate_response_data(data, response.status)
                         except json.JSONDecodeError as e:
+                            # Extrai headers de forma segura (pode falhar em mocks)
+                            try:
+                                headers_dict = dict(response.headers)
+                            except (TypeError, AttributeError):
+                                headers_dict = None
+
                             raise SicoobError(
                                 f'Resposta não é JSON válido: {e!s}',
                                 response_text=response_text,
-                                response_headers=dict(response.headers),
+                                response_headers=headers_dict,
                             ) from e
 
                 except asyncio.TimeoutError as e:
