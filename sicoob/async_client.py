@@ -163,6 +163,25 @@ class AsyncAPIClient:
 
                     # Verifica se houve erro HTTP
                     if response.status >= 400:
+                        # Tratamento especial para 404 (comportamento não-padrão da API Sicoob)
+                        if response.status == 404:
+                            try:
+                                error_data = await response.json()
+
+                                # Se contém dados válidos de boleto, processa como sucesso
+                                # (API Sicoob pode retornar 404 mas com dados válidos)
+                                if (
+                                    'resultado' in error_data
+                                    and 'nossoNumero' in error_data.get('resultado', {})
+                                ) or 'nossoNumero' in error_data:
+                                    # Boleto emitido com sucesso apesar de status 404
+                                    return self._validate_response_data(
+                                        error_data, response.status
+                                    )
+                            except json.JSONDecodeError:
+                                pass  # Continua para o erro padrão
+
+                        # Erro padrão para outros casos
                         try:
                             error_data = await response.json()
                             error_msg = error_data.get(

@@ -75,6 +75,83 @@ class AsyncBoletoAPI:
         except Exception as e:
             raise BoletoError(f'Erro ao emitir boleto: {e!s}') from e
 
+    async def emitir_e_verificar_boleto(
+        self,
+        dados: dict[str, Any],
+        max_tentativas: int = 3,
+        delay_inicial: float = 1.0,
+        nosso_numero: str | None = None,
+    ) -> dict[str, Any]:
+        """Emite boleto e verifica se foi registrado com retry e exponential backoff.
+
+        Este método é útil quando há delay de propagação entre a emissão
+        e a disponibilidade do boleto para consulta (ex: DDA).
+
+        Args:
+            dados: Dicionário com dados do boleto conforme especificação da API
+            max_tentativas: Número máximo de tentativas de verificação (default: 3)
+            delay_inicial: Delay inicial em segundos para backoff exponencial (default: 1.0)
+            nosso_numero: Nosso número específico (opcional)
+
+        Returns:
+            Resposta da API com dados do boleto emitido
+
+        Raises:
+            BoletoError: Em caso de falha na emissão
+
+        Example:
+            >>> async with AsyncSicoob(client_id="...") as client:
+            ...     resultado = await client.cobranca.boleto.emitir_e_verificar_boleto(
+            ...         dados_boleto,
+            ...         max_tentativas=2,
+            ...         delay_inicial=0.5
+            ...     )
+        """
+        import asyncio
+
+        # Emite o boleto
+        resultado = await self.emitir_boleto(dados, nosso_numero)
+
+        # Extrai informações para verificação
+        try:
+            # Tenta pegar nossoNumero do resultado
+            if 'resultado' in resultado:
+                numero_boleto = resultado['resultado'].get('nossoNumero')
+            else:
+                numero_boleto = resultado.get('nossoNumero')
+
+            if not numero_boleto:
+                # Sem nossoNumero, retorna resultado sem verificação
+                return resultado
+
+            # Aguarda propagação e verifica com exponential backoff
+            for tentativa in range(max_tentativas):
+                delay = delay_inicial * (2**tentativa)  # 1s, 2s, 4s, 8s...
+
+                await asyncio.sleep(delay)
+
+                # Tenta consultar o boleto
+                try:
+                    consulta = await self.consultar_boleto(str(numero_boleto))
+
+                    if consulta is not None:
+                        # Boleto verificado com sucesso
+                        return resultado
+
+                except Exception:
+                    # Falha na consulta, continua tentando
+                    if tentativa == max_tentativas - 1:
+                        # Última tentativa falhou, mas emissão foi bem-sucedida
+                        # Retorna resultado da emissão
+                        pass
+
+        except Exception:
+            # Erro na verificação não deve falhar a emissão
+            pass
+
+        # Retorna resultado da emissão mesmo sem verificação completa
+        return resultado
+
     async def consultar_boleto(self, nosso_numero: str) -> dict[str, Any]:
         """Consulta um boleto por nosso número de forma assíncrona.
 

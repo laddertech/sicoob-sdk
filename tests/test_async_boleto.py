@@ -376,3 +376,73 @@ class TestAsyncBoletoAPI:
             assert result['total_boletos'] == 0
             assert result['valor_total'] == 0.0
             assert result['vencimento_hoje'] == 0
+
+    @pytest.mark.asyncio
+    async def test_emitir_e_verificar_boleto_sucesso(
+        self, async_boleto_api, mock_api_client
+    ):
+        """Testa emissão e verificação de boleto com sucesso"""
+        dados = {'valor': 100.00, 'pagador': {'nome': 'Teste'}}
+        resultado_emissao = {'resultado': {'nossoNumero': '12345', 'valor': 100.00}}
+        resultado_consulta = {'nossoNumero': '12345', 'status': 'REGISTRADO'}
+
+        # Mock da emissão
+        mock_api_client._make_request.return_value = resultado_emissao
+
+        # Mock da consulta (retorna na primeira tentativa)
+        async def mock_consultar(nosso_numero):
+            return resultado_consulta
+
+        with patch.object(
+            async_boleto_api, 'consultar_boleto', side_effect=mock_consultar
+        ):
+            result = await async_boleto_api.emitir_e_verificar_boleto(
+                dados, max_tentativas=1, delay_inicial=0.1
+            )
+
+            assert result == resultado_emissao
+            # Verifica que consultar_boleto foi chamado
+            async_boleto_api.consultar_boleto.assert_called_once_with('12345')
+
+    @pytest.mark.asyncio
+    async def test_emitir_e_verificar_boleto_sem_nosso_numero(
+        self, async_boleto_api, mock_api_client
+    ):
+        """Testa emissão e verificação quando resultado não tem nossoNumero"""
+        dados = {'valor': 100.00, 'pagador': {'nome': 'Teste'}}
+        resultado_emissao = {'status': 'PENDENTE'}  # Sem nossoNumero
+
+        mock_api_client._make_request.return_value = resultado_emissao
+
+        result = await async_boleto_api.emitir_e_verificar_boleto(
+            dados, max_tentativas=1, delay_inicial=0.1
+        )
+
+        # Deve retornar resultado sem verificação
+        assert result == resultado_emissao
+
+    @pytest.mark.asyncio
+    async def test_emitir_e_verificar_boleto_consulta_falha(
+        self, async_boleto_api, mock_api_client
+    ):
+        """Testa emissão com sucesso mas consulta sempre falha"""
+        dados = {'valor': 100.00, 'pagador': {'nome': 'Teste'}}
+        resultado_emissao = {'resultado': {'nossoNumero': '12345', 'valor': 100.00}}
+
+        mock_api_client._make_request.return_value = resultado_emissao
+
+        # Mock da consulta que sempre falha
+        async def mock_consultar_falha(nosso_numero):
+            raise BoletoNaoEncontradoError(nosso_numero)
+
+        with patch.object(
+            async_boleto_api, 'consultar_boleto', side_effect=mock_consultar_falha
+        ):
+            result = await async_boleto_api.emitir_e_verificar_boleto(
+                dados, max_tentativas=2, delay_inicial=0.1
+            )
+
+            # Deve retornar resultado da emissão mesmo sem verificação
+            assert result == resultado_emissao
+            # Verifica que tentou consultar 2 vezes
+            assert async_boleto_api.consultar_boleto.call_count == 2
