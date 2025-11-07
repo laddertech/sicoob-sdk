@@ -76,7 +76,7 @@ class AsyncBoletoAPI:
             # Extrai mensagens específicas da API Sicoob
             error_details = e.get_error_details()
 
-            if 'mensagens' in error_details and error_details['mensagens']:
+            if error_details.get('mensagens'):
                 # Formata mensagens de validação de forma legível
                 msgs = error_details['mensagens']
                 formatted_msgs = '\n'.join(
