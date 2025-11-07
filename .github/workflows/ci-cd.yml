@@ -20,7 +20,7 @@ jobs:
       uses: astral-sh/setup-uv@v3
     - run: pip install -e ".[dev]"
     - name: Run tests (excluding integration)
-      run: uv run pytest tests/ -v -m "not integration" --cov-fail-under=0
+      run: uv run pytest tests/ -v -m "not integration"
 
   deploy:
     needs: test
