@@ -775,6 +775,80 @@ Veja [examples/emissao_lote_async.py](examples/emissao_lote_async.py) para exemp
 
 ---
 
+### Retry Automático Global (AsyncSicoob)
+
+A versão assíncrona suporta **retry automático** para erros de infraestrutura e rate limiting.
+
+**Configuração:**
+
+```python
+from sicoob.async_client import AsyncSicoob
+
+async with AsyncSicoob(
+    client_id="...",
+    certificado_pfx="...",
+    senha_pfx="...",
+    retry_config={
+        'max_tentativas': 3,           # Número máximo de tentativas
+        'delay_inicial': 1.0,          # Delay inicial em segundos
+        'backoff_exponencial': True,   # Usar exponential backoff
+        'codigos_retry': [500, 502, 503, 504, 429],  # Códigos HTTP para retry
+    }
+) as client:
+    # Todas as operações usarão retry automático
+    resultado = await client.cobranca.boleto.emitir_boleto(dados)
+```
+
+**Comportamento:**
+- **Exponential backoff**: 1s, 2s, 4s, 8s... (com jitter de ±25%)
+- **Códigos padrão para retry**: 500, 502, 503, 504, 429
+- **Sem retry por padrão**: Para manter compatibilidade, configure `max_tentativas > 1`
+
+**Quando usar:**
+- ✅ Erros transitórios de servidor (500, 503)
+- ✅ Rate limiting (429)
+- ✅ Timeouts e falhas de rede
+- ❌ Erros de validação (400, 404) - não faz retry
+
+**Exemplo com e sem retry:**
+
+```python
+# Sem retry (comportamento padrão)
+async with AsyncSicoob(client_id="...") as client:
+    # Falha imediatamente em erro 503
+    resultado = await client.cobranca.boleto.emitir_boleto(dados)
+
+# Com retry automático
+async with AsyncSicoob(
+    client_id="...",
+    retry_config={'max_tentativas': 3, 'delay_inicial': 0.5}
+) as client:
+    # Tenta 3x com backoff antes de falhar
+    resultado = await client.cobranca.boleto.emitir_boleto(dados)
+```
+
+**Combinando com métodos especializados:**
+
+O retry global é diferente de `emitir_e_verificar_boleto()`:
+- **Retry global**: Retenta em erros de infraestrutura (500, 503, 429)
+- **emitir_e_verificar_boleto()**: Verifica propagação DDA após sucesso
+
+Você pode usar ambos juntos:
+
+```python
+async with AsyncSicoob(
+    client_id="...",
+    retry_config={'max_tentativas': 3}  # Retry em erros de servidor
+) as client:
+    # Também verifica propagação DDA
+    resultado = await client.cobranca.boleto.emitir_e_verificar_boleto(
+        dados,
+        max_tentativas=2  # Retry de verificação DDA
+    )
+```
+
+---
+
 ### Logs e Debugging
 
 **Habilitar logs detalhados:**

@@ -503,6 +503,82 @@ async with AsyncSicoob(...) as client:
     boleto2 = await client.cobranca.boleto.emitir_boleto(dados2)
 ```
 
+### 6. Retry Automático Global (Novo!)
+
+A versão async suporta retry automático para erros de infraestrutura:
+
+```python
+# Configuração de retry para erros transitórios
+async with AsyncSicoob(
+    client_id="...",
+    retry_config={
+        'max_tentativas': 3,           # Máximo de tentativas
+        'delay_inicial': 1.0,          # Delay inicial (exponencial)
+        'backoff_exponencial': True,   # Usar backoff exponencial
+        'codigos_retry': [500, 502, 503, 504, 429],  # Códigos HTTP para retry
+    }
+) as client:
+    # Todas as operações têm retry automático
+    resultado = await client.cobranca.boleto.emitir_boleto(dados)
+```
+
+**Quando usar:**
+- ✅ Ambientes com instabilidade de rede
+- ✅ APIs com rate limiting (429)
+- ✅ Servidores com erros transitórios (500, 503)
+- ❌ Não é necessário para erros de validação (4xx)
+
+**Diferença entre retry global e métodos especializados:**
+
+| Recurso | Retry Global | emitir_e_verificar_boleto() |
+|---------|--------------|----------------------------|
+| **Propósito** | Erros de infraestrutura | Delay de propagação DDA |
+| **Quando retenta** | 500, 502, 503, 504, 429 | Após emissão bem-sucedida |
+| **Configuração** | retry_config no construtor | max_tentativas no método |
+| **Pode combinar** | ✅ Sim | ✅ Sim |
+
+**Exemplo combinando ambos:**
+
+```python
+# Retry global + verificação DDA
+async with AsyncSicoob(
+    client_id="...",
+    retry_config={'max_tentativas': 3}  # Retry em erros 500/503
+) as client:
+    # Também verifica propagação DDA
+    resultado = await client.cobranca.boleto.emitir_e_verificar_boleto(
+        dados,
+        max_tentativas=2  # Retry de verificação
+    )
+
+    # Resultado:
+    # - Se servidor retornar 503, tenta 3x (retry global)
+    # - Se emissão suceder, verifica DDA 2x (método especializado)
+```
+
+**Migração de retry manual para retry global:**
+
+```python
+# ❌ Antes - Retry manual
+async def emitir_com_retry_manual(dados):
+    for tentativa in range(3):
+        try:
+            return await client.cobranca.boleto.emitir_boleto(dados)
+        except SicoobError as e:
+            if e.code in [500, 503] and tentativa < 2:
+                await asyncio.sleep(2 ** tentativa)
+                continue
+            raise
+
+# ✅ Depois - Retry automático
+async with AsyncSicoob(
+    client_id="...",
+    retry_config={'max_tentativas': 3, 'delay_inicial': 1.0}
+) as client:
+    # Retry automático, menos código boilerplate
+    resultado = await client.cobranca.boleto.emitir_boleto(dados)
+```
+
 ## Troubleshooting
 
 ### Erro: "RuntimeError: asyncio.run() cannot be called from a running event loop"

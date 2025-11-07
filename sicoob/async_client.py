@@ -46,6 +46,7 @@ class AsyncAPIClient:
         session: ClientSession | None = None,
         max_concurrent_requests: int = 10,
         request_timeout: int = 30,
+        retry_config: dict[str, Any] | None = None,
     ) -> None:
         """Inicializa cliente assíncrono.
 
@@ -54,11 +55,26 @@ class AsyncAPIClient:
             session: Sessão aiohttp existente (opcional)
             max_concurrent_requests: Limite de requisições concorrentes
             request_timeout: Timeout padrão para requisições em segundos
+            retry_config: Configuração de retry automático (opcional)
+                {
+                    'max_tentativas': 3,
+                    'delay_inicial': 1.0,
+                    'backoff_exponencial': True,
+                    'codigos_retry': [500, 502, 503, 504, 429],
+                }
         """
         self.oauth_client = oauth_client
         self.max_concurrent_requests = max_concurrent_requests
         self.request_timeout = request_timeout
         # self.logger = get_logger(__name__)  # Temporariamente comentado
+
+        # Configuração de retry
+        self.retry_config = retry_config or {
+            'max_tentativas': 1,  # Sem retry por padrão
+            'delay_inicial': 1.0,
+            'backoff_exponencial': True,
+            'codigos_retry': [500, 502, 503, 504, 429],
+        }
 
         # Semáforo para limitar requisições concorrentes
         self._semaphore = asyncio.Semaphore(max_concurrent_requests)
@@ -123,10 +139,59 @@ class AsyncAPIClient:
             raise SicoobError(f'Resposta não é JSON válido. Status: {status}')
         return data
 
+    def _calcular_delay_retry(self, tentativa: int) -> float:
+        """Calcula o delay para retry com exponential backoff e jitter.
+
+        Args:
+            tentativa: Número da tentativa (0-indexed)
+
+        Returns:
+            Delay em segundos
+        """
+        import random
+
+        delay_inicial = self.retry_config.get('delay_inicial', 1.0)
+        backoff_exponencial = self.retry_config.get('backoff_exponencial', True)
+
+        if backoff_exponencial:
+            # Exponential backoff: delay_inicial * (2 ** tentativa)
+            delay = delay_inicial * (2**tentativa)
+        else:
+            # Delay fixo
+            delay = delay_inicial
+
+        # Adiciona jitter (±25%) para evitar thundering herd
+        jitter = delay * 0.25
+        delay = delay + random.uniform(-jitter, jitter)
+
+        return max(0.1, delay)  # Mínimo de 100ms
+
+    def _should_retry(self, status_code: int, tentativa: int) -> bool:
+        """Verifica se deve fazer retry baseado no status code e tentativa.
+
+        Args:
+            status_code: Código HTTP de status
+            tentativa: Número da tentativa atual (0-indexed)
+
+        Returns:
+            True se deve fazer retry, False caso contrário
+        """
+        max_tentativas = self.retry_config.get('max_tentativas', 1)
+        codigos_retry = self.retry_config.get(
+            'codigos_retry', [500, 502, 503, 504, 429]
+        )
+
+        # Verifica se ainda tem tentativas disponíveis
+        if tentativa >= max_tentativas - 1:
+            return False
+
+        # Verifica se o código de status permite retry
+        return status_code in codigos_retry
+
     async def _make_request(
         self, method: str, url: str, scope: str, **kwargs: Any
     ) -> dict[str, Any]:
-        """Faz uma requisição HTTP assíncrona com logging integrado.
+        """Faz uma requisição HTTP assíncrona com retry automático e logging integrado.
 
         Args:
             method: Método HTTP (GET, POST, PUT, DELETE, etc.)
@@ -151,62 +216,96 @@ class AsyncAPIClient:
         # Log da requisição (simplificado)
         # TODO: Implementar logging apropriado quando SicoobLogger estiver disponível
 
-        # Controle de concorrência
-        async with self._semaphore:
-            try:
-                async with self._session.request(method, url, **kwargs) as response:
-                    # Lê o corpo da resposta
-                    response_text = await response.text()
+        # Implementa retry com exponential backoff
+        max_tentativas = self.retry_config.get('max_tentativas', 1)
+        last_error = None
 
-                    # Log da resposta (simplificado)
-                    # TODO: Implementar logging apropriado quando SicoobLogger estiver disponível
+        for tentativa in range(max_tentativas):
+            # Controle de concorrência
+            async with self._semaphore:
+                try:
+                    async with self._session.request(method, url, **kwargs) as response:
+                        # Lê o corpo da resposta
+                        response_text = await response.text()
 
-                    # Verifica se houve erro HTTP
-                    if response.status >= 400:
-                        # Tratamento especial para 404 (comportamento não-padrão da API Sicoob)
-                        if response.status == 404:
+                        # Log da resposta (simplificado)
+                        # TODO: Implementar logging apropriado quando SicoobLogger estiver disponível
+
+                        # Verifica se houve erro HTTP
+                        if response.status >= 400:
+                            # Tratamento especial para 404 (comportamento não-padrão da API Sicoob)
+                            if response.status == 404:
+                                try:
+                                    error_data = await response.json()
+
+                                    # Se contém dados válidos de boleto, processa como sucesso
+                                    # (API Sicoob pode retornar 404 mas com dados válidos)
+                                    if (
+                                        'resultado' in error_data
+                                        and 'nossoNumero'
+                                        in error_data.get('resultado', {})
+                                    ) or 'nossoNumero' in error_data:
+                                        # Boleto emitido com sucesso apesar de status 404
+                                        return self._validate_response_data(
+                                            error_data, response.status
+                                        )
+                                except json.JSONDecodeError:
+                                    pass  # Continua para o erro padrão
+
+                            # Verifica se deve fazer retry
+                            if self._should_retry(response.status, tentativa):
+                                delay = self._calcular_delay_retry(tentativa)
+                                # TODO: Log de retry quando SicoobLogger estiver disponível
+                                # print(f'Retry {tentativa + 1}/{max_tentativas} após {delay:.2f}s (HTTP {response.status})')
+                                await asyncio.sleep(delay)
+                                continue  # Tenta novamente
+
+                            # Erro padrão para outros casos
                             try:
                                 error_data = await response.json()
+                                error_msg = error_data.get(
+                                    'message', f'HTTP {response.status}'
+                                )
+                            except Exception:
+                                error_msg = f'HTTP {response.status}: {response_text}'
 
-                                # Se contém dados válidos de boleto, processa como sucesso
-                                # (API Sicoob pode retornar 404 mas com dados válidos)
-                                if (
-                                    'resultado' in error_data
-                                    and 'nossoNumero' in error_data.get('resultado', {})
-                                ) or 'nossoNumero' in error_data:
-                                    # Boleto emitido com sucesso apesar de status 404
-                                    return self._validate_response_data(
-                                        error_data, response.status
-                                    )
-                            except json.JSONDecodeError:
-                                pass  # Continua para o erro padrão
+                            raise SicoobError(error_msg, code=response.status)
 
-                        # Erro padrão para outros casos
+                        # Parse JSON - sucesso
                         try:
-                            error_data = await response.json()
-                            error_msg = error_data.get(
-                                'message', f'HTTP {response.status}'
-                            )
-                        except Exception:
-                            error_msg = f'HTTP {response.status}: {response_text}'
+                            data = await response.json()
+                            return self._validate_response_data(data, response.status)
+                        except json.JSONDecodeError as e:
+                            raise SicoobError(
+                                f'Resposta não é JSON válido: {e!s}'
+                            ) from e
 
-                        raise SicoobError(error_msg, code=response.status)
+                except asyncio.TimeoutError as e:
+                    last_error = e
+                    # Verifica se deve fazer retry em caso de timeout
+                    if tentativa < max_tentativas - 1:
+                        delay = self._calcular_delay_retry(tentativa)
+                        # TODO: Log quando disponível
+                        await asyncio.sleep(delay)
+                        continue
+                    # self.logger.error(f'Timeout na requisição assíncrona')  # Temporariamente comentado
+                    raise SicoobError(f'Timeout na requisição para {url}') from e
 
-                    # Parse JSON
-                    try:
-                        data = await response.json()
-                        return self._validate_response_data(data, response.status)
-                    except json.JSONDecodeError as e:
-                        raise SicoobError(f'Resposta não é JSON válido: {e!s}') from e
+                except SicoobError:
+                    # Relança SicoobError sem wrapping
+                    raise
 
-            except asyncio.TimeoutError as e:
-                # self.logger.error(f'Timeout na requisição assíncrona')  # Temporariamente comentado
-                raise SicoobError(f'Timeout na requisição para {url}') from e
+                except Exception as e:
+                    last_error = e
+                    # self.logger.error(f'Erro na requisição assíncrona: {e!s}')  # Temporariamente comentado
+                    raise SicoobError(f'Erro na requisição assíncrona: {e!s}') from e
 
-            except Exception as e:
-                # self.logger.error(f'Erro na requisição assíncrona: {e!s}')  # Temporariamente comentado
-                pass
-                raise SicoobError(f'Erro na requisição assíncrona: {e!s}') from e
+        # Se chegou aqui, esgotou todas as tentativas
+        if last_error:
+            raise SicoobError(
+                f'Todas as {max_tentativas} tentativas falharam para {url}'
+            ) from last_error
+        raise SicoobError(f'Falha inesperada após {max_tentativas} tentativas')
 
 
 class AsyncSicoob:
@@ -222,6 +321,7 @@ class AsyncSicoob:
         environment: str | Environment | None = None,
         max_concurrent_requests: int = 10,
         request_timeout: int = 30,
+        retry_config: dict[str, Any] | None = None,
     ) -> None:
         """Inicializa o cliente assíncrono.
 
@@ -234,6 +334,13 @@ class AsyncSicoob:
             environment: Ambiente (development, test, staging, production, sandbox)
             max_concurrent_requests: Limite de requisições concorrentes
             request_timeout: Timeout padrão para requisições
+            retry_config: Configuração de retry automático (opcional)
+                {
+                    'max_tentativas': 3,
+                    'delay_inicial': 1.0,
+                    'backoff_exponencial': True,
+                    'codigos_retry': [500, 502, 503, 504, 429],
+                }
         """
         import os
 
@@ -281,6 +388,7 @@ class AsyncSicoob:
             oauth_client=self.oauth_client,
             max_concurrent_requests=max_concurrent_requests,
             request_timeout=request_timeout,
+            retry_config=retry_config,
         )
 
         # self.logger = get_logger(__name__)  # Temporariamente comentado

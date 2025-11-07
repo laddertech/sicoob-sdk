@@ -93,16 +93,14 @@ async def emitir_lote_boletos_exemplo():
                     await asyncio.sleep(delay_entre_requests)
 
                     # Usa emitir_e_verificar_boleto para maior robustez
-                    resultado = (
-                        await client.cobranca.boleto.emitir_e_verificar_boleto(
-                            dados, max_tentativas=2, delay_inicial=0.5
-                        )
+                    resultado = await client.cobranca.boleto.emitir_e_verificar_boleto(
+                        dados, max_tentativas=2, delay_inicial=0.5
                     )
 
                     stats['sucesso'] += 1
                     print(
-                        f"✅ [{indice:03d}] Boleto emitido: "
-                        f"{resultado.get('resultado', {}).get('nossoNumero', 'N/A')}"
+                        f'✅ [{indice:03d}] Boleto emitido: '
+                        f'{resultado.get("resultado", {}).get("nossoNumero", "N/A")}'
                     )
 
                     return {'status': 'sucesso', 'indice': indice, 'dados': resultado}
@@ -116,7 +114,7 @@ async def emitir_lote_boletos_exemplo():
                     }
                     stats['erros_detalhados'].append(erro_detalhado)
 
-                    print(f"❌ [{indice:03d}] Erro: {e}")
+                    print(f'❌ [{indice:03d}] Erro: {e}')
 
                     return {'status': 'erro', 'indice': indice, 'erro': str(e)}
 
@@ -140,21 +138,23 @@ async def emitir_lote_boletos_exemplo():
         print('\n' + '=' * 60)
         print('📊 ESTATÍSTICAS DE PROCESSAMENTO')
         print('=' * 60)
-        print(f"Total de boletos: {stats['total']}")
-        print(f"✅ Sucessos: {stats['sucesso']}")
-        print(f"❌ Erros: {stats['erro']}")
-        print(f"⏱️  Tempo total: {stats['duracao_segundos']:.2f}s")
+        print(f'Total de boletos: {stats["total"]}')
+        print(f'✅ Sucessos: {stats["sucesso"]}')
+        print(f'❌ Erros: {stats["erro"]}')
+        print(f'⏱️  Tempo total: {stats["duracao_segundos"]:.2f}s')
         print(
-            f"📈 Taxa média: {stats['total'] / stats['duracao_segundos']:.2f} boletos/s"
+            f'📈 Taxa média: {stats["total"] / stats["duracao_segundos"]:.2f} boletos/s'
         )
 
         if stats['erros_detalhados']:
             print('\n❌ ERROS DETALHADOS:')
             for erro in stats['erros_detalhados'][:10]:  # Mostra apenas primeiros 10
-                print(f"  - [{erro['indice']:03d}] {erro['seu_numero']}: {erro['erro']}")
+                print(
+                    f'  - [{erro["indice"]:03d}] {erro["seu_numero"]}: {erro["erro"]}'
+                )
 
             if len(stats['erros_detalhados']) > 10:
-                print(f"  ... e mais {len(stats['erros_detalhados']) - 10} erros")
+                print(f'  ... e mais {len(stats["erros_detalhados"]) - 10} erros')
 
         print('=' * 60)
 
