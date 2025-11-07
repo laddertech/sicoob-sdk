@@ -60,10 +60,10 @@ class AsyncBoletoAPI:
             base_url = self.api_client._get_base_url()
 
             if nosso_numero:
-                url = f'{base_url}/cobranca-bancaria/boleto/{nosso_numero}'
+                url = f'{base_url}/cobranca-bancaria/v3/boletos/{nosso_numero}'
                 method = 'PUT'
             else:
-                url = f'{base_url}/cobranca-bancaria/boleto'
+                url = f'{base_url}/cobranca-bancaria/v3/boletos'
                 method = 'POST'
 
             response = await self.api_client._make_request(
@@ -232,7 +232,7 @@ class AsyncBoletoAPI:
         """
         try:
             base_url = self.api_client._get_base_url()
-            url = f'{base_url}/cobranca-bancaria/boleto/{nosso_numero}'
+            url = f'{base_url}/cobranca-bancaria/v3/boletos/{nosso_numero}'
 
             response = await self.api_client._make_request(
                 'GET', url, scope='boletos_consulta'
@@ -264,7 +264,7 @@ class AsyncBoletoAPI:
             Lista de boletos
         """
         base_url = self.api_client._get_base_url()
-        url = f'{base_url}/cobranca-bancaria/boleto'
+        url = f'{base_url}/cobranca-bancaria/v3/boletos'
 
         params = {}
         if data_inicio:
@@ -306,7 +306,7 @@ class AsyncBoletoAPI:
             cpf_cnpj_limpo = validate_cnpj(cpf_cnpj)
 
         base_url = self.api_client._get_base_url()
-        url = f'{base_url}/cobranca-bancaria/boleto/pagador'
+        url = f'{base_url}/cobranca-bancaria/v3/boletos/pagador'
 
         params = {'cpfCnpj': cpf_cnpj_limpo}
 
@@ -332,7 +332,7 @@ class AsyncBoletoAPI:
             Dados do boleto alterado
         """
         base_url = self.api_client._get_base_url()
-        url = f'{base_url}/cobranca-bancaria/boleto/{nosso_numero}'
+        url = f'{base_url}/cobranca-bancaria/v3/boletos/{nosso_numero}'
 
         return await self.api_client._make_request(
             'PATCH', url, scope='boletos_alteracao', json=dados_alteracao
@@ -351,7 +351,7 @@ class AsyncBoletoAPI:
             Confirmação da baixa
         """
         base_url = self.api_client._get_base_url()
-        url = f'{base_url}/cobranca-bancaria/boleto/{nosso_numero}/baixa'
+        url = f'{base_url}/cobranca-bancaria/v3/boletos/{nosso_numero}/baixa'
 
         return await self.api_client._make_request(
             'POST', url, scope='boletos_alteracao', json=dados_baixa

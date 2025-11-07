@@ -50,7 +50,7 @@ class TestAsyncBoletoAPI:
         assert result == expected_response
         mock_api_client._make_request.assert_called_once_with(
             'POST',
-            'https://api.sicoob.com.br/prd/cobranca-bancaria/boleto',
+            'https://api.sicoob.com.br/prd/cobranca-bancaria/v3/boletos',
             scope='boletos_inclusao',
             json=dados,
         )
@@ -71,7 +71,7 @@ class TestAsyncBoletoAPI:
         assert result == expected_response
         mock_api_client._make_request.assert_called_once_with(
             'PUT',
-            f'https://api.sicoob.com.br/prd/cobranca-bancaria/boleto/{nosso_numero}',
+            f'https://api.sicoob.com.br/prd/cobranca-bancaria/v3/boletos/{nosso_numero}',
             scope='boletos_inclusao',
             json=dados,
         )
@@ -98,7 +98,7 @@ class TestAsyncBoletoAPI:
         assert result == expected_response
         mock_api_client._make_request.assert_called_once_with(
             'GET',
-            f'https://api.sicoob.com.br/prd/cobranca-bancaria/boleto/{nosso_numero}',
+            f'https://api.sicoob.com.br/prd/cobranca-bancaria/v3/boletos/{nosso_numero}',
             scope='boletos_consulta',
         )
 
@@ -138,7 +138,7 @@ class TestAsyncBoletoAPI:
         assert result == expected_response
         mock_api_client._make_request.assert_called_once_with(
             'GET',
-            'https://api.sicoob.com.br/prd/cobranca-bancaria/boleto',
+            'https://api.sicoob.com.br/prd/cobranca-bancaria/v3/boletos',
             scope='boletos_consulta',
             params={
                 'dataInicio': '2023-01-01',
@@ -161,7 +161,7 @@ class TestAsyncBoletoAPI:
         assert result == expected_response
         mock_api_client._make_request.assert_called_once_with(
             'GET',
-            'https://api.sicoob.com.br/prd/cobranca-bancaria/boleto',
+            'https://api.sicoob.com.br/prd/cobranca-bancaria/v3/boletos',
             scope='boletos_consulta',
             params={},
         )
@@ -183,7 +183,7 @@ class TestAsyncBoletoAPI:
         assert result == expected_response
         mock_api_client._make_request.assert_called_once_with(
             'GET',
-            'https://api.sicoob.com.br/prd/cobranca-bancaria/boleto/pagador',
+            'https://api.sicoob.com.br/prd/cobranca-bancaria/v3/boletos/pagador',
             scope='boletos_consulta',
             params={
                 'cpfCnpj': cpf_cnpj,
@@ -209,7 +209,7 @@ class TestAsyncBoletoAPI:
         assert result == expected_response
         mock_api_client._make_request.assert_called_once_with(
             'GET',
-            'https://api.sicoob.com.br/prd/cobranca-bancaria/boleto/pagador',
+            'https://api.sicoob.com.br/prd/cobranca-bancaria/v3/boletos/pagador',
             scope='boletos_consulta',
             params={'cpfCnpj': cpf_cnpj},
         )
@@ -228,7 +228,7 @@ class TestAsyncBoletoAPI:
         assert result == expected_response
         mock_api_client._make_request.assert_called_once_with(
             'PATCH',
-            f'https://api.sicoob.com.br/prd/cobranca-bancaria/boleto/{nosso_numero}',
+            f'https://api.sicoob.com.br/prd/cobranca-bancaria/v3/boletos/{nosso_numero}',
             scope='boletos_alteracao',
             json=dados_alteracao,
         )
@@ -247,7 +247,7 @@ class TestAsyncBoletoAPI:
         assert result == expected_response
         mock_api_client._make_request.assert_called_once_with(
             'POST',
-            f'https://api.sicoob.com.br/prd/cobranca-bancaria/boleto/{nosso_numero}/baixa',
+            f'https://api.sicoob.com.br/prd/cobranca-bancaria/v3/boletos/{nosso_numero}/baixa',
             scope='boletos_alteracao',
             json=dados_baixa,
         )
