@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 import pytest_asyncio
-from aiohttp import ClientResponse, ClientSession
+from aiohttp import ClientResponse
 
 from sicoob.async_client import AsyncAPIClient, AsyncSicoob
 from sicoob.auth import OAuth2Client

@@ -41,7 +41,7 @@ Certificado PEM/Key
 
    cliente = Sicoob(
        client_id="seu_client_id",
-       certificate_path="/path/to/certificate.pem", 
+       certificate_path="/path/to/certificate.pem",
        private_key_path="/path/to/private_key.key",
        sandbox_mode=True  # Para testes
    )
@@ -93,13 +93,13 @@ Teste de Conectividade
        cliente = Sicoob(
            client_id="seu_client_id",
            certificate_path="/path/to/certificate.pem",
-           private_key_path="/path/to/private_key.key", 
+           private_key_path="/path/to/private_key.key",
            sandbox_mode=True
        )
-       
+
        # Testa autenticação
        print("✅ Cliente configurado com sucesso!")
-       
+
    except Exception as e:
        print(f"❌ Erro na configuração: {e}")
 
@@ -133,10 +133,10 @@ Exemplo Completo PIX
                "solicitacaoPagador": "Pagamento do pedido #123"
            }
        )
-       
+
        print(f"QR Code: {cobranca['qrcode']}")
        print(f"PIX Copia e Cola: {cobranca['pixCopiaECola']}")
-       
+
    except Exception as e:
        print(f"Erro: {e}")
 

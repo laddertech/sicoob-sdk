@@ -7,14 +7,13 @@ Testa as melhorias implementadas para debugging:
 """
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
-from aiohttp import ClientResponse
 
-from sicoob.async_client import AsyncAPIClient
 from sicoob.async_boleto import AsyncBoletoAPI
+from sicoob.async_client import AsyncAPIClient
 from sicoob.exceptions import BoletoError, SicoobError
 
 

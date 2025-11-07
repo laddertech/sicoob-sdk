@@ -39,7 +39,7 @@ Configuração Básica
 
    # Ou com certificado PFX
    cliente = Sicoob(
-       client_id="seu_client_id", 
+       client_id="seu_client_id",
        pfx_path="/path/to/certificate.pfx",
        pfx_password="senha_do_certificado",
        sandbox_mode=True
@@ -82,7 +82,7 @@ Conta Corrente
 
    # Consultar saldo
    saldo = cliente.conta_corrente.consultar_saldo(
-       agencia="1234", 
+       agencia="1234",
        conta="567890"
    )
 
@@ -95,6 +95,5 @@ Para referência completa da API, consulte :doc:`api_reference`.
 =======
 
 * :ref:`genindex`
-* :ref:`modindex` 
+* :ref:`modindex`
 * :ref:`search`
-

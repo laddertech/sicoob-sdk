@@ -120,7 +120,7 @@ with open('coverage.json') as f:
     for file, stats in data['files'].items():
         if stats['summary']['percent_covered'] < 75 and not file.endswith('__init__.py'):
             low_coverage.append((file, stats['summary']['percent_covered']))
-    
+
     if low_coverage:
         print('⚠️  Arquivos com cobertura < 75%:')
         for file, coverage in sorted(low_coverage, key=lambda x: x[1]):
@@ -138,7 +138,7 @@ fi
 # Relatório final
 log "📋 Resumo da execução:"
 echo "   • Linting: ✅"
-echo "   • Testes unitários: ✅" 
+echo "   • Testes unitários: ✅"
 if [[ "$CI_MODE" == "false" ]]; then
     echo "   • Testes integração: ⚠️ (local)"
 fi

@@ -29,7 +29,7 @@ Certificado PFX
 
    cliente = Sicoob(
        client_id="seu_client_id",
-       pfx_path="/path/to/certificate.pfx", 
+       pfx_path="/path/to/certificate.pfx",
        pfx_password="senha_do_certificado",
        sandbox_mode=True
    )
@@ -74,7 +74,7 @@ Consultar Cobrança
 .. code-block:: python
 
    cobranca = cliente.pix.consultar_cobranca_imediata(txid="seu_txid_aqui")
-   
+
    print(f"Status: {cobranca['status']}")
    print(f"Valor: {cobranca['valor']['original']}")
 
@@ -152,7 +152,7 @@ Emitir Boleto
 
    boleto = cliente.boleto.emitir_boleto({
        "numeroConvenio": "123456",
-       "numeroCarteira": "1", 
+       "numeroCarteira": "1",
        "numeroVariacaoCarteira": "1",
        "codigoModalidade": "1",
        "dataVencimento": vencimento,
@@ -184,7 +184,7 @@ Consultar Boleto
        convenio="123456",
        nosso_numero="12345678901"
    )
-   
+
    print(f"Situação: {boleto['situacao']}")
    print(f"Valor: {boleto['valor']}")
 
@@ -200,7 +200,7 @@ Consultar Saldo
        agencia="1234",
        conta="567890"
    )
-   
+
    print(f"Saldo Atual: R$ {saldo['saldoAtual']}")
    print(f"Saldo Bloqueado: R$ {saldo['saldoBloqueado']}")
 
@@ -216,7 +216,7 @@ Extrato
 
    extrato = cliente.conta_corrente.consultar_extrato(
        agencia="1234",
-       conta="567890", 
+       conta="567890",
        data_inicio=data_inicio,
        data_fim=data_fim
    )
@@ -235,7 +235,7 @@ Transferência
            "conta": "567890"
        },
        "contaDestino": {
-           "agencia": "5678", 
+           "agencia": "5678",
            "conta": "901234",
            "banco": "756"
        },
@@ -253,7 +253,7 @@ Tratamento de Erros
    from sicoob import Sicoob
    from sicoob.exceptions import (
        SicoobError,
-       PixError, 
+       PixError,
        BoletoError,
        ContaCorrenteError,
        ValidationError
@@ -317,7 +317,7 @@ Configuração via Ambiente
 
    # Configuração é carregada automaticamente
    from sicoob import Sicoob
-   
+
    cliente = Sicoob()  # Logs configurados automaticamente
 
 Configuração Avançada

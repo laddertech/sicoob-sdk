@@ -69,6 +69,7 @@ ignore = [
     "ANN401", # Dynamically typed expressions (Any) - comum em frameworks
     "S301", # Pickle usage - controlado internamente para cache
     "S110", # Try-except-pass - aceitável para operações best-effort
+    # "ANN101", # Removida em ruff 0.5+, era: Missing type annotation for self - desnecessário
     "ANN201", # Missing return type annotation for public function
     "ANN204", # Missing return type annotation for special method
     "ANN202", # Missing return type annotation for private function

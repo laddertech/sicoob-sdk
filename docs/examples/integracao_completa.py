@@ -194,7 +194,7 @@ def exemplo_completo():
         ├── Saldo
         ├── Extrato
         └── Transferências
-    
+
     ✨ PIX usa pypix-api (genérica para todos os bancos)
     ✨ Boleto e Conta Corrente são específicos do Sicoob
     """)

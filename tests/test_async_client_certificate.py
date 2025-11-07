@@ -1,10 +1,9 @@
 """Testes para carregamento de certificado no AsyncAPIClient."""
 
 import ssl
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
-import pytest_asyncio
 
 from sicoob.async_client import AsyncAPIClient
 from sicoob.auth import OAuth2Client

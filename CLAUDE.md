@@ -25,6 +25,23 @@ ruff check .       # Verificar diretamente
 ruff format .      # Formatar diretamente
 ```
 
+### Pre-commit Hooks (Recomendado)
+```bash
+# Instalar pre-commit
+pip install pre-commit
+
+# Ativar hooks (roda ruff automaticamente antes de cada commit)
+pre-commit install
+
+# Rodar manualmente em todos os arquivos
+pre-commit run --all-files
+
+# Ver documentação completa
+cat docs/PRE_COMMIT_SETUP.md
+```
+
+**Por que usar?** Evita commits com erros de linting, corrige automaticamente quando possível, economiza tempo no CI/CD.
+
 ### Versionamento
 ```bash
 make bump-patch    # Incrementar patch version (0.1.2 → 0.1.3)
