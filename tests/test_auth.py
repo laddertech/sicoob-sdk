@@ -8,6 +8,7 @@ import requests
 
 from sicoob.auth import OAuth2Client
 from sicoob.config import SicoobConfig
+from sicoob.exceptions import AutenticacaoError
 
 
 class TestOAuth2Client:
@@ -58,11 +59,12 @@ class TestOAuth2Client:
     @patch('sicoob.auth.oauth.load_dotenv')
     @patch('requests.Session.post')
     def test_get_access_token_http_error(self, mock_post, mock_load_dotenv):
-        """Testa tratamento de erro HTTP na requisição de token"""
+        """Testa tratamento de erro HTTP genérico (não 401) na requisição de token"""
         mock_response = Mock()
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
-            '401 Unauthorized'
-        )
+        mock_response.status_code = 500
+        error = requests.exceptions.HTTPError('500 Internal Server Error')
+        error.response = mock_response
+        mock_response.raise_for_status.side_effect = error
         mock_post.return_value = mock_response
 
         with patch(
@@ -72,6 +74,35 @@ class TestOAuth2Client:
 
         with pytest.raises(requests.exceptions.HTTPError):
             client.get_access_token('test_scope')
+
+    @patch('sicoob.auth.oauth.load_dotenv')
+    @patch('requests.Session.post')
+    def test_get_access_token_401_raises_autenticacao_error(
+        self, mock_post, mock_load_dotenv
+    ):
+        """Testa que erro 401 na requisição de token lança AutenticacaoError"""
+        mock_response = Mock()
+        mock_response.status_code = 401
+        mock_response.text = '{"error": "unauthorized"}'
+        mock_response.headers = {'Content-Type': 'application/json'}
+        error = requests.exceptions.HTTPError(
+            '401 Client Error: Unauthorized for url: https://auth.sicoob.com.br/...'
+        )
+        error.response = mock_response
+        mock_response.raise_for_status.side_effect = error
+        mock_post.return_value = mock_response
+
+        with patch(
+            'sicoob.config.SicoobConfig.requires_certificate', return_value=False
+        ):
+            client = OAuth2Client(client_id='test_id')
+
+        with pytest.raises(AutenticacaoError) as exc_info:
+            client.get_access_token('test_scope')
+
+        assert exc_info.value.code == 401
+        assert 'credenciais inválidas' in exc_info.value.message
+        assert exc_info.value.response_text == '{"error": "unauthorized"}'
 
     @patch('sicoob.auth.oauth.load_dotenv')
     def test_is_token_expired(self, mock_load_dotenv):

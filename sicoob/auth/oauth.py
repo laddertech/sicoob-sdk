@@ -7,6 +7,7 @@ import requests_pkcs12
 from dotenv import load_dotenv
 
 from sicoob.config import SicoobConfig
+from sicoob.exceptions import AutenticacaoError
 from sicoob.logging_config import get_logger
 
 
@@ -134,6 +135,16 @@ class OAuth2Client:
                 extra={'operation': 'token_request_error', 'scope': scope},
                 exc_info=True,
             )
+            # Tratar erro 401 especificamente como erro de autenticação
+            if e.response is not None and e.response.status_code == 401:
+                raise AutenticacaoError(
+                    'Falha na autenticação OAuth2: credenciais inválidas, '
+                    'client_id incorreto ou certificado não autorizado',
+                    code=401,
+                    response=e.response,
+                    response_text=e.response.text,
+                    response_headers=dict(e.response.headers),
+                ) from e
             raise
         except Exception as e:
             self.logger.error(
