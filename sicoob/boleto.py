@@ -932,7 +932,7 @@ class BoletoAPI(APIClientBase):
         """
         try:
             url = f'{self._get_base_url()}/cobranca-bancaria/v3/boletos/{nosso_numero}/baixar'
-            headers = self._get_headers(scope='boletos_baixa')
+            headers = self._get_headers(scope='boletos_alteracao')
             headers['client_id'] = client_id
 
             response = self.session.post(url, json=dados_boleto, headers=headers)
