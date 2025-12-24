@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from typing import Any
 
 import requests
@@ -18,6 +19,14 @@ from sicoob.validation import (
     ValidationError,
     get_boleto_schema,
 )
+
+# Padrões de mensagem que indicam boleto duplicado (case-insensitive)
+MENSAGENS_DUPLICACAO = [
+    'já existe',
+    'duplicad',
+    'já cadastrad',
+    'título existente',
+]
 
 
 class BoletoAPI(APIClientBase):
@@ -72,16 +81,17 @@ class BoletoAPI(APIClientBase):
 
                 # Tenta extrair mensagem de erro do mock
                 mensagem = 'Erro em mock de teste'
+                mensagens_api = None
                 try:
                     if hasattr(response, 'json') and callable(response.json):
                         error_data = response.json()
                         if isinstance(error_data, dict):
-                            mensagens = error_data.get(
-                                'mensagens',
-                                [{'mensagem': mensagem, 'codigo': str(status_code)}],
-                            )
-                            if isinstance(mensagens, list) and len(mensagens) > 0:
-                                mensagem = mensagens[0].get('mensagem', mensagem)
+                            mensagens_api = error_data.get('mensagens', [])
+                            if (
+                                isinstance(mensagens_api, list)
+                                and len(mensagens_api) > 0
+                            ):
+                                mensagem = mensagens_api[0].get('mensagem', mensagem)
                 except Exception:
                     pass
 
@@ -153,7 +163,12 @@ class BoletoAPI(APIClientBase):
                 else:
                     message = f'[{status_code}] {prefixo}: {mensagem}'
 
-                raise error_class(message=message, code=status_code, **kwargs)
+                raise error_class(
+                    message=message,
+                    code=status_code,
+                    mensagens=mensagens_api,
+                    **kwargs,
+                )
 
             # Verifica os códigos de erro específicos
             if hasattr(response, 'status_code') and response.status_code in (
@@ -503,20 +518,162 @@ class BoletoAPI(APIClientBase):
         # Retorna o resultado da emissão mesmo sem verificação
         return resultado
 
+    def _is_erro_duplicacao(self, erro: Exception) -> bool:
+        """Verifica se o erro indica boleto duplicado.
+
+        Args:
+            erro: Exceção de emissão de boleto
+
+        Returns:
+            True se a mensagem indica duplicação
+        """
+        # Verifica mensagem principal
+        mensagem = str(erro).lower()
+        for padrao in MENSAGENS_DUPLICACAO:
+            if padrao in mensagem:
+                return True
+
+        # Verifica lista de mensagens da API (se disponível)
+        if hasattr(erro, 'mensagens') and erro.mensagens:
+            for msg_dict in erro.mensagens:
+                msg_texto = str(msg_dict.get('mensagem', '')).lower()
+                for padrao in MENSAGENS_DUPLICACAO:
+                    if padrao in msg_texto:
+                        return True
+
+        return False
+
+    def _tentar_recovery_por_pagador(
+        self,
+        dados_boleto: dict,
+        client_id: str | None = None,
+    ) -> dict | None:
+        """Tenta recuperar boleto consultando por pagador e filtrando por seuNumero.
+
+        Útil quando o nossoNumero mudou (ex: após timeout e retry com novo número).
+
+        Args:
+            dados_boleto: Dados do boleto original
+            client_id: ClientId para autenticação (obrigatório)
+
+        Returns:
+            Boleto encontrado ou None se não encontrado
+        """
+        # Extrai dados necessários
+        pagador = dados_boleto.get('pagador', {})
+        cpf_cnpj = pagador.get('numeroCpfCnpj')
+        seu_numero = dados_boleto.get('seuNumero')
+        numero_cliente = dados_boleto.get('numeroCliente')
+
+        if not cpf_cnpj or not seu_numero or not numero_cliente:
+            self.logger.debug(
+                'Dados insuficientes para recovery por pagador',
+                extra={
+                    'operation': 'boleto_recovery_pagador_skip',
+                    'tem_cpf_cnpj': bool(cpf_cnpj),
+                    'tem_seu_numero': bool(seu_numero),
+                    'tem_numero_cliente': bool(numero_cliente),
+                },
+            )
+            return None
+
+        if not client_id:
+            self.logger.debug(
+                'client_id não fornecido para recovery por pagador',
+                extra={'operation': 'boleto_recovery_pagador_skip'},
+            )
+            return None
+
+        # Calcula período de busca (últimos 30 dias)
+        data_fim = datetime.now()
+        data_inicio = data_fim - timedelta(days=30)
+
+        self.logger.info(
+            f'Tentando recovery por pagador: CPF/CNPJ={cpf_cnpj[:4]}***, seuNumero={seu_numero}',
+            extra={
+                'operation': 'boleto_recovery_pagador',
+                'seu_numero': seu_numero,
+                'periodo_dias': 30,
+            },
+        )
+
+        try:
+            resultado = self.consultar_boletos_por_pagador(
+                numero_cpf_cnpj=cpf_cnpj,
+                numero_cliente=numero_cliente,
+                client_id=client_id,
+                data_inicio=data_inicio.strftime('%Y-%m-%d'),
+                data_fim=data_fim.strftime('%Y-%m-%d'),
+            )
+
+            # Procura boleto pelo seuNumero
+            boletos = resultado.get('resultado', {}).get('boletos', [])
+            if not boletos:
+                boletos = resultado.get('boletos', [])
+
+            for boleto in boletos:
+                if boleto.get('seuNumero') == seu_numero:
+                    self.logger.info(
+                        f'Recovery por pagador bem-sucedido: encontrado boleto com seuNumero={seu_numero}',
+                        extra={
+                            'operation': 'boleto_recovery_pagador_sucesso',
+                            'seu_numero': seu_numero,
+                            'nosso_numero': boleto.get('nossoNumero'),
+                        },
+                    )
+                    return boleto
+
+            self.logger.debug(
+                f'Boleto não encontrado na consulta por pagador: seuNumero={seu_numero}',
+                extra={
+                    'operation': 'boleto_recovery_pagador_nao_encontrado',
+                    'seu_numero': seu_numero,
+                    'boletos_encontrados': len(boletos),
+                },
+            )
+            return None
+
+        except Exception as e:
+            self.logger.warning(
+                f'Erro ao tentar recovery por pagador: {e}',
+                extra={
+                    'operation': 'boleto_recovery_pagador_erro',
+                    'seu_numero': seu_numero,
+                    'error': str(e),
+                },
+            )
+            return None
+
     def emitir_com_recovery(
-        self, dados_boleto: dict, tentar_consulta_em_404: bool = True
+        self,
+        dados_boleto: dict,
+        tentar_consulta_em_404: bool = True,
+        tentar_recovery_em_400: bool = True,
+        client_id: str | None = None,
     ) -> dict:
         """Emite boleto com recovery automático em caso de duplicação.
 
-        Se a emissão falhar com 404, tenta recuperar o boleto via consulta.
-        Útil para garantir idempotência em reprocessamentos e retries.
+        Se a emissão falhar com 404 ou 400 (duplicação), tenta recuperar o boleto
+        via consulta. Útil para garantir idempotência em reprocessamentos e retries.
+
+        O recovery em 400 é especialmente útil quando:
+        - A resposta original do Sicoob não chegou (timeout)
+        - O ERP gerou novo nossoNumero e tentou reemitir
+        - O Sicoob retorna erro 400 "Já existe título"
+
+        Neste caso, o método consulta boletos do pagador e filtra pelo seuNumero
+        para encontrar o boleto original.
 
         Args:
             dados_boleto: Dados do boleto
             tentar_consulta_em_404: Se True, tenta consultar em caso de 404 (default: True)
+            tentar_recovery_em_400: Se True, tenta recovery em caso de 400 com
+                mensagem de duplicação (default: True)
+            client_id: ClientId para consulta por pagador (necessário para recovery em 400)
 
         Returns:
-            Dados do boleto (emitido ou recuperado)
+            Dados do boleto (emitido ou recuperado).
+            Se recuperado, inclui flag '_recovery': True
 
         Raises:
             BoletoEmissaoError: Se emissão e recovery falharem
@@ -527,8 +684,11 @@ class BoletoAPI(APIClientBase):
             ...     try:
             ...         # Tenta emitir, mas se já existe, recupera automaticamente
             ...         resultado = client.cobranca.boleto.emitir_com_recovery(
-            ...             dados_boleto
+            ...             dados_boleto,
+            ...             client_id=client.client_id
             ...         )
+            ...         if resultado.get('_recovery'):
+            ...             print("Boleto recuperado de emissão anterior")
             ...     except BoletoEmissaoError:
             ...         # Emissão e recovery falharam
             ...         pass
@@ -538,24 +698,19 @@ class BoletoAPI(APIClientBase):
             return self.emitir_boleto(dados_boleto)
 
         except BoletoEmissaoError as e:
-            # Se não deve tentar recovery, relança
-            if not tentar_consulta_em_404:
-                raise
+            # Extrai informações para consulta
+            numero_cliente = dados_boleto.get('numeroCliente')
+            codigo_modalidade = dados_boleto.get('codigoModalidade')
+            nosso_numero = dados_boleto.get('nossoNumero')
 
-            # Tenta recovery apenas em caso de 404
-            if e.code == 404:
-                # Extrai informações para consulta
-                numero_cliente = dados_boleto.get('numeroCliente')
-                codigo_modalidade = dados_boleto.get('codigoModalidade')
-                nosso_numero = dados_boleto.get('nossoNumero')
-
+            # Recovery para erro 404
+            if e.code == 404 and tentar_consulta_em_404:
                 if numero_cliente and codigo_modalidade and nosso_numero:
                     try:
-                        # Tenta recuperar boleto existente
                         self.logger.info(
                             f'Tentando recovery de boleto após 404: {nosso_numero}',
                             extra={
-                                'operation': 'boleto_recovery',
+                                'operation': 'boleto_recovery_404',
                                 'nosso_numero': nosso_numero,
                             },
                         )
@@ -574,19 +729,72 @@ class BoletoAPI(APIClientBase):
                                     'nosso_numero': nosso_numero,
                                 },
                             )
-                            # Retorna boleto existente como resultado (recovery bem-sucedido)
                             return {'resultado': boleto_existente, '_recovery': True}
 
                     except Exception as recovery_error:
-                        # Recovery falhou, loga e relança erro original
                         self.logger.warning(
-                            f'Recovery falhou para boleto {nosso_numero}: {recovery_error}',
+                            f'Recovery 404 falhou para boleto {nosso_numero}: {recovery_error}',
                             extra={
-                                'operation': 'boleto_recovery_falha',
+                                'operation': 'boleto_recovery_404_falha',
                                 'nosso_numero': nosso_numero,
                                 'error': str(recovery_error),
                             },
                         )
+
+            # Recovery para erro 400 (duplicação)
+            if e.code == 400 and tentar_recovery_em_400 and self._is_erro_duplicacao(e):
+                self.logger.info(
+                    'Detectado erro 400 de duplicação, tentando recovery',
+                    extra={
+                        'operation': 'boleto_recovery_400',
+                        'nosso_numero': nosso_numero,
+                        'seu_numero': dados_boleto.get('seuNumero'),
+                    },
+                )
+
+                # Primeiro tenta por nossoNumero (caso não tenha mudado)
+                if numero_cliente and codigo_modalidade and nosso_numero:
+                    try:
+                        boleto_existente = self.consultar_boleto(
+                            numero_cliente=numero_cliente,
+                            codigo_modalidade=codigo_modalidade,
+                            nosso_numero=nosso_numero,
+                        )
+
+                        if boleto_existente:
+                            self.logger.info(
+                                f'Recovery 400 por nossoNumero bem-sucedido: {nosso_numero}',
+                                extra={
+                                    'operation': 'boleto_recovery_400_nosso_numero_sucesso',
+                                    'nosso_numero': nosso_numero,
+                                },
+                            )
+                            return {'resultado': boleto_existente, '_recovery': True}
+
+                    except Exception as recovery_error:
+                        self.logger.debug(
+                            f'Recovery por nossoNumero falhou: {recovery_error}',
+                            extra={
+                                'operation': 'boleto_recovery_400_nosso_numero_falha',
+                                'error': str(recovery_error),
+                            },
+                        )
+
+                # Se não encontrou por nossoNumero, tenta por pagador + seuNumero
+                boleto_por_pagador = self._tentar_recovery_por_pagador(
+                    dados_boleto, client_id=client_id
+                )
+
+                if boleto_por_pagador:
+                    return {'resultado': boleto_por_pagador, '_recovery': True}
+
+                self.logger.warning(
+                    'Recovery 400 falhou: boleto não encontrado',
+                    extra={
+                        'operation': 'boleto_recovery_400_falha',
+                        'seu_numero': dados_boleto.get('seuNumero'),
+                    },
+                )
 
             # Se não conseguiu fazer recovery, relança erro original
             raise

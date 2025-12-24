@@ -2110,3 +2110,266 @@ def test_consultar_solicitacoes_webhook_erro_comunicacao(
         exc_info.value
     )
     assert exc_info.value.id_webhook == id_webhook
+
+
+# ============================================================================
+# Testes para emitir_com_recovery() - Recovery em erro 400 de duplicação
+# ============================================================================
+
+
+@pytest.fixture
+def dados_boleto_completo() -> dict:
+    """Fixture com dados completos de boleto para testes de recovery.
+
+    Nota: nossoNumero não incluído pois é gerado pelo Sicoob.
+    O cenário de recovery em 400 ocorre quando o ERP gera um novo
+    nossoNumero após timeout, então usamos seuNumero para identificação.
+    """
+    return {
+        'numeroCliente': 123456,
+        'codigoModalidade': 1,
+        'numeroContaCorrente': 12345,
+        'codigoEspecieDocumento': 'DM',
+        'dataEmissao': '2024-01-01',
+        'dataVencimento': '2024-12-31',
+        'valor': 100.50,
+        'seuNumero': 'SEU-123456',
+        'identificacaoEmissaoBoleto': 1,
+        'identificacaoDistribuicaoBoleto': 1,
+        'tipoDesconto': 0,
+        'tipoMulta': 0,
+        'tipoJurosMora': 3,
+        'numeroParcela': 1,
+        'pagador': {
+            'numeroCpfCnpj': '11144477735',
+            'nome': 'João Silva',
+            'endereco': 'Rua Teste, 123',
+            'bairro': 'Centro',
+            'cidade': 'São Paulo',
+            'cep': '01001000',
+            'uf': 'SP',
+        },
+    }
+
+
+def test_emitir_com_recovery_sucesso_normal(
+    boleto_client: BoletoAPI, dados_boleto_completo: dict
+) -> None:
+    """Testa emissão normal sem necessidade de recovery"""
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        'resultado': {'nossoNumero': 789012, 'codigoBarras': '123456789'}
+    }
+    boleto_client.session.post.return_value = mock_response
+
+    result = boleto_client.emitir_com_recovery(dados_boleto_completo)
+
+    assert 'resultado' in result
+    assert '_recovery' not in result
+
+
+def test_emitir_com_recovery_400_duplicacao_encontra_por_pagador(
+    boleto_client: BoletoAPI, dados_boleto_completo: dict
+) -> None:
+    """Testa recovery em 400 de duplicação - encontra boleto por pagador + seuNumero.
+
+    Este é o cenário principal: após timeout, ERP gera novo nossoNumero e tenta
+    reemitir. O Sicoob retorna 400 "Já existe título". O recovery consulta
+    boletos do pagador e filtra pelo seuNumero para encontrar o boleto original.
+    """
+    # Mock para emissão retornar 400 com mensagem de duplicação
+    mock_post_response = Mock()
+    mock_post_response.status_code = 400
+    mock_post_response.json.return_value = {
+        'mensagens': [{'mensagem': 'Já existe título cadastrado', 'codigo': 'ERR001'}]
+    }
+    boleto_client.session.post.return_value = mock_post_response
+
+    # Mock para consulta por pagador retornar lista com o boleto
+    mock_get_pagador = Mock()
+    mock_get_pagador.status_code = 200
+    mock_get_pagador.json.return_value = {
+        'resultado': {
+            'boletos': [
+                {
+                    'nossoNumero': 999999,
+                    'seuNumero': 'OUTRO-123',
+                    'codigoBarras': '111111111',
+                },
+                {
+                    'nossoNumero': 888888,
+                    'seuNumero': 'SEU-123456',
+                    'codigoBarras': '222222222',
+                },
+            ]
+        }
+    }
+    boleto_client.session.get.return_value = mock_get_pagador
+
+    result = boleto_client.emitir_com_recovery(
+        dados_boleto_completo, client_id='test-client-id'
+    )
+
+    assert result['_recovery'] is True
+    assert result['resultado']['nossoNumero'] == 888888
+    assert result['resultado']['seuNumero'] == 'SEU-123456'
+
+
+def test_emitir_com_recovery_400_duplicacao_com_nosso_numero(
+    boleto_client: BoletoAPI, dados_boleto_completo: dict
+) -> None:
+    """Testa recovery em 400 com nossoNumero - tenta primeiro por nossoNumero."""
+    # Adiciona nossoNumero ao dados_boleto para este teste
+    dados_com_nosso_numero = {**dados_boleto_completo, 'nossoNumero': 789012}
+
+    # Mock para emissão retornar 400 com mensagem de duplicação
+    mock_post_response = Mock()
+    mock_post_response.status_code = 400
+    mock_post_response.json.return_value = {
+        'mensagens': [{'mensagem': 'Título duplicado no sistema', 'codigo': 'ERR002'}]
+    }
+    boleto_client.session.post.return_value = mock_post_response
+
+    # Mock para consulta por nossoNumero retornar o boleto
+    # consultar_boleto retorna {'resultado': {...}}, então o recovery
+    # retorna {'resultado': {'resultado': {...}}, '_recovery': True}
+    mock_get_response = Mock()
+    mock_get_response.status_code = 200
+    mock_get_response.json.return_value = {
+        'resultado': {
+            'nossoNumero': 789012,
+            'seuNumero': 'SEU-123456',
+            'codigoBarras': '123456789',
+        }
+    }
+    boleto_client.session.get.return_value = mock_get_response
+
+    result = boleto_client.emitir_com_recovery(dados_com_nosso_numero)
+
+    assert result['_recovery'] is True
+    # consultar_boleto retorna dict com 'resultado', então o recovery
+    # aninha: {'resultado': <retorno de consultar_boleto>}
+    assert result['resultado']['resultado']['nossoNumero'] == 789012
+
+
+def test_emitir_com_recovery_400_duplicacao_nao_encontra(
+    boleto_client: BoletoAPI, dados_boleto_completo: dict
+) -> None:
+    """Testa recovery em 400 de duplicação - não encontra boleto"""
+    # Mock para emissão retornar 400 com mensagem de duplicação
+    mock_post_response = Mock()
+    mock_post_response.status_code = 400
+    mock_post_response.json.return_value = {
+        'mensagens': [{'mensagem': 'Já existe título', 'codigo': 'ERR001'}]
+    }
+    boleto_client.session.post.return_value = mock_post_response
+
+    # Mock para consulta por pagador retornar lista vazia
+    mock_get_pagador = Mock()
+    mock_get_pagador.status_code = 200
+    mock_get_pagador.json.return_value = {'resultado': {'boletos': []}}
+    boleto_client.session.get.return_value = mock_get_pagador
+
+    with pytest.raises(BoletoEmissaoError) as exc_info:
+        boleto_client.emitir_com_recovery(
+            dados_boleto_completo, client_id='test-client-id'
+        )
+
+    assert exc_info.value.code == 400
+
+
+def test_emitir_com_recovery_400_sem_duplicacao_nao_faz_recovery(
+    boleto_client: BoletoAPI, dados_boleto_completo: dict
+) -> None:
+    """Testa que erro 400 sem mensagem de duplicação não tenta recovery"""
+    # Mock para emissão retornar 400 com mensagem genérica
+    mock_post_response = Mock()
+    mock_post_response.status_code = 400
+    mock_post_response.json.return_value = {
+        'mensagens': [{'mensagem': 'Campo inválido', 'codigo': 'ERR003'}]
+    }
+    boleto_client.session.post.return_value = mock_post_response
+
+    with pytest.raises(BoletoEmissaoError) as exc_info:
+        boleto_client.emitir_com_recovery(dados_boleto_completo)
+
+    assert exc_info.value.code == 400
+    # Verifica que não tentou consultar (GET não foi chamado)
+    boleto_client.session.get.assert_not_called()
+
+
+def test_emitir_com_recovery_400_desabilitado(
+    boleto_client: BoletoAPI, dados_boleto_completo: dict
+) -> None:
+    """Testa que tentar_recovery_em_400=False desabilita o recovery"""
+    # Mock para emissão retornar 400 com mensagem de duplicação
+    mock_post_response = Mock()
+    mock_post_response.status_code = 400
+    mock_post_response.json.return_value = {
+        'mensagens': [{'mensagem': 'Já existe título', 'codigo': 'ERR001'}]
+    }
+    boleto_client.session.post.return_value = mock_post_response
+
+    with pytest.raises(BoletoEmissaoError) as exc_info:
+        boleto_client.emitir_com_recovery(
+            dados_boleto_completo, tentar_recovery_em_400=False
+        )
+
+    assert exc_info.value.code == 400
+    # Verifica que não tentou consultar
+    boleto_client.session.get.assert_not_called()
+
+
+def test_is_erro_duplicacao_mensagem_principal(boleto_client: BoletoAPI) -> None:
+    """Testa detecção de duplicação na mensagem principal"""
+    erro = BoletoEmissaoError(
+        message='Já existe título cadastrado', code=400, dados_boleto={}
+    )
+    assert boleto_client._is_erro_duplicacao(erro) is True
+
+
+def test_is_erro_duplicacao_lista_mensagens(boleto_client: BoletoAPI) -> None:
+    """Testa detecção de duplicação na lista de mensagens"""
+    erro = BoletoEmissaoError(
+        message='Erro na emissão',
+        code=400,
+        dados_boleto={},
+        mensagens=[{'mensagem': 'Título duplicado', 'codigo': 'ERR001'}],
+    )
+    assert boleto_client._is_erro_duplicacao(erro) is True
+
+
+def test_is_erro_duplicacao_sem_duplicacao(boleto_client: BoletoAPI) -> None:
+    """Testa que erros genéricos não são detectados como duplicação"""
+    erro = BoletoEmissaoError(
+        message='Campo obrigatório não informado',
+        code=400,
+        dados_boleto={},
+        mensagens=[{'mensagem': 'Valor inválido', 'codigo': 'ERR002'}],
+    )
+    assert boleto_client._is_erro_duplicacao(erro) is False
+
+
+def test_tentar_recovery_por_pagador_sem_client_id(
+    boleto_client: BoletoAPI, dados_boleto_completo: dict
+) -> None:
+    """Testa que recovery por pagador sem client_id retorna None"""
+    result = boleto_client._tentar_recovery_por_pagador(
+        dados_boleto_completo, client_id=None
+    )
+    assert result is None
+
+
+def test_tentar_recovery_por_pagador_sem_dados_suficientes(
+    boleto_client: BoletoAPI,
+) -> None:
+    """Testa que recovery por pagador sem dados suficientes retorna None"""
+    dados_incompletos = {
+        'numeroCliente': 123456,
+        # Faltando pagador e seuNumero
+    }
+    result = boleto_client._tentar_recovery_por_pagador(
+        dados_incompletos, client_id='test-client'
+    )
+    assert result is None
