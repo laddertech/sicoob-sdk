@@ -44,11 +44,13 @@ try:
     )
     from .async_client import (  # noqa: F401
         AsyncAPIClient,
+        AsyncCircuitBreaker,
         AsyncCobrancaAPI,
         AsyncContaCorrenteAPI,
         AsyncSicoob,
         async_batch_processor,
         gather_with_concurrency,
+        gather_with_rate_limit,
     )
     from .async_pix import AsyncPixAPI  # noqa: F401
 
@@ -57,12 +59,14 @@ try:
     __all_async__ = [
         'AsyncSicoob',
         'AsyncAPIClient',
+        'AsyncCircuitBreaker',
         'AsyncContaCorrenteAPI',
         'AsyncCobrancaAPI',
         'AsyncBoletoAPI',
         'AsyncPixAPI',
         'AsyncCacheManager',
         'gather_with_concurrency',
+        'gather_with_rate_limit',
         'async_batch_processor',
         'get_default_async_cache',
         'async_cached',

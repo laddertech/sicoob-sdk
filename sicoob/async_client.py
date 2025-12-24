@@ -29,7 +29,8 @@ import logging
 import os
 import ssl
 import tempfile
-from collections.abc import AsyncGenerator
+import time
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -37,10 +38,147 @@ from aiohttp import ClientSession, ClientTimeout, TCPConnector
 
 from sicoob.auth import OAuth2Client
 from sicoob.config import Environment, SicoobConfig
-from sicoob.exceptions import SicoobError
+from sicoob.exceptions import CircuitBreakerOpenError, SicoobError
 
 # Logger para debugging
 logger = logging.getLogger(__name__)
+
+
+class AsyncCircuitBreaker:
+    """Circuit breaker assíncrono para proteção contra falhas em cascata.
+
+    O circuit breaker monitora falhas consecutivas e "abre" o circuito quando
+    um threshold é atingido, bloqueando novas requisições temporariamente.
+
+    Estados:
+        - CLOSED: Operação normal, requisições passam
+        - OPEN: Bloqueando requisições (muitas falhas recentes)
+        - HALF_OPEN: Testando se o serviço voltou ao normal
+
+    Example:
+        >>> cb = AsyncCircuitBreaker(failure_threshold=5, recovery_timeout=30.0)
+        >>> try:
+        ...     result = await cb.call(make_api_request, url, data)
+        ... except CircuitBreakerOpenError:
+        ...     print("Serviço temporariamente indisponível")
+    """
+
+    CLOSED = 'closed'
+    OPEN = 'open'
+    HALF_OPEN = 'half_open'
+
+    def __init__(
+        self,
+        failure_threshold: int = 5,
+        recovery_timeout: float = 30.0,
+        half_open_max_calls: int = 3,
+    ) -> None:
+        """Inicializa o circuit breaker.
+
+        Args:
+            failure_threshold: Número de falhas consecutivas para abrir o circuito
+            recovery_timeout: Tempo em segundos para tentar fechar o circuito
+            half_open_max_calls: Número máximo de chamadas em estado half-open
+        """
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.half_open_max_calls = half_open_max_calls
+
+        self.failures = 0
+        self.state = self.CLOSED
+        self.last_failure_time: float | None = None
+        self.half_open_calls = 0
+        self._lock = asyncio.Lock()
+
+    def _can_attempt_reset(self) -> bool:
+        """Verifica se pode tentar resetar o circuit breaker."""
+        if self.last_failure_time is None:
+            return False
+        return time.time() - self.last_failure_time >= self.recovery_timeout
+
+    async def _on_success(self) -> None:
+        """Registra uma operação bem-sucedida."""
+        async with self._lock:
+            self.failures = 0
+            self.state = self.CLOSED
+            logger.debug('Circuit breaker fechado após sucesso')
+
+    async def _on_failure(self) -> None:
+        """Registra uma falha."""
+        async with self._lock:
+            self.failures += 1
+            self.last_failure_time = time.time()
+            if self.failures >= self.failure_threshold:
+                self.state = self.OPEN
+                logger.warning(
+                    'Circuit breaker aberto após %d falhas consecutivas',
+                    self.failures,
+                    extra={
+                        'operation': 'circuit_breaker_opened',
+                        'failure_count': self.failures,
+                        'threshold': self.failure_threshold,
+                    },
+                )
+
+    async def call(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+        """Executa função com proteção do circuit breaker.
+
+        Args:
+            func: Função assíncrona a ser executada
+            *args: Argumentos posicionais
+            **kwargs: Argumentos nomeados
+
+        Returns:
+            Resultado da função
+
+        Raises:
+            CircuitBreakerOpenError: Se o circuit breaker estiver aberto
+        """
+        async with self._lock:
+            if self.state == self.OPEN:
+                if self._can_attempt_reset():
+                    self.state = self.HALF_OPEN
+                    self.half_open_calls = 0
+                    logger.info(
+                        'Circuit breaker em half-open, testando requisição',
+                        extra={'operation': 'circuit_breaker_half_open'},
+                    )
+                else:
+                    time_remaining = self.recovery_timeout - (
+                        time.time() - (self.last_failure_time or 0)
+                    )
+                    raise CircuitBreakerOpenError(
+                        f'Circuit breaker aberto. Próxima tentativa em {time_remaining:.1f}s',
+                        failure_count=self.failures,
+                        recovery_timeout=self.recovery_timeout,
+                    )
+
+            if self.state == self.HALF_OPEN:
+                self.half_open_calls += 1
+                if self.half_open_calls > self.half_open_max_calls:
+                    # Muitas chamadas em half-open, volta para open
+                    self.state = self.OPEN
+                    self.last_failure_time = time.time()
+                    raise CircuitBreakerOpenError(
+                        'Circuit breaker reaberto após limite de chamadas half-open',
+                        failure_count=self.failures,
+                        recovery_timeout=self.recovery_timeout,
+                    )
+
+        try:
+            result = await func(*args, **kwargs)
+            await self._on_success()
+            return result
+        except Exception:
+            await self._on_failure()
+            raise
+
+    def reset(self) -> None:
+        """Reseta o circuit breaker para o estado inicial."""
+        self.failures = 0
+        self.state = self.CLOSED
+        self.last_failure_time = None
+        self.half_open_calls = 0
 
 
 class AsyncAPIClient:
@@ -53,6 +191,7 @@ class AsyncAPIClient:
         max_concurrent_requests: int = 10,
         request_timeout: int = 30,
         retry_config: dict[str, Any] | None = None,
+        circuit_breaker_config: dict[str, Any] | None = None,
     ) -> None:
         """Inicializa cliente assíncrono.
 
@@ -64,9 +203,16 @@ class AsyncAPIClient:
             retry_config: Configuração de retry automático (opcional)
                 {
                     'max_tentativas': 3,
-                    'delay_inicial': 1.0,
+                    'delay_inicial': 0.5,
+                    'delay_maximo': 5.0,
                     'backoff_exponencial': True,
                     'codigos_retry': [500, 502, 503, 504, 429],
+                }
+            circuit_breaker_config: Configuração do circuit breaker (opcional)
+                {
+                    'failure_threshold': 5,
+                    'recovery_timeout': 30.0,
+                    'half_open_max_calls': 3,
                 }
         """
         self.oauth_client = oauth_client
@@ -76,11 +222,20 @@ class AsyncAPIClient:
 
         # Configuração de retry
         self.retry_config = retry_config or {
-            'max_tentativas': 1,  # Sem retry por padrão
-            'delay_inicial': 1.0,
+            'max_tentativas': 3,  # 2 retries por padrão
+            'delay_inicial': 0.5,  # Delay inicial de 500ms
+            'delay_maximo': 5.0,  # Cap máximo de 5s
             'backoff_exponencial': True,
             'codigos_retry': [500, 502, 503, 504, 429],
         }
+
+        # Circuit breaker (opcional)
+        if circuit_breaker_config is not None:
+            self._circuit_breaker: AsyncCircuitBreaker | None = AsyncCircuitBreaker(
+                **circuit_breaker_config
+            )
+        else:
+            self._circuit_breaker = None
 
         # Semáforo para limitar requisições concorrentes
         self._semaphore = asyncio.Semaphore(max_concurrent_requests)
@@ -279,7 +434,8 @@ class AsyncAPIClient:
         """
         import random
 
-        delay_inicial = self.retry_config.get('delay_inicial', 1.0)
+        delay_inicial = self.retry_config.get('delay_inicial', 0.5)
+        delay_maximo = self.retry_config.get('delay_maximo', 5.0)
         backoff_exponencial = self.retry_config.get('backoff_exponencial', True)
 
         if backoff_exponencial:
@@ -288,6 +444,9 @@ class AsyncAPIClient:
         else:
             # Delay fixo
             delay = delay_inicial
+
+        # Aplica cap máximo para evitar delays muito longos
+        delay = min(delay, delay_maximo)
 
         # Adiciona jitter (±25%) para evitar thundering herd
         jitter = delay * 0.25
@@ -333,6 +492,34 @@ class AsyncAPIClient:
 
         Raises:
             SicoobError: Em caso de erro na requisição
+            CircuitBreakerOpenError: Se o circuit breaker estiver aberto
+        """
+        # Se circuit breaker estiver configurado, usa ele
+        if self._circuit_breaker is not None:
+            return await self._circuit_breaker.call(
+                self._do_request, method, url, scope, **kwargs
+            )
+        return await self._do_request(method, url, scope, **kwargs)
+
+    async def _do_request(
+        self, method: str, url: str, scope: str, **kwargs: Any
+    ) -> dict[str, Any]:
+        """Executa a requisição HTTP com retry e controle de concorrência.
+
+        Este método interno contém a lógica real de requisição e é chamado
+        diretamente ou através do circuit breaker.
+
+        Args:
+            method: Método HTTP
+            url: URL completa
+            scope: Escopo OAuth2
+            **kwargs: Argumentos adicionais
+
+        Returns:
+            Dados JSON da resposta
+
+        Raises:
+            SicoobError: Em caso de erro na requisição
         """
         await self._ensure_session()
 
@@ -342,11 +529,8 @@ class AsyncAPIClient:
             headers.update(kwargs['headers'])
         kwargs['headers'] = headers
 
-        # Log da requisição (simplificado)
-        # TODO: Implementar logging apropriado quando SicoobLogger estiver disponível
-
         # Implementa retry com exponential backoff
-        max_tentativas = self.retry_config.get('max_tentativas', 1)
+        max_tentativas = self.retry_config.get('max_tentativas', 3)
         last_error = None
 
         for tentativa in range(max_tentativas):
@@ -422,15 +606,27 @@ class AsyncAPIClient:
                             # Verifica se deve fazer retry
                             if self._should_retry(response.status, tentativa):
                                 delay = self._calcular_delay_retry(tentativa)
-                                logger.info(
-                                    f'Retry {tentativa + 1}/{max_tentativas} após {delay:.2f}s (HTTP {response.status})',
+                                # Calcula requisições concorrentes ativas
+                                concurrent_active = (
+                                    self.max_concurrent_requests
+                                    - self._semaphore._value
+                                )
+                                logger.warning(
+                                    'Requisição falhou - tentativa %d/%d - '
+                                    'HTTP %d - retry em %.2fs',
+                                    tentativa + 1,
+                                    max_tentativas,
+                                    response.status,
+                                    delay,
                                     extra={
                                         'operation': 'http_retry',
                                         'tentativa': tentativa + 1,
                                         'max_tentativas': max_tentativas,
                                         'delay': delay,
-                                        'status': response.status,
+                                        'status_code': response.status,
                                         'url': url,
+                                        'method': method,
+                                        'concurrent_active': concurrent_active,
                                     },
                                 )
                                 await asyncio.sleep(delay)
@@ -749,6 +945,71 @@ async def gather_with_concurrency(tasks: list, max_concurrency: int = 10) -> lis
             return await task
 
     bounded_tasks = [bounded_task(task) for task in tasks]
+    return await asyncio.gather(*bounded_tasks)
+
+
+async def gather_with_rate_limit(
+    tasks: list,
+    max_concurrency: int = 10,
+    requests_per_second: float = 5.0,
+    stagger_delay: float = 0.0,
+) -> list:
+    """Executa tarefas com limite de concorrência E rate limiting integrado.
+
+    Esta função combina controle de concorrência (semáforo) com rate limiting
+    (intervalo mínimo entre requisições) para evitar throttling em APIs que
+    limitam a taxa de requisições.
+
+    Args:
+        tasks: Lista de corrotinas a executar
+        max_concurrency: Número máximo de tarefas concorrentes (default: 10)
+        requests_per_second: Taxa máxima de requisições por segundo (default: 5.0)
+        stagger_delay: Delay inicial escalonado para evitar rajada inicial
+            em segundos. Se > 0, cada task aguarda (stagger_delay * índice)
+            antes de começar. (default: 0.0 = desabilitado)
+
+    Returns:
+        Lista com resultados de todas as tasks na mesma ordem
+
+    Example:
+        >>> # Emitir 12 boletos com rate limiting para evitar erro 500
+        >>> tasks = [emitir_boleto(dados) for dados in lista_boletos]
+        >>> resultados = await gather_with_rate_limit(
+        ...     tasks,
+        ...     max_concurrency=3,
+        ...     requests_per_second=3.0,  # Margem de segurança (API permite 5)
+        ...     stagger_delay=0.2  # 200ms entre início de cada task
+        ... )
+
+    Note:
+        - O rate limiting é aplicado DENTRO do semáforo, garantindo que mesmo
+          com várias tasks aguardando, elas respeitem o intervalo mínimo.
+        - O stagger_delay é calculado como: delay * (index % max_concurrency),
+          distribuindo as tasks em "ondas" para evitar rajada inicial.
+    """
+    semaphore = asyncio.Semaphore(max_concurrency)
+    min_interval = 1.0 / requests_per_second
+    last_request_lock = asyncio.Lock()
+    last_request_time: list[float] = [0.0]
+
+    async def rate_limited_task(task: Any, index: int) -> Any:
+        # Stagger delay para evitar rajada inicial
+        if index > 0 and stagger_delay > 0:
+            await asyncio.sleep(stagger_delay * (index % max_concurrency))
+
+        async with semaphore:
+            # Rate limiting - garante intervalo mínimo entre requisições
+            async with last_request_lock:
+                loop = asyncio.get_event_loop()
+                now = loop.time()
+                elapsed = now - last_request_time[0]
+                if elapsed < min_interval:
+                    await asyncio.sleep(min_interval - elapsed)
+                last_request_time[0] = loop.time()
+
+            return await task
+
+    bounded_tasks = [rate_limited_task(task, i) for i, task in enumerate(tasks)]
     return await asyncio.gather(*bounded_tasks)
 
 
