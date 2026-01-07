@@ -20,7 +20,7 @@ dependencies = [
     "requests>=2.25.1",
     "python-dotenv>=0.15.0",
     "requests-pkcs12>=1.25",
-    "pypix-api==0.7.0",
+    "pypix-api==0.8.0",
     "aiohttp>=3.8.0",
     "aiofiles>=24.0.0",
     "pytest-asyncio>=1.1.0",
