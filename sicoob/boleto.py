@@ -919,7 +919,7 @@ class BoletoAPI(APIClientBase):
                 params['numeroContratoCobranca'] = numero_contrato_cobranca
 
             url = f'{self._get_base_url()}/cobranca-bancaria/v3/boletos/segunda-via'
-            headers = self._get_headers(scope='boletos_inclusao')
+            headers = self._get_headers(scope='boletos_consulta')
             if client_id:
                 headers['client_id'] = client_id
 
