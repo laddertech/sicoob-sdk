@@ -259,7 +259,7 @@ class PixAPI(APIClientBase):
         Returns:
             Lista de cobranças
         """
-        return self.listar_cob(inicio, fim, **filtros)
+        return self.consultar_cobs(inicio, fim, **filtros)
 
     def criar_lote_cobranca(self, id_lote: int, dados: dict) -> dict:
         """Cria lote de cobranças com vencimento
@@ -271,7 +271,7 @@ class PixAPI(APIClientBase):
         Returns:
             Dados do lote criado
         """
-        return self.criar_lotecobv(id_lote, dados)
+        return self.criar_lote_cobv(id_lote, dados)
 
     def consultar_lote_cobranca(self, id_lote: int) -> dict:
         """Consulta lote de cobranças
@@ -282,9 +282,31 @@ class PixAPI(APIClientBase):
         Returns:
             Dados do lote
         """
-        return self.consultar_lotecobv(id_lote)
+        return self.consultar_lote_cobv(id_lote)
 
     # Métodos paginados para grandes volumes
+
+    @staticmethod
+    def _filtros_da_pagina(params: dict, page_size: int) -> dict:
+        """Traduz os parâmetros de paginação para os nomes aceitos pela API PIX.
+
+        O módulo de paginação trabalha com chaves genéricas (``page``,
+        ``limit``, ``size``), enquanto a API PIX espera ``pagina_atual`` e
+        ``itens_por_pagina``. As chaves genéricas são descartadas para não
+        chegarem à pypix-api como argumentos desconhecidos.
+
+        Args:
+            params: Parâmetros da página atual
+            page_size: Quantidade de itens por página
+
+        Returns:
+            Filtros prontos para repassar a listar_cobrancas()
+        """
+        internas = ('inicio', 'fim', 'page', 'limit', 'size')
+        filtros = {k: v for k, v in params.items() if k not in internas}
+        filtros['pagina_atual'] = params.get('page', 1)
+        filtros['itens_por_pagina'] = page_size
+        return filtros
 
     def listar_cobrancas_paginado(
         self,
@@ -329,7 +351,7 @@ class PixAPI(APIClientBase):
             return self.listar_cobrancas(
                 params.get('inicio', inicio),
                 params.get('fim', fim),
-                **{k: v for k, v in params.items() if k not in ['inicio', 'fim']},
+                **self._filtros_da_pagina(params, pagination.page_size),
             )
 
         strategy = SicoobPaginationStrategy()
@@ -381,7 +403,7 @@ class PixAPI(APIClientBase):
             raw_response = self.listar_cobrancas(
                 params.get('inicio', inicio),
                 params.get('fim', fim),
-                **{k: v for k, v in params.items() if k not in ['inicio', 'fim']},
+                **self._filtros_da_pagina(params, pagination.page_size),
             )
 
             # Converte resposta em PagedResponse
