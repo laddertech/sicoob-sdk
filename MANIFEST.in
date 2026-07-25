@@ -1,0 +1,3 @@
+# Mantém testes e scripts de desenvolvimento fora dos pacotes publicados.
+prune tests
+prune scripts
