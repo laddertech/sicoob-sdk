@@ -1085,7 +1085,7 @@ wheels = [
 
 [[package]]
 name = "pypix-api"
-version = "0.8.0"
+version = "0.9.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "python-dotenv" },
@@ -1093,9 +1093,9 @@ dependencies = [
     { name = "requests-pkcs12" },
     { name = "ruff" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4b/d3/1cdea56ca5166807c5ef9724d3f322468f22a2510263cc68663dbe51d1f3/pypix_api-0.8.0.tar.gz", hash = "sha256:53d8a4308a05035edffbc0b365c5b1759c8607bb0cf96a49951a78e585139d0e", size = 43507, upload-time = "2026-01-07T14:21:20.56Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/08/5b/8b11e1b056b74765b8990ae916cdd83f1d406130ec289b8c2a69e9d69a9b/pypix_api-0.9.2.tar.gz", hash = "sha256:a5f865924a9056131a83d63b43188b5a01a0323d49f37fc8f3bc9749d75236ba", size = 47312, upload-time = "2026-07-24T14:55:56.76Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/1a/47d948217aa4d49b2e452e6ad64369fdcbc8e38b345d3a5bb346f610c336/pypix_api-0.8.0-py3-none-any.whl", hash = "sha256:ab7a7712aed02dca8ec936d26a6b90347a4009440780979522b688ba3cffdeea", size = 59119, upload-time = "2026-01-07T14:21:19.396Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/d0/cc2428e77366c427fcbf970c14e38cde2f3710b08cdbe298a538a25b2f8e/pypix_api-0.9.2-py3-none-any.whl", hash = "sha256:82f1516e64c50bff3d3f051f7267504d99d44a155eb3907592d39b58259ae517", size = 63614, upload-time = "2026-07-24T14:55:55.557Z" },
 ]
 
 [[package]]
@@ -1392,7 +1392,7 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.8.0" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.2.2.post1" },
     { name = "cryptography", specifier = ">=41.0.0" },
-    { name = "pypix-api", specifier = "==0.8.0" },
+    { name = "pypix-api", specifier = "==0.9.2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", specifier = ">=1.1.0" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.6.1" },
