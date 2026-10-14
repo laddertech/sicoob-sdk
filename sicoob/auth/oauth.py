@@ -154,6 +154,19 @@ class OAuth2Client:
             )
             raise
 
+    def get_token(self, scope: str | None = None) -> str:
+        """Alias de `get_access_token` no contrato esperado pela pypix-api
+
+        A pypix-api obtém o token chamando ``oauth.get_token(escopos)``.
+
+        Args:
+            scope: Escopo(s) necessário(s) para a API
+
+        Returns:
+            str: Token de acesso válido para o escopo solicitado
+        """
+        return self.get_access_token(scope)
+
     def _is_token_expired(self, scope: str) -> bool:
         """Verifica se o token para o escopo especificado expirou"""
         if scope not in self.token_cache or 'expires_at' not in self.token_cache[scope]:

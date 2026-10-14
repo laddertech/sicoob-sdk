@@ -2,6 +2,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from sicoob.auth import OAuth2Client
 from sicoob.exceptions import (
     CobrancaPixNaoEncontradaError,
     PixError,
@@ -453,3 +454,43 @@ def test_handle_error_usa_type_quando_sem_detalhe(
         pix_api_custom._handle_error_response(resposta)
 
     assert 'ValidacaoErro' in str(exc_info.value)
+
+
+@pytest.mark.parametrize('payload', [None, [], ['erro']])
+def test_handle_error_corpo_json_nao_objeto(
+    pix_api_custom: SicoobPixAPICustom, payload: object
+) -> None:
+    """Testa que JSON válido que não é objeto preserva o status do erro"""
+    resposta = _resposta(502, payload)
+
+    with pytest.raises(PixError) as exc_info:
+        pix_api_custom._handle_error_response(resposta)
+
+    assert '502' in str(exc_info.value)
+
+
+def test_handle_error_lista_preserva_corpo(
+    pix_api_custom: SicoobPixAPICustom,
+) -> None:
+    """Testa que o corpo em lista aparece na mensagem de erro"""
+    resposta = _resposta(400, [{'erro': 'campo valor ausente'}])
+
+    with pytest.raises(PixError) as exc_info:
+        pix_api_custom._handle_error_response(resposta)
+
+    assert 'campo valor ausente' in str(exc_info.value)
+
+
+def test_create_headers_usa_get_token_do_oauth_do_sdk() -> None:
+    """Testa que a pypix-api obtém o token pelo OAuth2Client do SDK"""
+    with patch('sicoob.config.SicoobConfig.requires_certificate', return_value=False):
+        oauth = OAuth2Client(client_id='test_id')
+
+    with patch.object(
+        OAuth2Client, 'get_access_token', return_value='token_real'
+    ) as mock_token:
+        api = SicoobPixAPICustom(oauth=oauth, sandbox_mode=False)
+        headers = api._create_headers()
+
+    assert headers['Authorization'] == 'Bearer token_real'
+    mock_token.assert_called_once()

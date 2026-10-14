@@ -468,6 +468,13 @@ class SicoobPixAPICustom(SicoobPixAPI):
             error_data = response.json()
         except (ValueError, AttributeError):
             error_data = {}
+        corpo_bruto = ''
+        if not isinstance(error_data, dict):
+            # JSON válido fora do padrão BACEN (lista, null): preserva um
+            # trecho do corpo para diagnóstico
+            if error_data is not None:
+                corpo_bruto = str(error_data)[:500]
+            error_data = {}
 
         detail = error_data.get('detail', '')
         title = error_data.get('title', '')
@@ -482,5 +489,5 @@ class SicoobPixAPICustom(SicoobPixAPI):
                 raise WebhookPixNaoEncontradoError(detail or title)
 
         # Erro genérico
-        error_msg = detail or title or f'Erro {status}: {type_}'
+        error_msg = detail or title or f'Erro {status}: {type_ or corpo_bruto}'
         raise PixError(error_msg)
