@@ -72,3 +72,13 @@ Dockerfile.Dev
 # Documentation build
 docs/_build/
 docs/api/
+
+# Relatórios e configuração local
+junit*.xml
+.claude/settings.local.json
+
+# Certificados e chaves (nunca versionar)
+*.pfx
+*.p12
+*.pem
+*.key
