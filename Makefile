@@ -47,7 +47,7 @@ release-major: ## Preparar release major completo (testes + versão + commit + t
 	make format && uv run python scripts/release.py major --skip-tests && git add -A && git commit -m "chore: :bookmark: Release $$(uv run python scripts/release.py --current | cut -d' ' -f3)" && git tag v$$(uv run python scripts/release.py --current | cut -d' ' -f3)
 
 release-push: ## Fazer push do commit e tag da release
-	git push origin master --tags
+	git push origin main --tags
 
 ## @ Verifica e formata código
 

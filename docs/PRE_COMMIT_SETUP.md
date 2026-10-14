@@ -51,7 +51,7 @@ git commit -m "fix: corrigir bug"
 # ruff format...............................Passed
 # trailing-whitespace.......................Passed
 # end-of-file-fixer.........................Passed
-# [master abc1234] fix: corrigir bug
+# [main abc1234] fix: corrigir bug
 ```
 
 Se houver problemas, o commit é **bloqueado**:

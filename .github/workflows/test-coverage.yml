@@ -2,9 +2,9 @@ name: Tests and Coverage
 
 on:
   push:
-    branches: [ master, main, develop ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ master, main, develop ]
+    branches: [ main, develop ]
   schedule:
     # Executa todo dia às 6:00 UTC
     - cron: '0 6 * * *'

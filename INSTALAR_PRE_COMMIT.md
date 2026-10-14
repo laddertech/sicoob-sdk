@@ -67,7 +67,7 @@ git commit -m "fix: corrigir bug"
 # ruff.....................................Passed
 # ruff-format..............................Passed
 # ...
-# [master abc1234] fix: corrigir bug
+# [main abc1234] fix: corrigir bug
 ```
 
 Se houver erros, eles são **corrigidos automaticamente**:
@@ -85,7 +85,7 @@ git commit -m "fix: teste"
 # Arquivos corrigidos! Basta adicionar novamente:
 git add sicoob/__init__.py
 git commit -m "fix: teste"
-# [master def5678] fix: teste
+# [main def5678] fix: teste
 ```
 
 ## Documentação Completa
