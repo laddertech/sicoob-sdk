@@ -78,7 +78,7 @@ except ImportError:
     _async_available = False
     __all_async__ = []
 
-__version__ = '0.2.19'
+__version__ = '0.2.20'
 __all__ = [
     'AutenticacaoError',
     'BoletoAPI',
