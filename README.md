@@ -194,6 +194,30 @@ except BoletoError as e:
     print(f"Erro na API de boletos: {e}")
 ```
 
+#### Movimentações da carteira (liquidações, baixas...)
+
+A consulta individual de boleto não traz valor nem data de pagamento de forma
+estruturada. Para conciliar recebimentos, use as movimentações: a API processa a
+solicitação de forma assíncrona e devolve arquivos com um registro por título.
+
+```python
+from sicoob.boleto import MOVIMENTO_LIQUIDACAO
+
+liquidacoes = boleto_api.obter_movimentacoes(
+    numero_cliente=123456,
+    tipo_movimento=MOVIMENTO_LIQUIDACAO,
+    data_inicial="2026-11-05",
+    data_final="2026-11-11",  # dividido em janelas de 2 dias
+)
+for r in liquidacoes:
+    print(r["numeroTitulo"], r["dataLiquidacao"], r["valorLiquido"],
+          r["valorMora"], r["valorDesconto"], r["valorTarifaMovimento"])
+```
+
+- `valorMora` soma juros e multa; `valorLiquido` é o valor recebido.
+- A solicitação exige o escopo `boletos_inclusao` além de `boletos_consulta`.
+- Erros da API chegam como `BoletoMovimentacaoError`, com `codigo_solicitacao`.
+
 ### PIX
 
 A classe `PixAPI` implementa todas as operações PIX disponíveis:
@@ -490,6 +514,11 @@ Operações com boletos bancários.
 - `atualizar_webhook()`: Atualiza um webhook cadastrado
 - `excluir_webhook()`: Remove permanentemente um webhook cadastrado
 - `consultar_solicitacoes_webhook()`: Consulta as solicitações de notificação
+- `solicitar_movimentacao()`: Solicita a movimentação da carteira (até 2 dias)
+- `consultar_situacao_movimentacao()`: Verifica se a solicitação já foi processada
+- `baixar_arquivo_movimentacao()`: Baixa e decodifica um arquivo de movimentação
+- `obter_movimentacoes()`: Faz o ciclo completo (solicitar, aguardar e baixar)
+  para qualquer período, dividindo-o em janelas de 2 dias
 
 #### API de PIX
 **Arquivo:** `sicoob/pix.py`

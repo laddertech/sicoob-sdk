@@ -1,4 +1,10 @@
-from datetime import datetime, timedelta
+import base64
+import binascii
+import io
+import json
+import time
+import zipfile
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import requests
@@ -12,13 +18,43 @@ from sicoob.exceptions import (
     BoletoConsultaFaixaError,
     BoletoConsultaPagadorError,
     BoletoEmissaoError,
+    BoletoMovimentacaoError,
     BoletoWebhookError,
+    RespostaInvalidaError,
 )
 from sicoob.validation import (
     MultipleValidationError,
     ValidationError,
     get_boleto_schema,
 )
+
+# Tipos de movimento aceitos por POST /boletos/movimentacoes
+MOVIMENTO_ENTRADA = 1
+MOVIMENTO_PRORROGACAO = 2
+MOVIMENTO_A_VENCER = 3
+MOVIMENTO_VENCIDO = 4
+MOVIMENTO_LIQUIDACAO = 5
+MOVIMENTO_BAIXA = 6
+MOVIMENTO_VINCULADO_OPERACOES_CREDITO = 7
+TIPOS_MOVIMENTO = range(MOVIMENTO_ENTRADA, MOVIMENTO_VINCULADO_OPERACOES_CREDITO + 1)
+
+# A API limita cada solicitação a 2 dias (data inicial e final inclusivas)
+JANELA_MOVIMENTACAO_DIAS = 2
+
+# A solicitação de movimentação (POST) exige o escopo de inclusão; consulta e
+# download aceitam o mesmo token, o que evita um segundo token por operação.
+ESCOPO_MOVIMENTACAO = 'boletos_consulta boletos_inclusao'
+
+# Situações da solicitação devolvidas por consultar_situacao_movimentacao
+SITUACAO_MOVIMENTACAO_PROCESSANDO = 'processando'
+SITUACAO_MOVIMENTACAO_PRONTA = 'pronta'
+SITUACAO_MOVIMENTACAO_SEM_REGISTROS = 'sem_registros'
+
+# A API devolve "em processamento" e "sem registros" como HTTP 400 com o mesmo
+# código (5002); só o texto distingue os dois casos.
+_CODIGO_MOVIMENTACAO_SITUACAO = '5002'
+_MSG_MOVIMENTACAO_PROCESSANDO = 'processamento'
+_MSG_MOVIMENTACAO_SEM_REGISTROS = 'nenhum registro'
 
 # Padrões de mensagem que indicam boleto duplicado (case-insensitive)
 MENSAGENS_DUPLICACAO = [
@@ -1753,3 +1789,478 @@ class BoletoAPI(APIClientBase):
                 url=webhook.get('url'),
                 dados_webhook=webhook,
             ) from e
+
+    # ------------------------------------------------------------------
+    # Movimentações da carteira (POST/GET /boletos/movimentacoes)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _resultado(dados: Any) -> Any:
+        """Desembrulha o envelope ``resultado`` da API v3."""
+        if isinstance(dados, dict) and 'resultado' in dados:
+            return dados['resultado']
+        return dados
+
+    def _json_movimentacao(
+        self,
+        response: requests.Response,
+        codigo_solicitacao: int | None = None,
+        id_arquivo: int | None = None,
+    ) -> Any:
+        """Lê o JSON de uma resposta 2xx; corpo vazio ou inválido é erro."""
+        try:
+            return self._resultado(self._validate_response(response))
+        except (RespostaInvalidaError, ValueError) as e:
+            raise BoletoMovimentacaoError(
+                f'Resposta inesperada da API de movimentação '
+                f'(Status: {response.status_code}): {e!s}',
+                code=response.status_code,
+                codigo_solicitacao=codigo_solicitacao,
+                id_arquivo=id_arquivo,
+            ) from e
+
+    @staticmethod
+    def _mensagens_erro(response: requests.Response) -> list[dict]:
+        """Extrai a lista ``mensagens`` de uma resposta de erro, se houver."""
+        try:
+            dados = response.json()
+        except ValueError:
+            return []
+        mensagens = dados.get('mensagens') if isinstance(dados, dict) else None
+        if not isinstance(mensagens, list):
+            return []
+        return [m for m in mensagens if isinstance(m, dict)]
+
+    def _erro_movimentacao(
+        self,
+        response: requests.Response,
+        acao: str,
+        codigo_solicitacao: int | None = None,
+        id_arquivo: int | None = None,
+    ) -> BoletoMovimentacaoError:
+        mensagens = self._mensagens_erro(response)
+        detalhe = '; '.join(
+            str(m.get('mensagem')) for m in mensagens if m.get('mensagem')
+        )
+        texto = f'Falha ao {acao} - Status: {response.status_code}'
+        if detalhe:
+            texto = f'{texto} - {detalhe}'
+        return BoletoMovimentacaoError(
+            texto,
+            code=response.status_code,
+            mensagens=mensagens or None,
+            codigo_solicitacao=codigo_solicitacao,
+            id_arquivo=id_arquivo,
+        )
+
+    @staticmethod
+    def _como_inteiro(valor: Any) -> int | None:
+        """Normaliza contagens que a API pode mandar como int ou '1.500'."""
+        if isinstance(valor, bool):
+            return None
+        if isinstance(valor, int):
+            return valor
+        if isinstance(valor, str):
+            digitos = valor.strip().replace('.', '')
+            if digitos.isdigit():
+                return int(digitos)
+        return None
+
+    @staticmethod
+    def _como_data(valor: date | str, campo: str) -> date:
+        if isinstance(valor, datetime):
+            return valor.date()
+        if isinstance(valor, date):
+            return valor
+        if isinstance(valor, str):
+            try:
+                return date.fromisoformat(valor)
+            except ValueError:
+                pass
+        raise ValidationError(
+            f'{campo} deve ser uma data ou string yyyy-MM-dd', campo, valor
+        )
+
+    def solicitar_movimentacao(
+        self,
+        numero_cliente: int,
+        tipo_movimento: int,
+        data_inicial: date | str,
+        data_final: date | str,
+    ) -> int:
+        """Solicita a movimentação da carteira de cobrança registrada.
+
+        A API processa a solicitação de forma assíncrona: use o código
+        devolvido em :meth:`consultar_situacao_movimentacao` e depois em
+        :meth:`baixar_arquivo_movimentacao`, ou use :meth:`obter_movimentacoes`,
+        que faz o ciclo completo.
+
+        Args:
+            numero_cliente: Contrato do beneficiário no Sisbr
+            tipo_movimento: 1-Entrada, 2-Prorrogação, 3-A Vencer, 4-Vencido,
+                5-Liquidação, 6-Baixa, 7-Vinculado Operações Crédito
+                (constantes ``MOVIMENTO_*``)
+            data_inicial: Data inicial do movimento (inclusiva)
+            data_final: Data final do movimento (inclusiva). A API limita o
+                período a 2 dias.
+
+        Returns:
+            Código da solicitação (``codigoSolicitacao``)
+
+        Raises:
+            ValidationError: Parâmetros inválidos
+            BoletoMovimentacaoError: Falha na requisição ou resposta sem código
+        """
+        if tipo_movimento not in TIPOS_MOVIMENTO:
+            raise ValidationError(
+                f'tipo_movimento deve estar entre {TIPOS_MOVIMENTO.start} e '
+                f'{TIPOS_MOVIMENTO.stop - 1}',
+                'tipo_movimento',
+                tipo_movimento,
+            )
+        inicio = self._como_data(data_inicial, 'data_inicial')
+        fim = self._como_data(data_final, 'data_final')
+        if fim < inicio:
+            raise ValidationError(
+                'data_final não pode ser anterior a data_inicial', 'data_final', fim
+            )
+        if (fim - inicio).days >= JANELA_MOVIMENTACAO_DIAS:
+            raise ValidationError(
+                f'O período da movimentação é limitado a '
+                f'{JANELA_MOVIMENTACAO_DIAS} dias; use obter_movimentacoes '
+                'para períodos maiores',
+                'data_final',
+                fim,
+            )
+
+        url = f'{self._get_base_url()}{self.base_path}/boletos/movimentacoes'
+        payload = {
+            'numeroCliente': numero_cliente,
+            'tipoMovimento': tipo_movimento,
+            'dataInicial': inicio.isoformat(),
+            'dataFinal': fim.isoformat(),
+        }
+        try:
+            response = self.session.post(
+                url,
+                json=payload,
+                headers=self._get_headers(scope=ESCOPO_MOVIMENTACAO),
+                timeout=self._get_timeout_for_operation('boleto'),
+            )
+        except requests.exceptions.RequestException as e:
+            raise BoletoMovimentacaoError(
+                f'Falha na comunicação ao solicitar movimentação: {e!s}'
+            ) from e
+
+        if not 200 <= response.status_code <= 299:
+            raise self._erro_movimentacao(response, 'solicitar movimentação')
+
+        resultado = self._json_movimentacao(response)
+        codigo = (
+            resultado.get('codigoSolicitacao') if isinstance(resultado, dict) else None
+        )
+        try:
+            return int(codigo)
+        except (TypeError, ValueError):
+            raise BoletoMovimentacaoError(
+                'Resposta da solicitação de movimentação sem codigoSolicitacao',
+                code=response.status_code,
+            ) from None
+
+    def consultar_situacao_movimentacao(
+        self, numero_cliente: int, codigo_solicitacao: int
+    ) -> dict:
+        """Consulta se a solicitação de movimentação já foi processada.
+
+        Args:
+            numero_cliente: Contrato do beneficiário no Sisbr
+            codigo_solicitacao: Código devolvido por :meth:`solicitar_movimentacao`
+
+        Returns:
+            Dicionário com ``situacao`` (``SITUACAO_MOVIMENTACAO_*``) e, quando
+            pronta, ``id_arquivos`` e ``quantidade_total_registros``::
+
+                {'situacao': 'pronta', 'id_arquivos': [30025254],
+                 'quantidade_total_registros': 9}
+
+        Raises:
+            BoletoMovimentacaoError: Falha na requisição ou resposta inesperada
+        """
+        url = f'{self._get_base_url()}{self.base_path}/boletos/movimentacoes'
+        params = {
+            'numeroCliente': numero_cliente,
+            'codigoSolicitacao': codigo_solicitacao,
+        }
+        try:
+            response = self.session.get(
+                url,
+                params=params,
+                headers=self._get_headers(scope=ESCOPO_MOVIMENTACAO),
+                timeout=self._get_timeout_for_operation('boleto'),
+            )
+        except requests.exceptions.RequestException as e:
+            raise BoletoMovimentacaoError(
+                f'Falha na comunicação ao consultar movimentação: {e!s}',
+                codigo_solicitacao=codigo_solicitacao,
+            ) from e
+
+        sem_registros = {
+            'situacao': SITUACAO_MOVIMENTACAO_SEM_REGISTROS,
+            'id_arquivos': [],
+            'quantidade_total_registros': 0,
+        }
+
+        if response.status_code == 400:
+            textos = ' '.join(
+                str(m.get('mensagem', ''))
+                for m in self._mensagens_erro(response)
+                if str(m.get('codigo', '')).strip() == _CODIGO_MOVIMENTACAO_SITUACAO
+            ).lower()
+            if _MSG_MOVIMENTACAO_SEM_REGISTROS in textos:
+                return sem_registros
+            if _MSG_MOVIMENTACAO_PROCESSANDO in textos:
+                return {
+                    'situacao': SITUACAO_MOVIMENTACAO_PROCESSANDO,
+                    'id_arquivos': [],
+                    'quantidade_total_registros': None,
+                }
+
+        if not 200 <= response.status_code <= 299:
+            raise self._erro_movimentacao(
+                response,
+                'consultar movimentação',
+                codigo_solicitacao=codigo_solicitacao,
+            )
+
+        resultado = self._json_movimentacao(
+            response, codigo_solicitacao=codigo_solicitacao
+        )
+        if not isinstance(resultado, dict):
+            raise BoletoMovimentacaoError(
+                'Resposta inesperada na consulta da movimentação',
+                code=response.status_code,
+                codigo_solicitacao=codigo_solicitacao,
+            )
+        id_arquivos = resultado.get('idArquivos') or []
+        if not isinstance(id_arquivos, list):
+            raise BoletoMovimentacaoError(
+                'idArquivos inválido na consulta da movimentação',
+                code=response.status_code,
+                codigo_solicitacao=codigo_solicitacao,
+            )
+        # Campo obrigatório no contrato: sem ele não há como conferir se os
+        # arquivos trouxeram tudo, e uma resposta incompleta sumiria calada.
+        total = self._como_inteiro(resultado.get('quantidadeTotalRegistros'))
+        if total is None or total < 0:
+            raise BoletoMovimentacaoError(
+                'quantidadeTotalRegistros ausente ou inválido na consulta da '
+                'movimentação',
+                code=response.status_code,
+                codigo_solicitacao=codigo_solicitacao,
+            )
+        qtd_arquivos = self._como_inteiro(resultado.get('quantidadeArquivo'))
+        if qtd_arquivos is not None and qtd_arquivos != len(id_arquivos):
+            raise BoletoMovimentacaoError(
+                f'Movimentação informou {qtd_arquivos} arquivo(s), mas listou '
+                f'{len(id_arquivos)}',
+                code=response.status_code,
+                codigo_solicitacao=codigo_solicitacao,
+            )
+        if not id_arquivos:
+            if total > 0:
+                raise BoletoMovimentacaoError(
+                    f'Movimentação com {total} registro(s) mas sem arquivos',
+                    code=response.status_code,
+                    codigo_solicitacao=codigo_solicitacao,
+                )
+            return sem_registros
+        return {
+            'situacao': SITUACAO_MOVIMENTACAO_PRONTA,
+            'id_arquivos': id_arquivos,
+            'quantidade_total_registros': total,
+        }
+
+    def baixar_arquivo_movimentacao(
+        self, numero_cliente: int, codigo_solicitacao: int, id_arquivo: int
+    ) -> list[dict]:
+        """Baixa um arquivo de movimentação e devolve os registros.
+
+        A API devolve um ZIP em base64 com um ou mais arquivos JSON; cada um
+        contém uma lista de registros (os campos variam com o tipo de
+        movimento; na liquidação: ``numeroTitulo``, ``dataLiquidacao``,
+        ``valorLiquido``, ``valorMora``, ``valorDesconto``,
+        ``valorTarifaMovimento``...).
+
+        Args:
+            numero_cliente: Contrato do beneficiário no Sisbr
+            codigo_solicitacao: Código devolvido por :meth:`solicitar_movimentacao`
+            id_arquivo: Um dos ``id_arquivos`` da consulta de situação
+
+        Returns:
+            Lista de registros do arquivo
+
+        Raises:
+            BoletoMovimentacaoError: Falha na requisição ou arquivo ilegível
+        """
+        url = f'{self._get_base_url()}{self.base_path}/boletos/movimentacoes/download'
+        params = {
+            'numeroCliente': numero_cliente,
+            'codigoSolicitacao': codigo_solicitacao,
+            'idArquivo': id_arquivo,
+        }
+        try:
+            response = self.session.get(
+                url,
+                params=params,
+                headers=self._get_headers(scope=ESCOPO_MOVIMENTACAO),
+                timeout=self._get_timeout_for_operation('boleto'),
+            )
+        except requests.exceptions.RequestException as e:
+            raise BoletoMovimentacaoError(
+                f'Falha na comunicação ao baixar movimentação: {e!s}',
+                codigo_solicitacao=codigo_solicitacao,
+                id_arquivo=id_arquivo,
+            ) from e
+
+        if not 200 <= response.status_code <= 299:
+            raise self._erro_movimentacao(
+                response,
+                'baixar arquivo de movimentação',
+                codigo_solicitacao=codigo_solicitacao,
+                id_arquivo=id_arquivo,
+            )
+
+        resultado = self._json_movimentacao(
+            response, codigo_solicitacao=codigo_solicitacao, id_arquivo=id_arquivo
+        )
+        arquivo = resultado.get('arquivo') if isinstance(resultado, dict) else None
+        if not isinstance(arquivo, str) or not arquivo:
+            raise BoletoMovimentacaoError(
+                'Resposta do download de movimentação sem arquivo',
+                code=response.status_code,
+                codigo_solicitacao=codigo_solicitacao,
+                id_arquivo=id_arquivo,
+            )
+
+        registros: list[dict] = []
+        try:
+            conteudo_zip = base64.b64decode(arquivo, validate=True)
+            with zipfile.ZipFile(io.BytesIO(conteudo_zip)) as zf:
+                # Lê pela entrada (ZipInfo), não pelo nome: nomes repetidos no
+                # ZIP fariam zf.read(nome) devolver a mesma entrada duas vezes.
+                for info in zf.infolist():
+                    if info.is_dir():
+                        continue
+                    nome = info.filename
+                    dados = json.loads(zf.read(info).decode('utf-8-sig'))
+                    if isinstance(dados, dict):
+                        dados = [dados]
+                    if not isinstance(dados, list) or not all(
+                        isinstance(r, dict) for r in dados
+                    ):
+                        raise ValueError(f'conteúdo inesperado em {nome}')
+                    registros.extend(dados)
+        except (binascii.Error, zipfile.BadZipFile, ValueError) as e:
+            raise BoletoMovimentacaoError(
+                f'Arquivo de movimentação ilegível: {e!s}',
+                code=response.status_code,
+                codigo_solicitacao=codigo_solicitacao,
+                id_arquivo=id_arquivo,
+            ) from e
+        return registros
+
+    def obter_movimentacoes(
+        self,
+        numero_cliente: int,
+        tipo_movimento: int,
+        data_inicial: date | str,
+        data_final: date | str,
+        intervalo_consulta: float = 5.0,
+        tempo_limite: float = 300.0,
+    ) -> list[dict]:
+        """Solicita, aguarda e baixa as movimentações de um período.
+
+        Períodos maiores que o limite da API (2 dias) são divididos em janelas
+        consecutivas que não se sobrepõem.
+
+        Args:
+            numero_cliente: Contrato do beneficiário no Sisbr
+            tipo_movimento: Constante ``MOVIMENTO_*`` (ex.: ``MOVIMENTO_LIQUIDACAO``)
+            data_inicial: Data inicial (inclusiva)
+            data_final: Data final (inclusiva)
+            intervalo_consulta: Segundos entre consultas de situação
+            tempo_limite: Segundos máximos de espera por janela
+
+        Returns:
+            Registros de todas as janelas, na ordem devolvida pela API
+
+        Raises:
+            ValidationError: Parâmetros inválidos
+            BoletoMovimentacaoError: Falha na API ou tempo limite excedido
+        """
+        inicio = self._como_data(data_inicial, 'data_inicial')
+        fim = self._como_data(data_final, 'data_final')
+        if fim < inicio:
+            raise ValidationError(
+                'data_final não pode ser anterior a data_inicial', 'data_final', fim
+            )
+
+        registros: list[dict] = []
+        janela_inicio = inicio
+        while janela_inicio <= fim:
+            janela_fim = min(
+                janela_inicio + timedelta(days=JANELA_MOVIMENTACAO_DIAS - 1), fim
+            )
+            registros.extend(
+                self._obter_movimentacoes_janela(
+                    numero_cliente,
+                    tipo_movimento,
+                    janela_inicio,
+                    janela_fim,
+                    intervalo_consulta,
+                    tempo_limite,
+                )
+            )
+            janela_inicio = janela_fim + timedelta(days=1)
+        return registros
+
+    def _obter_movimentacoes_janela(
+        self,
+        numero_cliente: int,
+        tipo_movimento: int,
+        inicio: date,
+        fim: date,
+        intervalo_consulta: float,
+        tempo_limite: float,
+    ) -> list[dict]:
+        codigo = self.solicitar_movimentacao(
+            numero_cliente, tipo_movimento, inicio, fim
+        )
+        prazo = time.monotonic() + tempo_limite
+        while True:
+            situacao = self.consultar_situacao_movimentacao(numero_cliente, codigo)
+            if situacao['situacao'] != SITUACAO_MOVIMENTACAO_PROCESSANDO:
+                break
+            if time.monotonic() >= prazo:
+                raise BoletoMovimentacaoError(
+                    f'Movimentação {codigo} ({inicio} a {fim}) não ficou pronta '
+                    f'em {tempo_limite:.0f}s',
+                    codigo_solicitacao=codigo,
+                )
+            time.sleep(intervalo_consulta)
+
+        registros: list[dict] = []
+        for id_arquivo in situacao['id_arquivos']:
+            registros.extend(
+                self.baixar_arquivo_movimentacao(numero_cliente, codigo, id_arquivo)
+            )
+
+        # Um arquivo truncado omitiria liquidações sem erro aparente
+        esperado = situacao['quantidade_total_registros']
+        if len(registros) != esperado:
+            raise BoletoMovimentacaoError(
+                f'Movimentação {codigo} ({inicio} a {fim}) informou {esperado} '
+                f'registro(s), mas os arquivos trouxeram {len(registros)}',
+                codigo_solicitacao=codigo,
+            )
+        return registros

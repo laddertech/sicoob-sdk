@@ -223,6 +223,22 @@ class BoletoWebhookError(BoletoError):
         super().__init__(message, code, mensagens)
 
 
+class BoletoMovimentacaoError(BoletoError):
+    """Erro ao solicitar, consultar ou baixar movimentações da carteira"""
+
+    def __init__(
+        self,
+        message: str,
+        code: int | None = None,
+        mensagens: list[dict] | None = None,
+        codigo_solicitacao: int | None = None,
+        id_arquivo: int | None = None,
+    ) -> None:
+        self.codigo_solicitacao = codigo_solicitacao
+        self.id_arquivo = id_arquivo
+        super().__init__(message, code, mensagens)
+
+
 class ContaCorrenteError(SicoobError):
     """Classe base para erros relacionados a conta corrente"""
 
