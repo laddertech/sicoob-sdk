@@ -1085,7 +1085,7 @@ wheels = [
 
 [[package]]
 name = "pypix-api"
-version = "0.14.0"
+version = "0.15.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "python-dotenv" },
@@ -1093,9 +1093,9 @@ dependencies = [
     { name = "requests-pkcs12" },
     { name = "ruff" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ae/09/5861e9b096cbcdd1fa9f20e58ed8e88d5e3d13ec394b9fa92dcbd098ca13/pypix_api-0.14.0.tar.gz", hash = "sha256:3e6aa0d2fb1ecd2513d2fc888bf56b125032bda1759977f5525ec08b9efea6d9", size = 70441, upload-time = "2026-10-14T17:50:13.235Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/42/42/f46384f8ee0f2f5a1c4893f305ed416ea96f9c751ab27315d253bba197e2/pypix_api-0.15.0.tar.gz", hash = "sha256:cf81fa113bda5c92e7485d392cdd5added497ec9ad674f11405aa569803babcd", size = 73687, upload-time = "2026-11-12T13:39:24.237Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/67/40/42564a25c41fd8e81aa879220481ba6125a9ab8793afc363c72fa02363ca/pypix_api-0.14.0-py3-none-any.whl", hash = "sha256:ed8cc9346a4d6d70865c8dd20a97f0bce9d0095f86b512a829378380e4aa0589", size = 88620, upload-time = "2026-10-14T17:50:11.596Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/15/024ab4870eb6e227733b2738a93a38a22c9660e75380d835d2ca0f2ccc07/pypix_api-0.15.0-py3-none-any.whl", hash = "sha256:2c3329517b0de40e944835f1532a67283a94fb3a0112a822ef7c34e10d31b869", size = 92766, upload-time = "2026-11-12T13:39:23.023Z" },
 ]
 
 [[package]]
@@ -1352,7 +1352,7 @@ wheels = [
 
 [[package]]
 name = "sicoob-sdk"
-version = "0.2.19"
+version = "0.2.21"
 source = { virtual = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1392,7 +1392,7 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.8.0" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.2.2.post1" },
     { name = "cryptography", specifier = ">=41.0.0" },
-    { name = "pypix-api", specifier = "==0.14.0" },
+    { name = "pypix-api", specifier = ">=0.14.0,<1.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", specifier = ">=1.1.0" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.6.1" },
