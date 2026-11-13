@@ -20,6 +20,7 @@ def sicoob_client():
     return Sicoob(
         client_id=client_id,
         environment='sandbox',  # Modo sandbox não requer certificado
+        sandbox_token=os.getenv('SICOOB_SANDBOX_TOKEN'),
     )
 
 

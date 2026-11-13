@@ -1,8 +1,10 @@
+from dataclasses import replace
 from unittest.mock import Mock, patch
 
 import pytest
 
 from sicoob.auth import OAuth2Client
+from sicoob.config import SicoobConfig
 from sicoob.exceptions import (
     CobrancaPixNaoEncontradaError,
     PixError,
@@ -483,8 +485,7 @@ def test_handle_error_lista_preserva_corpo(
 
 def test_create_headers_usa_get_token_do_oauth_do_sdk() -> None:
     """Testa que a pypix-api obtém o token pelo OAuth2Client do SDK"""
-    with patch('sicoob.config.SicoobConfig.requires_certificate', return_value=False):
-        oauth = OAuth2Client(client_id='test_id')
+    oauth = OAuth2Client(client_id='test_id', config=_SEM_CERTIFICADO)
 
     with patch.object(
         OAuth2Client, 'get_access_token', return_value='token_real'
@@ -494,3 +495,34 @@ def test_create_headers_usa_get_token_do_oauth_do_sdk() -> None:
 
     assert headers['Authorization'] == 'Bearer token_real'
     mock_token.assert_called_once()
+
+
+_SEM_CERTIFICADO = replace(
+    SicoobConfig.config_for('production'), require_certificate=False
+)
+
+
+def test_pix_sandbox_usa_token_da_instancia_e_nao_do_ambiente() -> None:
+    """Cada instância no sandbox envia o próprio token, ignorando SANDBOX_TOKEN"""
+    sandbox = SicoobConfig.config_for('sandbox')
+    a = OAuth2Client(client_id='cid-a', config=sandbox, sandbox_token='tok-a')
+    b = OAuth2Client(client_id='cid-b', config=sandbox, sandbox_token='tok-b')
+    with patch.dict('os.environ', {'SANDBOX_TOKEN': 'do-ambiente'}):
+        ha = SicoobPixAPICustom(oauth=a, sandbox_mode=True)._create_headers()
+        hb = SicoobPixAPICustom(oauth=b, sandbox_mode=True)._create_headers()
+    assert ha['Authorization'] == 'Bearer tok-a'
+    assert hb['Authorization'] == 'Bearer tok-b'
+
+
+def test_pix_api_herda_sandbox_da_instancia() -> None:
+    """PixAPI decide o sandbox pela config da instância, não pela global"""
+    from sicoob.pix import PixAPI
+
+    oauth = OAuth2Client(
+        client_id='cid',
+        config=SicoobConfig.config_for('sandbox'),
+        sandbox_token='tok',
+    )
+    api = PixAPI(oauth, oauth.session)
+    assert api._pix_api.sandbox_mode is True
+    assert api._pix_api._create_headers()['Authorization'] == 'Bearer tok'

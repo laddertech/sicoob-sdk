@@ -291,6 +291,7 @@ class SicoobLogger:
         headers: dict | None = None,
         body: str | None = None,
         request_id: str | None = None,
+        enabled: bool | None = None,
     ) -> None:
         """Loga uma requisição HTTP
 
@@ -300,8 +301,10 @@ class SicoobLogger:
             headers: Headers da requisição
             body: Corpo da requisição
             request_id: ID único da requisição
+            enabled: decisão do cliente que fez a chamada; quando informada,
+                prevalece sobre a flag global do logger
         """
-        if not cls._log_requests:
+        if not (cls._log_requests if enabled is None else enabled):
             return
 
         logger = cls.get_logger('sicoob.http')
@@ -336,6 +339,7 @@ class SicoobLogger:
         duration_ms: float,
         response_body: str | None = None,
         request_id: str | None = None,
+        enabled: bool | None = None,
     ) -> None:
         """Loga uma resposta HTTP
 
@@ -345,8 +349,10 @@ class SicoobLogger:
             duration_ms: Duração em milissegundos
             response_body: Corpo da resposta
             request_id: ID único da requisição
+            enabled: decisão do cliente que fez a chamada; quando informada,
+                prevalece sobre a flag global do logger
         """
-        if not cls._log_responses:
+        if not (cls._log_responses if enabled is None else enabled):
             return
 
         logger = cls.get_logger('sicoob.http')

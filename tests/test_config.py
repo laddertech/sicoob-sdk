@@ -34,14 +34,9 @@ def test_sicoob_config_singleton():
     assert config1 is config2
 
 
-@patch.dict(os.environ, {'SICOOB_ENVIRONMENT': 'development'})
 def test_sicoob_config_development_environment():
     """Testa configuração para ambiente development"""
-    # Força nova instância
-    SicoobConfig._instance = None
-
-    config = SicoobConfig()
-    current_config = config.get_current_config()
+    current_config = SicoobConfig.config_for('development')
 
     assert current_config.environment == Environment.DEVELOPMENT
     assert current_config.base_url == 'https://sandbox.sicoob.com.br/sicoob/sandbox'
@@ -51,14 +46,9 @@ def test_sicoob_config_development_environment():
     assert current_config.debug_mode is True
 
 
-@patch.dict(os.environ, {'SICOOB_ENVIRONMENT': 'test'})
 def test_sicoob_config_test_environment():
     """Testa configuração para ambiente test"""
-    # Força nova instância
-    SicoobConfig._instance = None
-
-    config = SicoobConfig()
-    current_config = config.get_current_config()
+    current_config = SicoobConfig.config_for('test')
 
     assert current_config.environment == Environment.TEST
     assert current_config.log_level == 'WARNING'
@@ -67,14 +57,9 @@ def test_sicoob_config_test_environment():
     assert current_config.require_certificate is False
 
 
-@patch.dict(os.environ, {'SICOOB_ENVIRONMENT': 'staging'})
 def test_sicoob_config_staging_environment():
     """Testa configuração para ambiente staging"""
-    # Força nova instância
-    SicoobConfig._instance = None
-
-    config = SicoobConfig()
-    current_config = config.get_current_config()
+    current_config = SicoobConfig.config_for('staging')
 
     assert current_config.environment == Environment.STAGING
     assert current_config.base_url == 'https://api.sicoob.com.br'
@@ -82,14 +67,9 @@ def test_sicoob_config_staging_environment():
     assert current_config.require_certificate is True
 
 
-@patch.dict(os.environ, {'SICOOB_ENVIRONMENT': 'production'})
 def test_sicoob_config_production_environment():
     """Testa configuração para ambiente production"""
-    # Força nova instância
-    SicoobConfig._instance = None
-
-    config = SicoobConfig()
-    current_config = config.get_current_config()
+    current_config = SicoobConfig.config_for('production')
 
     assert current_config.environment == Environment.PRODUCTION
     assert current_config.base_url == 'https://api.sicoob.com.br'
@@ -98,14 +78,9 @@ def test_sicoob_config_production_environment():
     assert current_config.require_certificate is True
 
 
-@patch.dict(os.environ, {'SICOOB_ENVIRONMENT': 'sandbox'})
 def test_sicoob_config_sandbox_environment():
     """Testa configuração para ambiente sandbox"""
-    # Força nova instância
-    SicoobConfig._instance = None
-
-    config = SicoobConfig()
-    current_config = config.get_current_config()
+    current_config = SicoobConfig.config_for('sandbox')
 
     assert current_config.environment == Environment.SANDBOX
     assert current_config.base_url == 'https://sandbox.sicoob.com.br/sicoob/sandbox'
@@ -115,16 +90,13 @@ def test_sicoob_config_sandbox_environment():
 
 
 def test_sicoob_config_invalid_environment():
-    """Testa comportamento com ambiente inválido"""
-    with patch.dict(os.environ, {'SICOOB_ENVIRONMENT': 'invalid'}):
-        # Força nova instância
-        SicoobConfig._instance = None
+    """Ambiente desconhecido é erro, nunca fallback silencioso para produção"""
+    import pytest
 
-        config = SicoobConfig()
-        current_config = config.get_current_config()
-
-        # Deve usar production como padrão
-        assert current_config.environment == Environment.PRODUCTION
+    with pytest.raises(ValueError, match='Ambiente desconhecido'):
+        SicoobConfig.config_for('producao')
+    with pytest.raises(ValueError):
+        Environment.parse('invalid')
 
 
 @patch.dict(
@@ -132,31 +104,49 @@ def test_sicoob_config_invalid_environment():
     {
         'SICOOB_ENVIRONMENT': 'development',
         'SICOOB_BASE_URL': 'https://custom.api.com',
+        'SICOOB_AUTH_URL': 'https://custom.auth.com',
+        'SICOOB_VERIFY_SSL': 'false',
         'SICOOB_TIMEOUT': '60',
-        'SICOOB_LOG_LEVEL': 'ERROR',
-        'SICOOB_DEBUG_MODE': 'true',
     },
 )
-def test_environment_variable_overrides():
-    """Testa sobrescrição com variáveis de ambiente"""
-    # Força nova instância
+def test_variaveis_de_ambiente_sao_ignoradas():
+    """A configuração não lê o ambiente do processo (nem desliga TLS por ele)"""
     SicoobConfig._instance = None
+    try:
+        current_config = SicoobConfig().get_current_config()
+        assert current_config.environment == Environment.PRODUCTION
+        assert current_config.base_url == 'https://api.sicoob.com.br'
+        assert current_config.verify_ssl is True
+        assert current_config.timeout == 30
+        sandbox = SicoobConfig.config_for('sandbox')
+        assert sandbox.base_url == 'https://sandbox.sicoob.com.br/sicoob/sandbox'
+        assert sandbox.verify_ssl is True
+    finally:
+        SicoobConfig._instance = None
 
-    config = SicoobConfig()
-    current_config = config.get_current_config()
 
-    assert current_config.base_url == 'https://custom.api.com'
-    assert current_config.timeout == 60
-    assert current_config.log_level == 'ERROR'
-    assert current_config.debug_mode is True
+def test_config_for_devolve_copias_independentes():
+    """config_for não compartilha estado entre chamadas nem com o global"""
+    a = SicoobConfig.config_for('production')
+    b = SicoobConfig.config_for('production')
+    a.custom_headers['x'] = '1'
+    a.timeout = 999
+    assert b.custom_headers == {}
+    assert b.timeout == 30
+    assert SicoobConfig._DEFAULT_CONFIGS[Environment.PRODUCTION].timeout == 30
+
+
+def test_environment_parse_aliases():
+    assert Environment.parse(' PROD ') is Environment.PRODUCTION
+    assert Environment.parse('sandbox') is Environment.SANDBOX
+    assert Environment.parse(Environment.TEST) is Environment.TEST
 
 
 def test_set_environment():
     """Testa mudança de ambiente programática"""
     # Força nova instância com production
     SicoobConfig._instance = None
-    with patch.dict(os.environ, {'SICOOB_ENVIRONMENT': 'production'}):
-        config = SicoobConfig()
+    SicoobConfig()
 
     # Muda para development
     SicoobConfig.set_environment(Environment.DEVELOPMENT)
@@ -242,29 +232,3 @@ def test_ssl_and_security_config():
 
     assert SicoobConfig.should_verify_ssl() is True
     assert SicoobConfig.is_debug_mode() is False
-
-
-@patch.dict(os.environ, {'SICOOB_VERIFY_SSL': 'false', 'SICOOB_MAX_RETRIES': '10'})
-def test_boolean_and_numeric_overrides():
-    """Testa conversão correta de valores booleanos e numéricos"""
-    # Força nova instância
-    SicoobConfig._instance = None
-
-    config = SicoobConfig()
-    current_config = config.get_current_config()
-
-    assert current_config.verify_ssl is False
-    assert current_config.max_retries == 10
-
-
-@patch.dict(os.environ, {'SICOOB_TIMEOUT': 'invalid'})
-def test_invalid_numeric_override():
-    """Testa comportamento com valor numérico inválido"""
-    # Força nova instância
-    SicoobConfig._instance = None
-
-    config = SicoobConfig()
-    current_config = config.get_current_config()
-
-    # Deve manter valor padrão se conversão falhar
-    assert current_config.timeout == 30  # Valor padrão

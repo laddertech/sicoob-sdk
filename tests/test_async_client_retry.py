@@ -294,17 +294,16 @@ class TestAsyncAPIClientRetry:
             'codigos_retry': [500, 503],
         }
 
-        with patch.dict('os.environ', {'SICOOB_CLIENT_ID': 'test_client_id'}):
-            with patch('sicoob.async_client.OAuth2Client'):
-                client = AsyncSicoob(
-                    client_id='test_client',
-                    certificado_pfx=b'test_cert',
-                    senha_pfx='test_password',
-                    retry_config=retry_config,
-                )
+        with patch('sicoob.async_client.OAuth2Client'):
+            client = AsyncSicoob(
+                client_id='test_client',
+                certificado_pfx=b'test_cert',
+                senha_pfx='test_password',
+                retry_config=retry_config,
+            )
 
-                # Verifica que retry_config foi passado para AsyncAPIClient
-                assert client._api_client.retry_config == retry_config
+            # Verifica que retry_config foi passado para AsyncAPIClient
+            assert client._api_client.retry_config == retry_config
 
 
 class TestAsyncAPIClientRetryIntegration:
@@ -359,4 +358,104 @@ class TestAsyncAPIClientRetryIntegration:
                 assert call_count == 2
                 assert result == {'data': 'success'}
         finally:
+            await client._session.close()
+
+
+class TestAsyncSicoobCredenciaisExplicitas:
+    """AsyncSicoob não lê credenciais nem ambiente do processo."""
+
+    @pytest.mark.parametrize('client_id', [None, '', '  '])
+    def test_client_id_ausente_nao_usa_ambiente(self, client_id):
+        with patch.dict('os.environ', {'SICOOB_CLIENT_ID': 'do-ambiente'}):
+            with pytest.raises(ValueError, match='client_id'):
+                AsyncSicoob(client_id=client_id, certificado_pfx=b'x', senha_pfx='s')
+
+    def test_ambiente_desconhecido_e_erro(self):
+        with pytest.raises(ValueError, match='Ambiente desconhecido'):
+            AsyncSicoob(client_id='id', environment='prd')
+
+    def test_ambiente_por_instancia(self):
+        from sicoob.config import Environment, SicoobConfig
+
+        with patch('sicoob.async_client.OAuth2Client') as oauth:
+            client = AsyncSicoob(client_id='id', environment='sandbox')
+        assert client.config.is_sandbox
+        assert oauth.call_args.kwargs['config'] is client.config
+        assert SicoobConfig.get_current_config().environment is Environment.PRODUCTION
+
+    def test_from_env(self):
+        env = {'SICOOB_CLIENT_ID': 'cid', 'SICOOB_ENVIRONMENT': 'sandbox'}
+        with patch.dict('os.environ', env):
+            with patch('sicoob.async_client.OAuth2Client'):
+                client = AsyncSicoob.from_env(dotenv=False)
+        assert client.client_id == 'cid'
+        assert client.config.is_sandbox
+
+
+class TestAsyncHeadersSandbox:
+    def _client(self, ambiente, token=None):
+        from sicoob.config import SicoobConfig
+
+        oauth = Mock()
+        oauth.config = SicoobConfig.config_for(ambiente)
+        oauth.client_id = 'cid'
+        oauth.sandbox_token = token
+        oauth.get_access_token.return_value = 'tok-oauth'
+        return AsyncAPIClient(oauth_client=oauth), oauth
+
+    def test_sandbox_usa_token_informado(self):
+        client, oauth = self._client('sandbox', 'tok-sb')
+        headers = client._get_headers('x')
+        assert headers['Authorization'] == 'Bearer tok-sb'
+        assert headers['client_id'] == 'cid'
+        oauth.get_access_token.assert_not_called()
+
+    def test_producao_usa_oauth(self):
+        client, oauth = self._client('production')
+        headers = client._get_headers('x')
+        assert headers['Authorization'] == 'Bearer tok-oauth'
+        assert client._get_base_url() == 'https://api.sicoob.com.br'
+
+
+class TestAsyncLoggingPorInstancia:
+    """Logs HTTP com prévia de resposta seguem a config da instância."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ('ambiente', 'espera_log'), [('production', False), ('sandbox', True)]
+    )
+    async def test_log_de_resposta(self, ambiente, espera_log):
+        import logging
+        from dataclasses import replace
+
+        from sicoob.config import SicoobConfig
+
+        oauth = Mock()
+        # Sem certificado real no teste: desliga só a exigência de mTLS.
+        oauth.config = replace(
+            SicoobConfig.config_for(ambiente), require_certificate=False
+        )
+        oauth.client_id = 'cid'
+        oauth.sandbox_token = 'tok'
+        oauth.get_access_token.return_value = 'tok'
+        client = AsyncAPIClient(oauth_client=oauth)
+        await client._ensure_session()
+        resposta = AsyncMock(spec=ClientResponse)
+        resposta.status = 200
+        resposta.text = AsyncMock(return_value='{"saldo": 1}')
+        resposta.json = AsyncMock(return_value={'saldo': 1})
+        logger = logging.getLogger('sicoob.async_client')
+        nivel = logger.level
+        logger.setLevel(logging.DEBUG)  # nível global "vazado" de um sandbox
+        try:
+            with (
+                patch.object(client._session, 'request') as req,
+                patch.object(logger, 'debug') as debug,
+            ):
+                req.return_value.__aenter__.return_value = resposta
+                await client._make_request('GET', 'https://x/y', 's')
+            mensagens = [c.args[0] for c in debug.call_args_list]
+            assert any('Resposta HTTP' in m for m in mensagens) is espera_log
+        finally:
+            logger.setLevel(nivel)
             await client._session.close()

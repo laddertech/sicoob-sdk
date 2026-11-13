@@ -6,7 +6,7 @@ import requests
 
 from sicoob.api_client import APIClientBase
 from sicoob.auth import OAuth2Client
-from sicoob.config import SicoobConfig
+from sicoob.config import Environment, SicoobConfig
 from sicoob.exceptions import RespostaInvalidaError
 
 
@@ -45,23 +45,40 @@ class TestAPIClientBase:
         assert client.oauth_client == mock_oauth_client
         assert client.session is not None
 
-    def test_get_base_url_sandbox(self, api_client):
-        """Testa obtenção da URL base em modo sandbox"""
-        with patch.object(
-            SicoobConfig, 'get_base_url', return_value='https://sandbox.sicoob.com'
-        ):
-            url = api_client._get_base_url()
-            assert url == 'https://sandbox.sicoob.com'
+    def test_get_base_url_sandbox(self, mock_oauth_client, mock_session):
+        """A URL base vem da configuração do OAuth2Client da instância"""
+        mock_oauth_client.config = SicoobConfig.config_for('sandbox')
+        client = APIClientBase(mock_oauth_client, mock_session)
+        assert client._get_base_url() == 'https://sandbox.sicoob.com.br/sicoob/sandbox'
 
     def test_get_base_url_production(self, mock_oauth_client, mock_session):
         """Testa obtenção da URL base em modo produção"""
+        mock_oauth_client.config = SicoobConfig.config_for('production')
         client = APIClientBase(mock_oauth_client, mock_session)
+        assert client._get_base_url() == 'https://api.sicoob.com.br'
 
-        with patch.object(
-            SicoobConfig, 'get_base_url', return_value='https://api.sicoob.com'
-        ):
-            url = client._get_base_url()
-            assert url == 'https://api.sicoob.com'
+    def test_config_da_instancia_ignora_global(self, mock_oauth_client, mock_session):
+        """Mudar o ambiente global não afeta um cliente já configurado"""
+        mock_oauth_client.config = SicoobConfig.config_for('production')
+        client = APIClientBase(mock_oauth_client, mock_session)
+        SicoobConfig.set_environment(Environment.SANDBOX)
+        try:
+            assert client._get_base_url() == 'https://api.sicoob.com.br'
+            assert client.config.is_sandbox is False
+        finally:
+            SicoobConfig.set_environment(Environment.PRODUCTION)
+
+    def test_sandbox_usa_token_informado(self, mock_oauth_client, mock_session):
+        """No sandbox o token vem do cliente, não de variável de ambiente"""
+        mock_oauth_client.config = SicoobConfig.config_for('sandbox')
+        mock_oauth_client.sandbox_token = 'tok-sandbox'
+        mock_oauth_client.client_id = 'cid'
+        client = APIClientBase(mock_oauth_client, mock_session)
+        with patch.dict('os.environ', {'SICOOB_SANDBOX_TOKEN': 'do-ambiente'}):
+            headers = client._get_headers('x')
+        assert headers['Authorization'] == 'Bearer tok-sandbox'
+        assert headers['client_id'] == 'cid'
+        mock_oauth_client.get_access_token.assert_not_called()
 
     def test_get_headers_basic(self, api_client):
         """Testa geração de headers básicos"""
@@ -316,3 +333,32 @@ class TestAPIClientBase:
             mock_create_session.assert_called_once()
             assert hasattr(client.session, '_sicoob_resilient')
             assert client.session._sicoob_resilient is True
+
+
+def test_logging_http_segue_config_da_instancia():
+    """Produção não loga mesmo com flag global ligada; sandbox loga com ela desligada"""
+    from sicoob.logging_config import SicoobLogger
+
+    oauth = Mock()
+    oauth.get_access_token.return_value = 'tok'
+    oauth.client_id = 'cid'
+    session = Mock()
+    session.request.return_value = Mock(
+        status_code=200, text='{}', headers={'Content-Type': 'application/json'}
+    )
+    client = APIClientBase(oauth, session, enable_resilience=False)
+    http_logger = Mock()
+    flags = (SicoobLogger._log_requests, SicoobLogger._log_responses)
+    try:
+        with patch.object(SicoobLogger, 'get_logger', return_value=http_logger):
+            SicoobLogger._log_requests = SicoobLogger._log_responses = True
+            oauth.config = SicoobConfig.config_for('production')
+            client._make_request('GET', 'https://api.sicoob.com.br/x', scope='s')
+            assert http_logger.method_calls == []
+
+            SicoobLogger._log_requests = SicoobLogger._log_responses = False
+            oauth.config = SicoobConfig.config_for('sandbox')
+            client._make_request('GET', 'https://x/y', scope='s')
+            assert len(http_logger.method_calls) >= 2
+    finally:
+        SicoobLogger._log_requests, SicoobLogger._log_responses = flags

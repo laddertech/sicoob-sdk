@@ -1,12 +1,11 @@
-import os
 import time
 from typing import BinaryIO
 
 import requests
 import requests_pkcs12
-from dotenv import load_dotenv
 
-from sicoob.config import SicoobConfig
+from sicoob._credenciais import validar_client_id
+from sicoob.config import Environment, EnvironmentConfig, SicoobConfig
 from sicoob.exceptions import AutenticacaoError
 from sicoob.logging_config import get_logger
 
@@ -21,32 +20,50 @@ class OAuth2Client:
         chave_privada: str | None = None,
         certificado_pfx: str | bytes | BinaryIO | None = None,
         senha_pfx: str | None = None,
+        config: EnvironmentConfig | None = None,
+        sandbox_token: str | None = None,
     ) -> None:
         """Inicializa o cliente OAuth2
 
+        Todas as credenciais são explícitas: o cliente não lê variáveis de
+        ambiente nem arquivos ``.env``.
+
         Args:
-            client_id: Client ID para autenticação OAuth2
+            client_id: Client ID para autenticação OAuth2 (obrigatório)
             certificado: Path para o certificado PEM (opcional)
             chave_privada: Path para a chave privada PEM (opcional)
             certificado_pfx: Path ou dados do certificado PFX (opcional)
             senha_pfx: Senha do certificado PFX (opcional)
-        """
-        load_dotenv()
+            config: Configuração do ambiente desta instância. Sem ela, usa
+                uma configuração nova de produção (nunca a global).
+            sandbox_token: Token fixo do sandbox do Sicoob (só no sandbox)
 
+        Raises:
+            ValueError: ``client_id`` ausente ou certificado exigido e não
+                informado.
+        """
         # Inicializa logger
         self.logger = get_logger(__name__)
 
-        self.client_id = client_id or os.getenv('SICOOB_CLIENT_ID')
-        self.certificado = certificado or os.getenv('SICOOB_CERTIFICADO')
-        self.chave_privada = chave_privada or os.getenv('SICOOB_CHAVE_PRIVADA')
-        self.certificado_pfx = certificado_pfx or os.getenv('SICOOB_CERTIFICADO_PFX')
-        self.senha_pfx = senha_pfx or os.getenv('SICOOB_SENHA_PFX')
+        self.client_id = validar_client_id(client_id)
+        self.certificado = certificado
+        self.chave_privada = chave_privada
+        self.certificado_pfx = certificado_pfx
+        self.senha_pfx = senha_pfx
+        self.sandbox_token = sandbox_token
+        # Sem config explícita, produção nova — nunca a configuração global,
+        # que outra parte do processo pode ter trocado para o sandbox.
+        self.config = (
+            config
+            if config is not None
+            else SicoobConfig.config_for(Environment.PRODUCTION)
+        )
 
-        self.token_url = SicoobConfig.get_auth_url()  # URL de autenticação OAuth2
+        self.token_url = self.config.auth_url  # URL de autenticação OAuth2
         self.token_cache = {}  # Cache de tokens por escopo
         self.session = requests.Session()
 
-        if SicoobConfig.requires_certificate():
+        if self.config.require_certificate:
             if self.certificado_pfx and self.senha_pfx:
                 # Configura autenticação com PFX
                 pkcs12_adapter = requests_pkcs12.Pkcs12Adapter(

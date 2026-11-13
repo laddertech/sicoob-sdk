@@ -1,5 +1,12 @@
 # Sistema de Configuração por Ambiente - Sicoob SDK
 
+> **A partir da 0.3.0** a configuração é por instância e o SDK não lê
+> variáveis de ambiente (`SICOOB_ENVIRONMENT`, `SICOOB_BASE_URL`,
+> `SICOOB_VERIFY_SSL`, credenciais...). Passe tudo ao construtor ou use
+> `Sicoob.from_env()` explicitamente. Trechos abaixo que descrevem
+> sobrescrita por variável de ambiente ou `set_environment` afetando os
+> clientes referem-se às versões anteriores. Veja `docs/changelog.rst`.
+
 O Sicoob SDK agora possui um sistema robusto de configuração por ambiente que substitui o sistema anterior baseado apenas em `sandbox_mode`.
 
 ## 🎯 Visão Geral

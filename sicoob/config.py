@@ -1,11 +1,14 @@
-"""Sistema de configuração flexível por ambiente para o Sicoob SDK"""
+"""Sistema de configuração por ambiente para o Sicoob SDK
 
-import os
-from dataclasses import dataclass, field
+A configuração **não lê variáveis de ambiente**: cada cliente recebe o seu
+``EnvironmentConfig`` (``SicoobConfig.config_for``), sem estado compartilhado
+entre instâncias. Para montar um cliente a partir de variáveis de ambiente,
+use explicitamente ``Sicoob.from_env()``.
+"""
+
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Optional
-
-from dotenv import load_dotenv
 
 
 class Environment(Enum):
@@ -16,6 +19,35 @@ class Environment(Enum):
     STAGING = 'staging'
     PRODUCTION = 'production'
     SANDBOX = 'sandbox'
+
+    @classmethod
+    def parse(cls, value: 'Environment | str') -> 'Environment':
+        """Converte um apelido textual no ambiente correspondente.
+
+        Raises:
+            ValueError: ambiente desconhecido. Não há fallback para produção:
+                um erro de digitação não pode mudar o destino das chamadas.
+        """
+        if isinstance(value, Environment):
+            return value
+        aliases = {
+            'dev': cls.DEVELOPMENT,
+            'development': cls.DEVELOPMENT,
+            'test': cls.TEST,
+            'testing': cls.TEST,
+            'stage': cls.STAGING,
+            'staging': cls.STAGING,
+            'prod': cls.PRODUCTION,
+            'production': cls.PRODUCTION,
+            'sandbox': cls.SANDBOX,
+        }
+        try:
+            return aliases[str(value).strip().lower()]
+        except KeyError:
+            raise ValueError(
+                f'Ambiente desconhecido: {value!r}. Use um de: '
+                + ', '.join(sorted(aliases))
+            ) from None
 
 
 @dataclass
@@ -58,6 +90,15 @@ class EnvironmentConfig:
 
     # Headers customizados por ambiente
     custom_headers: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def is_sandbox(self) -> bool:
+        """Ambientes que falam com o sandbox do Sicoob."""
+        return self.environment in (
+            Environment.DEVELOPMENT,
+            Environment.TEST,
+            Environment.SANDBOX,
+        )
 
 
 class SicoobConfig:
@@ -138,93 +179,27 @@ class SicoobConfig:
         return cls._instance
 
     def __init__(self) -> None:
-        """Inicializa a configuração"""
+        """Inicializa a configuração global (padrão: produção)."""
         if hasattr(self, '_initialized'):
             return
-
-        load_dotenv()
         self._initialized = True
-
-        # Detecta ambiente atual
-        env_name = os.getenv('SICOOB_ENVIRONMENT', 'production').lower()
-
-        # Mapeia nomes comuns para environments
-        env_mapping = {
-            'dev': Environment.DEVELOPMENT,
-            'development': Environment.DEVELOPMENT,
-            'test': Environment.TEST,
-            'testing': Environment.TEST,
-            'stage': Environment.STAGING,
-            'staging': Environment.STAGING,
-            'prod': Environment.PRODUCTION,
-            'production': Environment.PRODUCTION,
-            'sandbox': Environment.SANDBOX,
-        }
-
-        try:
-            current_env = env_mapping[env_name]
-        except KeyError:
-            current_env = Environment.PRODUCTION
-
-        # Carrega configuração padrão para o ambiente
-        self._current_config = self._load_config_for_environment(current_env)
+        self._current_config = self._load_config_for_environment(Environment.PRODUCTION)
 
     def _load_config_for_environment(
         self, environment: Environment
     ) -> EnvironmentConfig:
-        """Carrega configuração para um ambiente específico"""
-        base_config = self._DEFAULT_CONFIGS[environment]
+        """Cópia da configuração padrão do ambiente (sem ler o ambiente do SO)."""
+        return self.config_for(environment)
 
-        # Sobrescreve com variáveis de ambiente se disponíveis
-        overrides = {}
+    @classmethod
+    def config_for(cls, environment: 'Environment | str') -> EnvironmentConfig:
+        """Configuração nova e independente para um ambiente.
 
-        if os.getenv('SICOOB_BASE_URL'):
-            overrides['base_url'] = os.getenv('SICOOB_BASE_URL')
-
-        if os.getenv('SICOOB_AUTH_URL'):
-            overrides['auth_url'] = os.getenv('SICOOB_AUTH_URL')
-
-        if os.getenv('SICOOB_TIMEOUT'):
-            try:
-                overrides['timeout'] = int(os.getenv('SICOOB_TIMEOUT'))
-            except ValueError:
-                pass
-
-        if os.getenv('SICOOB_MAX_RETRIES'):
-            try:
-                overrides['max_retries'] = int(os.getenv('SICOOB_MAX_RETRIES'))
-            except ValueError:
-                pass
-
-        if os.getenv('SICOOB_LOG_LEVEL'):
-            overrides['log_level'] = os.getenv('SICOOB_LOG_LEVEL')
-
-        if os.getenv('SICOOB_LOG_FORMAT'):
-            overrides['log_format'] = os.getenv('SICOOB_LOG_FORMAT')
-
-        if os.getenv('SICOOB_LOG_REQUESTS'):
-            overrides['log_requests'] = (
-                os.getenv('SICOOB_LOG_REQUESTS').lower() == 'true'
-            )
-
-        if os.getenv('SICOOB_LOG_RESPONSES'):
-            overrides['log_responses'] = (
-                os.getenv('SICOOB_LOG_RESPONSES').lower() == 'true'
-            )
-
-        if os.getenv('SICOOB_DEBUG_MODE'):
-            overrides['debug_mode'] = os.getenv('SICOOB_DEBUG_MODE').lower() == 'true'
-
-        if os.getenv('SICOOB_VERIFY_SSL'):
-            overrides['verify_ssl'] = os.getenv('SICOOB_VERIFY_SSL').lower() == 'true'
-
-        # Cria nova instância com overrides
-        if overrides:
-            from dataclasses import replace
-
-            return replace(base_config, **overrides)
-
-        return base_config
+        Usada pelos clientes para terem configuração própria: alterá-la não
+        afeta outras instâncias nem a configuração global.
+        """
+        base = cls._DEFAULT_CONFIGS[Environment.parse(environment)]
+        return replace(base, custom_headers=dict(base.custom_headers))
 
     @classmethod
     def get_current_config(cls) -> EnvironmentConfig:
@@ -246,12 +221,7 @@ class SicoobConfig:
     @classmethod
     def is_sandbox(cls) -> bool:
         """Verifica se está em modo sandbox"""
-        config = cls.get_current_config()
-        return config.environment in [
-            Environment.DEVELOPMENT,
-            Environment.TEST,
-            Environment.SANDBOX,
-        ]
+        return cls.get_current_config().is_sandbox
 
     @classmethod
     def requires_certificate(cls) -> bool:

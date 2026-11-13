@@ -12,12 +12,29 @@ pip install -e .
 
 ## Configuração
 
-Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
+As credenciais e o ambiente são **sempre explícitos e próprios de cada
+cliente**. Desde a 0.3.0 o SDK não lê variáveis de ambiente nem `.env` por
+conta própria e não usa configuração global: aplicações que atendem várias
+contas no mesmo processo nunca correm o risco de uma conta autenticar com a
+credencial de outra, nem de um cliente sandbox mudar o ambiente dos demais.
 
-```ini
-SICOOB_CLIENT_ID=seu_client_id
-SICOOB_CERTIFICADO=caminho/para/certificado.pem
-SICOOB_CHAVE_PRIVADA=caminho/para/chave_privada.key
+| Parâmetro | Obrigatório | Observação |
+|---|---|---|
+| `client_id` | sim | vazio ou ausente é `ValueError` |
+| `certificado` + `chave_privada` (PEM) ou `certificado_pfx` + `senha_pfx` | em produção/staging | PFX aceita caminho, bytes ou arquivo aberto |
+| `environment` | não | `production` (padrão), `sandbox`, `staging`, `development`, `test`; valor desconhecido é `ValueError` |
+| `sandbox_token` | só no sandbox | token fixo do portal de desenvolvedores do Sicoob |
+
+Para scripts e testes de integração, a leitura do ambiente é opt-in:
+
+```python
+from sicoob import Sicoob
+
+# Lê SICOOB_CLIENT_ID, SICOOB_CERTIFICADO, SICOOB_CHAVE_PRIVADA,
+# SICOOB_CERTIFICADO_PFX, SICOOB_SENHA_PFX, SICOOB_ENVIRONMENT e
+# SICOOB_SANDBOX_TOKEN (carrega o .env antes, a menos que dotenv=False).
+cliente = Sicoob.from_env()
+cliente = Sicoob.from_env(environment='sandbox')  # argumentos prevalecem
 ```
 
 ## Uso Básico
@@ -25,21 +42,26 @@ SICOOB_CHAVE_PRIVADA=caminho/para/chave_privada.key
 ```python
 from sicoob import Sicoob
 
-# Inicializa o cliente (usando certificado PEM)
-# É obrigatório fornecer ou certificado+chave ou PFX+senha em ambiente de produção, mas opcional em ambiente de testes
+# Produção com certificado PEM
 cliente = Sicoob(
-    client_id="seu_client_id",  # Obrigatório
-    certificado="caminho/para/certificado.pem",  # Obrigatório se não usar PFX [E em produção]
-    chave_privada="caminho/para/chave_privada.key",  # Obrigatório se não usar PFX [E em produção]
-    sandbox_mode=False  # Opcional, default False
+    client_id="seu_client_id",
+    certificado="caminho/para/certificado.pem",
+    chave_privada="caminho/para/chave_privada.key",
+    environment="production",
 )
 
-# Alternativa usando certificado PFX
+# Produção com certificado PFX (caminho, bytes ou arquivo aberto)
 cliente_pfx = Sicoob(
-    client_id="seu_client_id",  # Obrigatório
-    certificado_pfx="caminho/para/certificado.pfx",  # Obrigatório (pode ser path, bytes ou arquivo aberto) [E em produção]
-    senha_pfx="senha_do_pfx",  # Obrigatório se usar PFX [E em produção]
-    sandbox_mode=True  # Opcional para ambiente de testes
+    client_id="seu_client_id",
+    certificado_pfx="caminho/para/certificado.pfx",
+    senha_pfx="senha_do_pfx",
+)
+
+# Sandbox (não exige certificado)
+cliente_sandbox = Sicoob(
+    client_id="client_id_do_sandbox",
+    environment="sandbox",
+    sandbox_token="token_do_sandbox",
 )
 
 # Exemplo: consulta de extratos

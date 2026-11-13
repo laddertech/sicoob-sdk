@@ -8,6 +8,36 @@ O formato é baseado em `Keep a Changelog`_ e este projeto segue `Semantic Versi
 .. _Keep a Changelog: https://keepachangelog.com/pt-BR/1.0.0/
 .. _Semantic Versioning: https://semver.org/lang/pt-BR/
 
+[0.3.0] - 2026-11-13
+--------------------
+
+Segurança (mudanças incompatíveis)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* ``Sicoob``, ``AsyncSicoob`` e ``OAuth2Client`` não leem mais variáveis de
+  ambiente nem ``.env``: ``client_id`` vazio ou certificado ausente deixam de
+  cair silenciosamente nas credenciais ``SICOOB_*`` do processo — em
+  aplicações multi-conta, isso podia autenticar uma conta com a credencial de
+  outra. A leitura do ambiente agora é explícita: ``Sicoob.from_env()`` /
+  ``AsyncSicoob.from_env()``.
+* Ambiente por instância: cada cliente tem o seu ``EnvironmentConfig``
+  (``SicoobConfig.config_for``). Criar um cliente não chama mais
+  ``SicoobConfig.set_environment``, então um cliente sandbox não muda o
+  ambiente dos demais.
+* Ambiente desconhecido levanta ``ValueError`` em vez de virar produção.
+* ``SicoobConfig`` não lê ``SICOOB_ENVIRONMENT``, ``SICOOB_BASE_URL``,
+  ``SICOOB_AUTH_URL``, ``SICOOB_VERIFY_SSL`` etc.: uma variável de ambiente
+  não pode mais redirecionar as chamadas nem desligar a verificação TLS.
+* Token do sandbox informado por ``sandbox_token`` (antes lido de
+  ``SICOOB_SANDBOX_TOKEN``); o ``client_id`` do sandbox é o do cliente.
+* Criar um cliente não força mais a reconfiguração do logging do processo.
+
+Migração
+~~~~~~~~
+* Quem passava credenciais ao construtor (caso do ERP) não precisa mudar nada.
+* Quem dependia de variáveis de ambiente: troque ``Sicoob()`` por
+  ``Sicoob.from_env()``.
+* No sandbox, passe ``sandbox_token=...``.
+
 [Unreleased]
 ------------
 

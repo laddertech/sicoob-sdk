@@ -128,12 +128,10 @@ class TestAsyncAPIClient:
 
     def test_get_base_url_sandbox(self, mock_oauth_client):
         """Testa URL base em modo sandbox"""
-        with patch.object(
-            SicoobConfig, 'get_base_url', return_value='https://sandbox.sicoob.com.br'
-        ):
-            client = AsyncAPIClient(oauth_client=mock_oauth_client)
-            url = client._get_base_url()
-            assert 'sandbox.sicoob.com.br' in url
+        mock_oauth_client.config = SicoobConfig.config_for('sandbox')
+        client = AsyncAPIClient(oauth_client=mock_oauth_client)
+        url = client._get_base_url()
+        assert 'sandbox.sicoob.com.br' in url
 
     def test_get_base_url_production(self, mock_oauth_client):
         """Testa URL base em modo produção"""
@@ -239,7 +237,10 @@ class TestAsyncSicoob:
         """Testa inicialização com client_id"""
         with patch.dict('os.environ', {'SICOOB_CLIENT_ID': 'test_client'}):
             with patch('sicoob.async_client.OAuth2Client') as mock_oauth:
-                client = AsyncSicoob()
+                # O construtor não lê o ambiente; from_env lê explicitamente.
+                with pytest.raises(ValueError, match='client_id'):
+                    AsyncSicoob()
+                client = AsyncSicoob.from_env(dotenv=False)
                 assert client.client_id == 'test_client'
                 mock_oauth.assert_called_once()
 
@@ -275,8 +276,9 @@ class TestAsyncSicoob:
     @pytest.mark.asyncio
     async def test_context_manager(self):
         """Testa context manager do AsyncSicoob"""
-        with patch('sicoob.async_client.OAuth2Client'):
-            async with AsyncSicoob(client_id='test') as client:
+        with patch('sicoob.async_client.OAuth2Client') as mock_oauth:
+            mock_oauth.return_value.config = SicoobConfig.config_for('sandbox')
+            async with AsyncSicoob(client_id='test', environment='sandbox') as client:
                 assert client is not None
 
     def test_conta_corrente_property(self):

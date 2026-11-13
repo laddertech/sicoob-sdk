@@ -36,8 +36,9 @@ from typing import Any
 
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
 
+from sicoob._credenciais import ler_env, validar_client_id
 from sicoob.auth import OAuth2Client
-from sicoob.config import Environment, SicoobConfig
+from sicoob.config import Environment, EnvironmentConfig, SicoobConfig
 from sicoob.exceptions import CircuitBreakerOpenError, SicoobError
 
 # Logger para debugging
@@ -347,7 +348,7 @@ class AsyncAPIClient:
         if self._session is None:
             # Configuração SSL
             ssl_context = ssl.create_default_context()
-            config = SicoobConfig.get_current_config()
+            config = self.config
 
             if not config.verify_ssl:
                 ssl_context.check_hostname = False
@@ -402,20 +403,35 @@ class AsyncAPIClient:
                 connector=connector, timeout=timeout, raise_for_status=False
             )
 
+    @property
+    def config(self) -> EnvironmentConfig:
+        """Configuração do ambiente desta instância (vinda do OAuth2Client)."""
+        config = getattr(self.oauth_client, 'config', None)
+        if isinstance(config, EnvironmentConfig):
+            return config
+        return SicoobConfig.get_current_config()
+
     def _get_base_url(self) -> str:
         """Retorna a URL base conforme configuração do ambiente."""
-        return SicoobConfig.get_base_url()
+        return self.config.base_url
 
     def _get_headers(self, scope: str) -> dict[str, str]:
         """Retorna headers padrão com token de acesso."""
-        token = self.oauth_client.get_access_token(scope)
-
-        return {
-            'Authorization': f'Bearer {token}',
+        headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'User-Agent': 'Sicoob-SDK-Python/0.1.21',
         }
+        if self.config.is_sandbox:
+            # Sandbox do Sicoob: token fixo informado no cliente + client_id.
+            token = getattr(self.oauth_client, 'sandbox_token', None)
+            if not isinstance(token, str) or not token:
+                token = 'sandbox-token'
+            headers['client_id'] = self.oauth_client.client_id
+        else:
+            token = self.oauth_client.get_access_token(scope)
+        headers['Authorization'] = f'Bearer {token}'
+        return headers
 
     def _validate_response_data(self, data: Any, status: int) -> dict[str, Any]:
         """Valida se os dados da resposta são JSON válidos."""
@@ -537,8 +553,10 @@ class AsyncAPIClient:
             # Controle de concorrência
             async with self._semaphore:
                 try:
-                    # Log ANTES da requisição (apenas em DEBUG)
-                    if logger.isEnabledFor(logging.DEBUG):
+                    # Log ANTES da requisição — só se a config desta instância
+                    # permitir: o nível DEBUG do logger é global e pode ter
+                    # sido ligado por um cliente de sandbox.
+                    if self.config.log_requests and logger.isEnabledFor(logging.DEBUG):
                         logger.debug(
                             f'Requisição HTTP: {method} {url}',
                             extra={
@@ -559,8 +577,11 @@ class AsyncAPIClient:
                         # Lê o corpo da resposta
                         response_text = await response.text()
 
-                        # Log APÓS resposta
-                        if logger.isEnabledFor(logging.DEBUG):
+                        # Log APÓS resposta (prévia do corpo e headers): mesma
+                        # regra, pela config da instância.
+                        if self.config.log_responses and logger.isEnabledFor(
+                            logging.DEBUG
+                        ):
                             # Extrai headers de forma segura (pode falhar em mocks)
                             try:
                                 resp_headers = dict(response.headers)
@@ -715,10 +736,11 @@ class AsyncSicoob:
         chave_privada: str | None = None,
         certificado_pfx: str | bytes | None = None,
         senha_pfx: str | None = None,
-        environment: str | Environment | None = None,
+        environment: str | Environment = Environment.PRODUCTION,
         max_concurrent_requests: int = 10,
         request_timeout: int = 30,
         retry_config: dict[str, Any] | None = None,
+        sandbox_token: str | None = None,
     ) -> None:
         """Inicializa o cliente assíncrono.
 
@@ -728,7 +750,8 @@ class AsyncSicoob:
             chave_privada: Path para a chave privada PEM (opcional)
             certificado_pfx: Path ou bytes do certificado PFX (opcional)
             senha_pfx: Senha do certificado PFX (opcional)
-            environment: Ambiente (development, test, staging, production, sandbox)
+            environment: Ambiente (development, test, staging, production,
+                sandbox). Padrão: production. Valor desconhecido é erro.
             max_concurrent_requests: Limite de requisições concorrentes
             request_timeout: Timeout padrão para requisições
             retry_config: Configuração de retry automático (opcional)
@@ -738,38 +761,20 @@ class AsyncSicoob:
                     'backoff_exponencial': True,
                     'codigos_retry': [500, 502, 503, 504, 429],
                 }
+            sandbox_token: Token fixo do sandbox do Sicoob (só no sandbox)
+
+        Raises:
+            ValueError: ``client_id`` ausente ou ambiente desconhecido.
         """
-        import os
-
-        from dotenv import load_dotenv
-
-        load_dotenv()
-
-        self.client_id = client_id or os.getenv('SICOOB_CLIENT_ID')
-        self.certificado = certificado or os.getenv('SICOOB_CERTIFICADO')
-        self.chave_privada = chave_privada or os.getenv('SICOOB_CHAVE_PRIVADA')
-        self.certificado_pfx = certificado_pfx or os.getenv('SICOOB_CERTIFICADO_PFX')
-        self.senha_pfx = senha_pfx or os.getenv('SICOOB_SENHA_PFX')
-        # Configura ambiente se fornecido
-        if environment is not None:
-            if isinstance(environment, str):
-                env_mapping = {
-                    'dev': Environment.DEVELOPMENT,
-                    'development': Environment.DEVELOPMENT,
-                    'test': Environment.TEST,
-                    'sandbox': Environment.SANDBOX,
-                    'staging': Environment.STAGING,
-                    'prod': Environment.PRODUCTION,
-                    'production': Environment.PRODUCTION,
-                }
-                env = env_mapping.get(environment.lower(), Environment.PRODUCTION)
-            else:
-                env = environment
-            SicoobConfig.set_environment(env)
-
-        # Valida credenciais mínimas
-        if not self.client_id:
-            raise ValueError('client_id é obrigatório')
+        # Credenciais e ambiente explícitos e próprios da instância: nada é
+        # lido do ambiente do processo (use AsyncSicoob.from_env para isso).
+        self.config = SicoobConfig.config_for(environment)
+        self.environment = self.config.environment
+        self.client_id = validar_client_id(client_id)
+        self.certificado = certificado
+        self.chave_privada = chave_privada
+        self.certificado_pfx = certificado_pfx
+        self.senha_pfx = senha_pfx
 
         # Inicializa cliente OAuth2 (síncrono para compatibilidade)
         self.oauth_client = OAuth2Client(
@@ -778,6 +783,8 @@ class AsyncSicoob:
             chave_privada=self.chave_privada,
             certificado_pfx=self.certificado_pfx,
             senha_pfx=self.senha_pfx,
+            config=self.config,
+            sandbox_token=sandbox_token,
         )
 
         # Inicializa cliente assíncrono
@@ -789,6 +796,14 @@ class AsyncSicoob:
         )
 
         # self.logger = get_logger(__name__)  # Temporariamente comentado
+
+    @classmethod
+    def from_env(cls, dotenv: bool = True, **overrides) -> 'AsyncSicoob':
+        """Cria o cliente a partir das variáveis de ambiente ``SICOOB_*``.
+
+        Mesmas variáveis e regras de :meth:`sicoob.Sicoob.from_env`.
+        """
+        return cls(**{**ler_env(dotenv), **overrides})
 
     async def __aenter__(self) -> 'AsyncAPIClient':
         """Entrada do context manager."""

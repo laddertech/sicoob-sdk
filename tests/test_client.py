@@ -50,9 +50,73 @@ def test_client_init_pfx() -> None:
 
 def test_client_init_invalid() -> None:
     """Testa a inicialização com parâmetros inválidos"""
-    with patch.dict('os.environ', {}, clear=True):  # Limpa variáveis de ambiente
-        with pytest.raises(ValueError):
-            Sicoob(client_id='test_id')  # Sem certificado
+    with pytest.raises(ValueError):
+        Sicoob(client_id='test_id')  # Sem certificado
+
+
+CERT_ENV = {
+    'SICOOB_CLIENT_ID': 'client-do-ambiente',
+    'SICOOB_CERTIFICADO_PFX': 'outro.pfx',
+    'SICOOB_SENHA_PFX': 'senha-do-ambiente',
+    'SICOOB_ENVIRONMENT': 'sandbox',
+}
+
+
+@pytest.mark.parametrize('client_id', [None, '', '   ', 123])
+def test_client_id_ausente_nao_usa_ambiente(client_id) -> None:
+    """client_id vazio é erro: nunca cai na credencial do ambiente"""
+    with patch.dict('os.environ', CERT_ENV):
+        with pytest.raises(ValueError, match='client_id'):
+            Sicoob(
+                client_id=client_id,
+                certificado_pfx=b'pfx',
+                senha_pfx='s',
+                environment='production',
+            )
+
+
+def test_certificado_ausente_nao_usa_ambiente() -> None:
+    """Sem certificado explícito em produção é erro, mesmo com env definida"""
+    with patch.dict('os.environ', CERT_ENV):
+        with pytest.raises(ValueError, match='certificado'):
+            Sicoob(client_id='id', environment='production')
+
+
+def test_ambiente_desconhecido_e_erro() -> None:
+    with pytest.raises(ValueError, match='Ambiente desconhecido'):
+        Sicoob(client_id='id', environment='producao')
+
+
+@patch('sicoob.auth.oauth.requests_pkcs12.Pkcs12Adapter')
+def test_instancias_tem_ambientes_independentes(_adapter) -> None:
+    """Criar um cliente sandbox não muda o ambiente de outro, nem o global"""
+    from sicoob.config import Environment, SicoobConfig
+
+    prod = Sicoob(client_id='a', certificado_pfx=b'x', senha_pfx='s')
+    sandbox = Sicoob(client_id='b', environment='sandbox', sandbox_token='t')
+    assert prod.config.environment is Environment.PRODUCTION
+    assert prod.oauth_client.config.base_url == 'https://api.sicoob.com.br'
+    assert sandbox.oauth_client.config.is_sandbox
+    assert sandbox.oauth_client.sandbox_token == 't'
+    assert SicoobConfig.get_current_config().environment is Environment.PRODUCTION
+    assert prod.cobranca.boleto._get_base_url() == 'https://api.sicoob.com.br'
+    assert sandbox.cobranca.boleto._get_base_url().startswith(
+        'https://sandbox.sicoob.com.br'
+    )
+
+
+def test_from_env_le_variaveis_explicitamente() -> None:
+    with patch.dict('os.environ', {**CERT_ENV, 'SICOOB_SANDBOX_TOKEN': 'tk'}):
+        client = Sicoob.from_env(dotenv=False)
+    assert client.client_id == 'client-do-ambiente'
+    assert client.config.is_sandbox
+    assert client.oauth_client.sandbox_token == 'tk'
+
+
+def test_from_env_overrides_prevalecem() -> None:
+    with patch.dict('os.environ', CERT_ENV):
+        client = Sicoob.from_env(dotenv=False, client_id='explicito')
+    assert client.client_id == 'explicito'
 
 
 def test_get_token(sicoob_client: Sicoob, mock_oauth_client: Mock) -> None:

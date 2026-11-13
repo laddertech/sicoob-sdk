@@ -6,7 +6,7 @@ from typing import Any
 import requests
 
 from sicoob.auth import OAuth2Client
-from sicoob.config import SicoobConfig
+from sicoob.config import EnvironmentConfig, SicoobConfig
 from sicoob.exceptions import RespostaInvalidaError
 from sicoob.logging_config import SicoobLogger, get_logger
 from sicoob.resilience import RetryConfig, create_resilient_session
@@ -83,9 +83,21 @@ class APIClientBase:
         else:
             self.session = session
 
+    @property
+    def config(self) -> EnvironmentConfig:
+        """Configuração do ambiente desta instância (vinda do OAuth2Client).
+
+        Cai na configuração global só quando o cliente OAuth não traz uma
+        (ex.: dublês de teste), preservando a compatibilidade.
+        """
+        config = getattr(self.oauth_client, 'config', None)
+        if isinstance(config, EnvironmentConfig):
+            return config
+        return SicoobConfig.get_current_config()
+
     def _get_base_url(self) -> str:
         """Retorna a URL base conforme configuração do ambiente"""
-        return SicoobConfig.get_base_url()
+        return self.config.base_url
 
     def _get_timeout_for_operation(self, operation: str = 'default') -> tuple[int, int]:
         """Obtém timeout específico para tipo de operação
@@ -96,7 +108,7 @@ class APIClientBase:
         Returns:
             Tupla (connect_timeout, read_timeout) em segundos
         """
-        config = SicoobConfig.get_current_config()
+        config = self.config
 
         # Timeouts específicos por operação
         timeout_map = {
@@ -110,17 +122,14 @@ class APIClientBase:
 
     def _get_headers(self, scope: str) -> dict[str, str]:
         """Retorna headers padrão com token de acesso"""
-        config = SicoobConfig.get_current_config()
+        config = self.config
 
-        if SicoobConfig.is_sandbox():
-            import os
-
-            from dotenv import load_dotenv
-
-            load_dotenv()
-
-            token = os.getenv('SICOOB_SANDBOX_TOKEN', 'sandbox-token')
-            client_id = os.getenv('SICOOB_SANDBOX_CLIENT_ID', 'sandbox-client-id')
+        if config.is_sandbox:
+            # Sandbox do Sicoob: token fixo do portal, informado no cliente.
+            token = getattr(self.oauth_client, 'sandbox_token', None)
+            if not isinstance(token, str) or not token:
+                token = 'sandbox-token'
+            client_id = self.oauth_client.client_id
         else:
             token = self.oauth_client.get_access_token(scope)
             client_id = self.oauth_client.client_id
@@ -136,7 +145,7 @@ class APIClientBase:
         }
 
         # Adiciona headers customizados do ambiente
-        custom_headers = SicoobConfig.get_custom_headers()
+        custom_headers = dict(config.custom_headers)
         if custom_headers:
             base_headers.update(custom_headers)
 
@@ -200,19 +209,22 @@ class APIClientBase:
         kwargs['headers'] = headers
 
         # Configurações de timeout e SSL baseadas no ambiente
-        config = SicoobConfig.get_current_config()
+        config = self.config
         if 'timeout' not in kwargs:
             kwargs['timeout'] = self._get_timeout_for_operation(operation)
         if 'verify' not in kwargs:
             kwargs['verify'] = config.verify_ssl
 
-        # Log da requisição
+        # Log da requisição: só se a configuração desta instância permitir
+        # (o logger global pode ter sido ligado por outra instância ou pelo
+        # ambiente do processo; produção não loga headers/corpos por padrão).
         SicoobLogger.log_http_request(
             method=method,
             url=url,
             headers=headers,
             body=kwargs.get('json') or kwargs.get('data'),
             request_id=request_id,
+            enabled=config.log_requests,
         )
 
         # Executa a requisição com timing
@@ -221,7 +233,7 @@ class APIClientBase:
             response = self.session.request(method, url, **kwargs)
             duration_ms = (time.time() - start_time) * 1000
 
-            # Log da resposta
+            # Log da resposta (mesma regra da requisição)
             SicoobLogger.log_http_response(
                 status_code=response.status_code,
                 url=url,
@@ -232,6 +244,7 @@ class APIClientBase:
                 )
                 else None,
                 request_id=request_id,
+                enabled=config.log_responses,
             )
 
             return response

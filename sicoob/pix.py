@@ -35,7 +35,6 @@ import requests
 from pypix_api.banks.sicoob import SicoobPixAPI
 
 from sicoob.api_client import APIClientBase
-from sicoob.config import SicoobConfig
 from sicoob.exceptions import (
     CobrancaPixNaoEncontradaError,
     PixError,
@@ -78,13 +77,13 @@ class PixAPI(APIClientBase):
             session: Sessão HTTP (mantida por compatibilidade)
 
         Note:
-            O ambiente é controlado via SicoobConfig.
+            O ambiente vem da configuração da instância (``self.config``).
         """
         super().__init__(oauth_client, session)
 
         # Inicializa a implementação PIX customizada do Sicoob
         self._pix_api = SicoobPixAPICustom(
-            oauth=oauth_client, sandbox_mode=SicoobConfig.is_sandbox()
+            oauth=oauth_client, sandbox_mode=self.config.is_sandbox
         )
 
     def __getattr__(self, name: str) -> Any:
@@ -449,6 +448,26 @@ class SicoobPixAPICustom(SicoobPixAPI):
 
     Adiciona tratamento de erros específicos do domínio Sicoob.
     """
+
+    def _create_headers(self) -> dict[str, str]:
+        """Headers da requisição, com o token do sandbox vindo do cliente.
+
+        A pypix-api, no sandbox, lê ``SANDBOX_TOKEN`` do ambiente do processo
+        (com ``load_dotenv``) — um token global compartilhado por todas as
+        instâncias. Aqui o token é o ``sandbox_token`` informado ao cliente
+        Sicoob desta instância.
+        """
+        if not self.sandbox_mode:
+            return super()._create_headers()
+        token = getattr(self.oauth, 'sandbox_token', None)
+        if not isinstance(token, str) or not token:
+            token = 'sandbox-token'
+        return {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+            'User-Agent': 'PyPixAPIClient/0.1',
+            'client_id': self.client_id or '',
+        }
 
     def _handle_error_response(
         self, response: requests.Response, **kwargs: Any

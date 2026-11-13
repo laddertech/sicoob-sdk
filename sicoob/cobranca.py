@@ -8,7 +8,6 @@ if TYPE_CHECKING:
     from sicoob.auth import OAuth2Client
 
 from sicoob.boleto import BoletoAPI
-from sicoob.config import SicoobConfig
 from sicoob.pix import PixAPI
 
 
@@ -34,7 +33,7 @@ class CobrancaAPI:
         self.pix = PixAPI(oauth_client, session)
 
     def __repr__(self):
-        return f'<CobrancaAPI environment={SicoobConfig.get_current_config().environment.value}>'
+        return f'<CobrancaAPI environment={self.pix.config.environment.value}>'
 
 
 __all__ = ['BoletoAPI', 'CobrancaAPI', 'PixAPI']
